@@ -140,9 +140,15 @@ export function showActiveWorkspacePanels() {
   } else if (currentWorkspace === WORKSPACES.PUBLISH) {
     const p = document.getElementById('panel-publish');
     if (p) p.classList.add('active');
+    if (typeof window.renderPublishTab === 'function') {
+      window.renderPublishTab();
+    }
   } else if (currentWorkspace === WORKSPACES.MEASURE) {
     const p = document.getElementById('panel-analytics');
     if (p) p.classList.add('active');
+    if (typeof window.renderAnalyticsDashboardGlobal === 'function') {
+      window.renderAnalyticsDashboardGlobal();
+    }
   }
 }
 

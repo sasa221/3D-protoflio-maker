@@ -24,7 +24,8 @@ import {
   createPortfolio, getAllPortfolios,
   getAnalytics, saveDraft, getCurrentDraft, incrementStat,
   encodePortfolioToURL, savePortfolioDebounced,
-  loadUserPortfoliosFromSupabase, fetchUserProfileAndEntitlements
+  loadUserPortfoliosFromSupabase, fetchUserProfileAndEntitlements,
+  publishPortfolio
 } from './services/DBService.js';
 import { runSupabaseCutoverTestSuite } from './tests/SupabaseCutoverTestSuite.js';
 import { uploadAvatar, uploadResume, uploadProjectMedia, getResumeAccessUrl, deleteAsset } from './services/AssetStorageService.js';
@@ -1033,6 +1034,7 @@ function renderAll() {
   renderSkills();
   renderProjects();
   renderCerts();
+  renderPublishTab();
   updateHUD();
 }
 
@@ -1447,91 +1449,173 @@ window.setIntroMode = function(mode) {
 };
 
 // ─── PUBLISH TAB RENDERER ─────────────────────
-function renderPublishTab() {
+export function renderPublishTab() {
   const el = document.getElementById('publish-panel-content');
   if (!el) return;
+
+  const slug = portfolioData.slug || (portfolioData.name ? portfolioData.name.toLowerCase().replace(/[^a-z0-9]/g, '-') : 'portfolio');
+  const publicUrl = `${window.location.origin}/u/${slug}`;
+  const isPublished = Boolean(portfolioData.publishedAt || portfolioData.published_at);
   const pro = isPro();
 
-  if (!pro) {
-    // FREE TIER UI
-    el.innerHTML = `
-      <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:16px;padding:18px;margin-bottom:14px">
-        <div style="font-size:0.72rem;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px">🆓 الخطة المجانية</div>
-        <div style="font-size:0.8rem;color:rgba(255,255,255,0.55);line-height:1.6;margin-bottom:14px">
-          تنزيل ملف HTML كامل على جهازك رفعه يدويًا.<br/>
-          <span style="color:rgba(239,68,68,0.8);font-size:0.75rem">⚠️ يحتوي على العلامة المائية "Built with Ultra 3D Portfolio"</span>
-        </div>
-        <button class="btn btn-secondary" onclick="exportHTML()" style="width:100%;margin-bottom:8px">📦 تنزيل ملف HTML</button>
-        <button class="btn btn-share" onclick="copyShareableLink()" style="width:100%">🔗 نسخ رابط السريع</button>
+  el.innerHTML = `
+    <!-- PUBLISH STATUS & PRIMARY CONTROLS -->
+    <div style="background: ${isPublished ? 'rgba(16,185,129,0.06)' : 'rgba(245,158,11,0.06)'}; border: 1px solid ${isPublished ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'}; border-radius: 16px; padding: 18px; margin-bottom: 14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <span style="font-size:0.75rem;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${isPublished ? '#10b981' : '#f59e0b'}">
+          ${isPublished ? '🟢 Live & Published' : '🟡 Unpublished Draft'}
+        </span>
+        <span style="font-size:0.7rem;color:rgba(255,255,255,0.4)">
+          ${isPublished ? 'Synced with Supabase' : 'Saved Locally'}
+        </span>
       </div>
 
-      <!-- IRRESISTIBLE PRO PROMO CARD -->
-      <div style="background:linear-gradient(135deg,rgba(124,58,237,0.18),rgba(6,182,212,0.12));border:1px solid rgba(124,58,237,0.35);border-radius:18px;padding:22px;text-align:center;position:relative;overflow:hidden">
-        <div style="position:absolute;top:10px;right:10px;background:#ef4444;color:#fff;font-size:0.65rem;font-weight:900;padding:4px 10px;border-radius:20px;letter-spacing:1px;text-transform:uppercase">🔥 خصم 60% لفترة محدودة</div>
-        <div style="font-size:2.2rem;margin-bottom:6px;margin-top:10px">👑</div>
-        <div style="font-size:1.1rem;font-weight:900;margin-bottom:4px;background:linear-gradient(135deg,#7c3aed,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent">الترقية إلى خطة Pro المميزة</div>
-        
-        <div style="margin:10px 0 16px;display:flex;align-items:center;justify-content:center;gap:10px">
-          <span style="text-decoration:line-through;color:rgba(255,255,255,0.35);font-size:1rem;font-weight:700">500 ج.م</span>
-          <span style="font-size:1.6rem;font-weight:900;color:#10b981;font-family:'JetBrains Mono',monospace">200 ج.م</span>
-          <span style="font-size:0.75rem;color:rgba(255,255,255,0.4)">/ مدى الحياة</span>
-        </div>
+      <div style="font-size:0.8rem;color:rgba(255,255,255,0.7);line-height:1.5;margin-bottom:14px">
+        ${isPublished 
+          ? `Your 3D portfolio is live and accessible to employers & visitors worldwide.` 
+          : `Publish your portfolio to generate a public link and enable live 3D web visits.`}
+      </div>
 
-        <div style="display:flex;flex-direction:column;gap:8px;text-align:left;background:rgba(0,0,0,0.2);padding:14px;border-radius:12px;margin-bottom:16px;font-size:0.78rem">
-          <div style="color:#10b981;font-weight:700">🚀 رفع تلقائي أوتوماتيك بنقرة واحدة ورابط حي</div>
-          <div style="color:#10b981;font-weight:700">🚫 إزالة العلامة المائية باسم موقعك 100%</div>
-          <div style="color:#10b981;font-weight:700">🎨 إخفاء وتخصيص شارة الثيم حسب رغبتك</div>
-          <div style="color:#10b981;font-weight:700">💎 فتح جميع العوالم الـ 11 3D وبدون أي قيود</div>
-        </div>
+      <!-- PUBLIC URL DISPLAY -->
+      <div style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span id="public-url-text" style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:#06b6d4;word-break:break-all;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${publicUrl}</span>
+      </div>
 
-        <button class="btn btn-primary" onclick="handleUpgradeClick()" style="width:100%;padding:14px;font-size:0.95rem;font-weight:800">
-          💬 اشترك الآن بـ 200 ج.م عبر InstaPay
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+        <button id="btn-copy-public-url" class="btn btn-secondary" onclick="copyPublicPortfolioUrl()" style="font-size:0.78rem;padding:8px">
+          📋 Copy Public Link
         </button>
-      </div>`;
-  } else {
-    // PRO TIER UI WITH WATERMARK TOGGLE
-    const deployedSites = getDeployedSites();
-    el.innerHTML = `
+        <a id="link-open-public-portfolio" href="${publicUrl}" target="_blank" class="btn btn-secondary" style="font-size:0.78rem;padding:8px;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">
+          🌐 Open Live Site ↗
+        </a>
+      </div>
+
+      <!-- PRIMARY PUBLISH ACTION -->
+      <button id="btn-publish-portfolio" class="btn btn-primary" onclick="handlePublishPortfolio()" style="width:100%;padding:12px;font-size:0.88rem;font-weight:800;background:linear-gradient(135deg,#7c3aed,#06b6d4)">
+        ${isPublished ? '🚀 Publish Changes (Update Live Site)' : '🚀 Publish Portfolio Live'}
+      </button>
+    </div>
+
+    <!-- PUBLIC SLUG SETTINGS -->
+    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:16px;padding:16px;margin-bottom:14px">
+      <div style="font-size:0.75rem;font-weight:800;color:rgba(255,255,255,0.8);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
+        🔗 Public Slug / Username
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:rgba(255,255,255,0.4)">/u/</span>
+        <input id="f-publish-slug" class="field-input" value="${portfolioData.slug || ''}" placeholder="my-portfolio-slug" style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;padding:8px 12px;flex:1" onchange="updatePortfolioSlug(this.value)"/>
+      </div>
+    </div>
+
+    <!-- CUSTOM DOMAIN SECTION -->
+    <div id="custom-domain-slot"></div>
+
+    <!-- BACKUP & OFFLINE EXPORT ACTIONS -->
+    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:16px;padding:16px;margin-bottom:14px">
+      <div style="font-size:0.75rem;font-weight:800;color:rgba(255,255,255,0.8);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">
+        📦 Standalone Export & Backup
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-secondary" onclick="exportHTML()" style="width:100%;font-size:0.8rem">
+          📦 Download Standalone HTML (Zero Dependencies)
+        </button>
+        <button class="btn btn-secondary" onclick="copyShareableLink()" style="width:100%;font-size:0.8rem">
+          🔗 Copy Instant Encoded URL (Offline Share)
+        </button>
+        <button class="btn btn-secondary" onclick="saveToDB()" style="width:100%;font-size:0.8rem">
+          💾 Save Draft Snapshot
+        </button>
+      </div>
+    </div>
+
+    <!-- PRO BRANDING CONTROLS -->
+    ${pro ? `
       <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.25);border-radius:16px;padding:16px;margin-bottom:14px">
         <div style="font-size:0.75rem;font-weight:800;color:#10b981;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px">💎 Pro Branding Options</div>
-        
         <label style="display:flex;align-items:center;justify-content:space-between;font-size:0.8rem;color:rgba(255,255,255,0.8);cursor:pointer;margin-bottom:10px">
           <span>🚫 إزالة العلامة المائية (Watermark)</span>
           <input type="checkbox" id="chk-hide-watermark" ${portfolioData.hideWatermark ? 'checked' : ''} onchange="toggleProBranding('hideWatermark', this.checked)"/>
         </label>
-        
         <label style="display:flex;align-items:center;justify-content:space-between;font-size:0.8rem;color:rgba(255,255,255,0.8);cursor:pointer">
           <span>🎨 إخفاء شارة الثيم الـ 3D (Theme Badge)</span>
           <input type="checkbox" id="chk-hide-theme" ${portfolioData.hideThemeBadge ? 'checked' : ''} onchange="toggleProBranding('hideThemeBadge', this.checked)"/>
         </label>
       </div>
+    ` : `
+      <div style="background:linear-gradient(135deg,rgba(124,58,237,0.18),rgba(6,182,212,0.12));border:1px solid rgba(124,58,237,0.35);border-radius:18px;padding:20px;text-align:center;position:relative;overflow:hidden">
+        <div style="font-size:2rem;margin-bottom:6px">👑</div>
+        <div style="font-size:1rem;font-weight:900;margin-bottom:4px;background:linear-gradient(135deg,#7c3aed,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent">الترقية إلى خطة Pro المميزة</div>
+        <div style="font-size:0.78rem;color:rgba(255,255,255,0.6);margin-bottom:14px">إزالة العلامة المائية وربط دومين مخصص وفتح جميع الميزات.</div>
+        <button class="btn btn-primary" onclick="openBillingModal()" style="width:100%;padding:10px;font-size:0.85rem;font-weight:800">
+          💎 ترقية الحساب
+        </button>
+      </div>
+    `}
+  `;
 
-      <div style="background:linear-gradient(135deg,rgba(124,58,237,0.1),rgba(6,182,212,0.08));border:1px solid rgba(124,58,237,0.25);border-radius:16px;padding:24px;text-align:center;margin-bottom:14px">
-        <div style="font-size:2.5rem;margin-bottom:10px">🚀</div>
-        <div style="font-size:1rem;font-weight:800;margin-bottom:6px">Auto-Deploy Live</div>
-        <div style="font-size:0.78rem;color:rgba(255,255,255,0.45);margin-bottom:20px;line-height:1.6">
-          نعالج ونستضيف موقعك الـ 3D أوتوماتيكياً.<br/>
-          تحصل على رابط حي فوراً بدون أي خطوات يدويّة.
-        </div>
-        <div id="deploy-progress" style="display:none;margin-bottom:16px">
-          <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;margin-bottom:8px">
-            <div id="deploy-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#7c3aed,#06b6d4);border-radius:4px;transition:width 0.6s ease"></div>
-          </div>
-          <div id="deploy-progress-msg" style="font-size:0.78rem;color:rgba(124,58,237,0.8)">Preparing...</div>
-        </div>
-        <div id="deploy-result" style="display:none;margin-bottom:16px">
-          <div style="font-size:0.7rem;color:rgba(255,255,255,0.3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px">🌐 Your Live URL</div>
-          <div id="deploy-url-box" style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:12px;font-family:'JetBrains Mono',monospace;font-size:0.76rem;color:#10b981;word-break:break-all;cursor:pointer;transition:all 0.3s" onclick="copyDeployUrl()" title="Click to copy"></div>
-          <div style="font-size:0.68rem;color:rgba(255,255,255,0.2);margin-top:6px">Click to copy · <a id="deploy-open-link" href="#" target="_blank" style="color:rgba(124,58,237,0.7)">Open in new tab →</a></div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <button id="deploy-btn" class="btn btn-primary" onclick="deployLive()" style="width:100%">⚡ Deploy My Portfolio Live</button>
-          <button class="btn btn-secondary" onclick="copyShareableLink()" style="width:100%">🔗 Copy Instant Share Link</button>
-          <button class="btn btn-secondary" onclick="exportHTML()" style="width:100%">📦 Download HTML (Backup)</button>
-        </div>
-      </div>`;
+  // Render Custom Domain panel into the slot
+  const cdSlot = document.getElementById('custom-domain-slot');
+  if (cdSlot) {
+    renderCustomDomainPanel(cdSlot, portfolioData, (updatedPf) => {
+      Object.assign(portfolioData, updatedPf);
+      autoSave();
+    });
   }
 }
+
+window.renderPublishTab = renderPublishTab;
+
+window.handlePublishPortfolio = async function() {
+  const btn = document.getElementById('btn-publish-portfolio');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Publishing to Supabase...';
+  }
+
+  try {
+    const res = await publishPortfolio(portfolioData);
+    if (res.success) {
+      portfolioData.publishedAt = res.publishedAt;
+      portfolioData.published_at = res.publishedAt;
+      showToast('success', '🚀', 'Portfolio published live to Supabase!');
+      renderPublishTab();
+      if (typeof confetti === 'function') {
+        confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+      }
+    } else {
+      showToast('error', '❌', `Publish failed: ${res.error}`);
+    }
+  } catch (err) {
+    showToast('error', '❌', `Publish error: ${err.message}`);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '🚀 Publish Changes (Update Live Site)';
+    }
+  }
+};
+
+window.copyPublicPortfolioUrl = function() {
+  const slug = portfolioData.slug || (portfolioData.name ? portfolioData.name.toLowerCase().replace(/[^a-z0-9]/g, '-') : 'portfolio');
+  const url = `${window.location.origin}/u/${slug}`;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      showToast('success', '📋', 'Public portfolio link copied to clipboard!');
+    }).catch(() => {
+      showToast('info', '🔗', url);
+    });
+  } else {
+    showToast('info', '🔗', url);
+  }
+};
+
+window.updatePortfolioSlug = function(val) {
+  const clean = (val || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  portfolioData.slug = clean;
+  autoSave();
+  renderPublishTab();
+  showToast('info', '🔗', `Public URL slug updated to: /u/${clean}`);
+};
 
 window.toggleProBranding = function(prop, val) {
   portfolioData[prop] = val;

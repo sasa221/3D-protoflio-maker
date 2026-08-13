@@ -331,6 +331,7 @@ export async function publishPortfolio(masterProfile) {
         profession: masterProfile.profession,
         bio: masterProfile.bio,
         theme: masterProfile.theme,
+        slug: masterProfile.slug || ('user-' + masterProfile.owner_user_id?.substr(0, 8)),
         master_profile_json: masterProfile,
         updated_at: publishedAt
       })
