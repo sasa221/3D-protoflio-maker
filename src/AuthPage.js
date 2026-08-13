@@ -71,6 +71,15 @@ export function renderAuthPage(onSuccess) {
     <form id="form-login" onsubmit="authDoLogin(event)">
       ${authField('login-email','Email Address','email','your@email.com','✉')}
       ${authField('login-password','Password','password','••••••••','🔑')}
+      <div style="display:flex;justify-content:flex-end;margin-top:-6px;margin-bottom:14px">
+        <button type="button" onclick="authDoSendResetPassword(event)" style="
+          background:none;border:none;color:rgba(255,255,255,0.4);font-size:0.75rem;
+          cursor:pointer;font-family:'Inter',sans-serif;text-decoration:underline;
+          transition:color 0.2s;
+        " onmouseover="this.style.color='#a855f7'" onmouseout="this.style.color='rgba(255,255,255,0.4)'">
+          🔑 Forgot Password?
+        </button>
+      </div>
       <div id="login-error" style="display:none;font-size:0.8rem;color:#ef4444;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:10px 14px;margin-bottom:16px"></div>
       <button type="submit" id="login-btn" style="
         width:100%;padding:13px;
@@ -179,7 +188,60 @@ export function renderAuthPage(onSuccess) {
       }
       if (resendBtn) {
         resendBtn.disabled = false;
-        resendBtn.textContent = '📧 Resend confirmation email';
+      }
+    }
+  };
+
+  window.authDoSendResetPassword = async (e) => {
+    if (e) e.preventDefault();
+    const email = document.getElementById('login-email')?.value || '';
+    const err = document.getElementById('login-error');
+
+    if (!email || !email.includes('@')) {
+      if (err) {
+        err.innerHTML = '❌ Please enter your email address above first.';
+        err.style.color = '#ef4444';
+        err.style.background = 'rgba(239,68,68,0.1)';
+        err.style.borderColor = 'rgba(239,68,68,0.2)';
+        err.style.display = 'block';
+      }
+      return;
+    }
+
+    if (err) {
+      err.innerHTML = '⏳ Sending password reset email...';
+      err.style.color = '#3b82f6';
+      err.style.background = 'rgba(59,130,246,0.1)';
+      err.style.borderColor = 'rgba(59,130,246,0.2)';
+      err.style.display = 'block';
+    }
+
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() })
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.success) {
+        if (err) {
+          err.innerHTML = '✅ Password reset instructions sent to your inbox.';
+          err.style.color = '#10b981';
+          err.style.background = 'rgba(16,185,129,0.1)';
+          err.style.borderColor = 'rgba(16,185,129,0.25)';
+          err.style.display = 'block';
+        }
+      } else {
+        throw new Error(data.error || 'Failed to send password reset email');
+      }
+    } catch (error) {
+      if (err) {
+        err.innerHTML = '❌ ' + (error.message || 'Error sending password reset email');
+        err.style.color = '#ef4444';
+        err.style.background = 'rgba(239,68,68,0.1)';
+        err.style.borderColor = 'rgba(239,68,68,0.2)';
+        err.style.display = 'block';
       }
     }
   };
