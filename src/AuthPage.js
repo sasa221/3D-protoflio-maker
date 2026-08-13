@@ -6,6 +6,7 @@
 import {
   signUp, login, getSession, isLoggedIn, getCurrentUser
 } from './services/AuthService.js';
+import { PLAN_CONFIG } from './services/EntitlementService.js';
 
 export function renderAuthPage(onSuccess) {
   document.body.innerHTML = `
@@ -82,9 +83,6 @@ export function renderAuthPage(onSuccess) {
          onmouseout="this.style.transform='';this.style.boxShadow=''">
         ⚡ Sign In to Studio
       </button>
-      <div style="text-align:center;font-size:0.75rem;color:rgba(255,255,255,0.25)">
-        Admin? Use admin@3dportfolio.app
-      </div>
     </form>
 
     <!-- SIGNUP FORM -->
@@ -107,7 +105,7 @@ export function renderAuthPage(onSuccess) {
       </button>
     </form>
 
-    <!-- FREE TIER INFO -->
+    <!-- PLAN ENTITLEMENT INFO -->
     <div style="
       margin-top:24px;padding:14px;
       background:rgba(124,58,237,0.06);
@@ -116,10 +114,10 @@ export function renderAuthPage(onSuccess) {
       color:rgba(255,255,255,0.5);line-height:1.6;
     ">
       <div style="color:rgba(124,58,237,0.9);font-weight:700;margin-bottom:6px">🆓 Free Plan includes:</div>
-      <div>✓ 2 active 3D portfolios</div>
-      <div>✓ 4 theme worlds</div>
-      <div>✓ HTML export + shareable link</div>
-      <div style="margin-top:8px;color:rgba(245,158,11,0.8);font-weight:600">💎 Pro unlocks all 11 themes + unlimited portfolios</div>
+      <div>✓ ${PLAN_CONFIG.free.limits.portfolios} Active 3D Portfolio</div>
+      <div>✓ Cinematic 3D Rendering & HTML Export</div>
+      <div>✓ Standard ${PLAN_CONFIG.free.limits.analyticsDays}-Day Analytics</div>
+      <div style="margin-top:8px;color:rgba(245,158,11,0.8);font-weight:600">💎 Pro unlocks up to ${PLAN_CONFIG.pro.limits.portfolios} portfolios, ${PLAN_CONFIG.pro.limits.customDomains} custom domains & ${PLAN_CONFIG.pro.limits.variants} variants</div>
     </div>
   </div>
 </div>`;
