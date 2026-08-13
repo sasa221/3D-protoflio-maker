@@ -9,6 +9,16 @@ import {
 import { PLAN_CONFIG } from './services/EntitlementService.js';
 
 export function renderAuthPage(onSuccess) {
+  const isRecovery = window.location.pathname.startsWith('/reset-password') ||
+                     window.location.hash.includes('type=recovery') ||
+                     window.location.search.includes('type=recovery') ||
+                     window.location.search.includes('code=');
+
+  if (isRecovery) {
+    renderResetPasswordPage(onSuccess);
+    return;
+  }
+
   document.body.innerHTML = `
 <div id="auth-page" style="
   min-height:100vh;width:100vw;
@@ -440,4 +450,150 @@ function initAuthCanvas() {
     });
   }
   animate();
+}
+
+export function renderResetPasswordPage(onSuccess) {
+  document.body.innerHTML = `
+<div id="reset-password-page" style="
+  min-height:100vh;width:100vw;
+  background:#050508;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  font-family:'Inter',sans-serif;
+  overflow:hidden;position:relative;
+">
+  <!-- Animated background canvas -->
+  <canvas id="auth-canvas" style="position:fixed;inset:0;z-index:0;width:100%;height:100%"></canvas>
+
+  <!-- Reset Password Card -->
+  <div style="
+    position:relative;z-index:10;
+    width:100%;max-width:420px;
+    background:rgba(10,10,22,0.9);
+    backdrop-filter:blur(30px);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:24px;
+    padding:40px 36px;
+    box-shadow:0 40px 80px rgba(0,0,0,0.6);
+    margin:20px;
+  ">
+    <!-- Header -->
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="
+        width:56px;height:56px;
+        background:linear-gradient(135deg,#7c3aed,#06b6d4);
+        border-radius:16px;
+        display:inline-flex;align-items:center;justify-content:center;
+        font-size:26px;margin-bottom:16px;
+        box-shadow:0 0 30px rgba(124,58,237,0.5);
+      ">🔑</div>
+      <div style="font-size:1.3rem;font-weight:800;background:linear-gradient(135deg,#7c3aed,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-family:'Outfit',sans-serif">
+        Set New Password
+      </div>
+      <div style="font-size:0.78rem;color:rgba(255,255,255,0.45);margin-top:6px;line-height:1.5">
+        Create a new secure password for your 3D Portfolio account
+      </div>
+    </div>
+
+    <!-- FORM -->
+    <form id="form-reset-password" onsubmit="authDoUpdatePassword(event)">
+      <div style="margin-bottom:18px">
+        <label style="display:block;font-size:0.75rem;font-weight:600;color:rgba(255,255,255,0.7);margin-bottom:8px">🔑 New Password (min 8 chars)</label>
+        <input type="password" id="reset-new-password" placeholder="••••••••" required minlength="8" style="
+          width:100%;padding:12px 14px;background:rgba(255,255,255,0.05);
+          border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#fff;
+          font-size:0.88rem;outline:none;box-sizing:border-box;
+        "/>
+      </div>
+      <div style="margin-bottom:20px">
+        <label style="display:block;font-size:0.75rem;font-weight:600;color:rgba(255,255,255,0.7);margin-bottom:8px">🔐 Confirm New Password</label>
+        <input type="password" id="reset-confirm-password" placeholder="••••••••" required minlength="8" style="
+          width:100%;padding:12px 14px;background:rgba(255,255,255,0.05);
+          border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#fff;
+          font-size:0.88rem;outline:none;box-sizing:border-box;
+        "/>
+      </div>
+      
+      <div id="reset-error" style="display:none;font-size:0.8rem;color:#ef4444;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:10px 14px;margin-bottom:16px"></div>
+      <div id="reset-success" style="display:none;font-size:0.85rem;color:#10b981;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:16px;margin-bottom:16px;text-align:center"></div>
+
+      <button type="submit" id="reset-submit-btn" style="
+        width:100%;padding:13px;
+        background:linear-gradient(135deg,#7c3aed,#06b6d4);
+        border:none;border-radius:12px;
+        color:#fff;font-size:0.9rem;font-weight:700;cursor:pointer;
+        font-family:'Inter',sans-serif;letter-spacing:0.5px;
+        transition:all 0.3s;
+      " onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 12px 30px rgba(124,58,237,0.4)'"
+         onmouseout="this.style.transform='';this.style.boxShadow=''">
+        ⚡ Update Password
+      </button>
+    </form>
+  </div>
+</div>
+  `;
+
+  initAuthCanvas();
+
+  window.authDoUpdatePassword = async (e) => {
+    if (e) e.preventDefault();
+    const newPass = document.getElementById('reset-new-password')?.value || '';
+    const confirmPass = document.getElementById('reset-confirm-password')?.value || '';
+    const btn = document.getElementById('reset-submit-btn');
+    const err = document.getElementById('reset-error');
+    const succ = document.getElementById('reset-success');
+
+    if (newPass.length < 8) {
+      if (err) {
+        err.textContent = '❌ Password must be at least 8 characters long.';
+        err.style.display = 'block';
+      }
+      return;
+    }
+
+    if (newPass !== confirmPass) {
+      if (err) {
+        err.textContent = '❌ Passwords do not match.';
+        err.style.display = 'block';
+      }
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '⏳ Updating Password...';
+    }
+    if (err) err.style.display = 'none';
+
+    try {
+      const { updateUserPassword } = await import('./services/AuthService.js');
+      await updateUserPassword(newPass);
+
+      if (succ) {
+        succ.innerHTML = `
+          <div style="font-weight:800;font-size:1rem;margin-bottom:6px">✅ Password updated successfully!</div>
+          <div style="font-size:0.78rem;color:rgba(255,255,255,0.7);margin-bottom:14px">Your password has been updated. You can now sign in.</div>
+          <button type="button" onclick="window.location.href='/login'" style="
+            width:100%;padding:11px;background:linear-gradient(135deg,#7c3aed,#06b6d4);
+            border:none;border-radius:10px;color:#fff;font-weight:700;cursor:pointer;font-size:0.85rem;
+          ">⚡ Proceed to Sign In</button>
+        `;
+        succ.style.display = 'block';
+      }
+      if (btn) btn.style.display = 'none';
+      const form = document.getElementById('form-reset-password');
+      if (form) form.style.display = 'none';
+
+      if (onSuccess) onSuccess();
+    } catch (error) {
+      if (err) {
+        err.textContent = '❌ ' + (error.message || 'Failed to update password.');
+        err.style.display = 'block';
+      }
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '⚡ Update Password';
+      }
+    }
+  };
 }

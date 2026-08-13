@@ -3,9 +3,9 @@
  */
 
 import './index.css';
-import { renderAuthPage } from './AuthPage.js';
+import { renderAuthPage, renderResetPasswordPage } from './AuthPage.js';
 import { renderAdminPage } from './AdminPage.js';
-import { isLoggedIn, getCurrentUser, getCurrentAuthUser, isPro, logout, upgradeToPro, isAdmin, redeemPromoCode } from './services/AuthService.js';
+import { isLoggedIn, getCurrentUser, getCurrentAuthUser, isPro, logout, upgradeToPro, isAdmin, redeemPromoCode, subscribeToAuthStateChange } from './services/AuthService.js';
 import { HyperEngine } from './three/HyperEngine.js';
 import { classifyProfession, getThemeById, getAllThemes } from './three/ProceduralTheme.js';
 import { exportStandaloneHTML, generateShareableURL } from './exporter/PortfolioExporter.js';
@@ -232,7 +232,21 @@ async function router() {
     }
   }
 
-  // 2. Marketing Landing Page Route
+  // 2. Recovery / Reset Password Route
+  const isRecoveryMode = path.startsWith('/reset-password') ||
+                         window.location.hash.includes('type=recovery') ||
+                         window.location.search.includes('type=recovery') ||
+                         window.location.search.includes('code=');
+
+  if (isRecoveryMode) {
+    setPageTitle('Set New Password');
+    renderResetPasswordPage(() => {
+      window.location.href = '/login';
+    });
+    return;
+  }
+
+  // 3. Marketing Landing Page Route
   if (path === '/' || path === '/index.html') {
     setPageTitle('');
     renderLandingPage(getAppContainer());
@@ -367,6 +381,15 @@ function render404Page(target) {
 // ─── INIT ───────────────────────────────────
 function init() {
   router();
+
+  subscribeToAuthStateChange((event) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      setPageTitle('Set New Password');
+      renderResetPasswordPage(() => {
+        window.location.href = '/login';
+      });
+    }
+  });
 }
 
 async function initStudio() {
