@@ -904,6 +904,10 @@ function initEngine() {
   // Set default Desktop (1440x900) Virtual Viewport mode & scale
   setPreviewMode('desktop');
   requestAnimationFrame(updatePreviewScale);
+  setTimeout(updatePreviewScale, 60);
+  setTimeout(updatePreviewScale, 250);
+
+  window.uploadAvatar = uploadAvatar;
 
   updateHUD();
 
