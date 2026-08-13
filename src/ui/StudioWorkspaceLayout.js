@@ -59,6 +59,13 @@ export function setActiveWorkspace(ws, subSection = null) {
     renderWorkspaceHeader();
     renderWorkspaceNav();
     showActiveWorkspacePanels();
+
+    // Trigger responsive preview recalculation for active workspace
+    if (typeof window.updatePreviewScale === 'function') {
+      requestAnimationFrame(() => window.updatePreviewScale());
+      setTimeout(() => window.updatePreviewScale(), 60);
+      setTimeout(() => window.updatePreviewScale(), 200);
+    }
   }
 }
 

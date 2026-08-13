@@ -18,25 +18,26 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    return res.status(401).json({ error: 'Unauthorized — Auth token required' });
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized — Auth Bearer token required' });
   }
 
-  const token = authHeader.replace('Bearer ', '');
+  const token = authHeader.replace(/^bearer\s+/i, '').trim();
   const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://kupxhrfijkdlcteniqfp.supabase.co';
-  const supabaseAnonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || supabaseAnonKey;
+  const supabaseAnonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseAnonKey;
 
   try {
-    // 1. Authenticate user JWT
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } }
+    // 1. Authenticate and validate user JWT token with Supabase Auth
+    const adminClient = createClient(supabaseUrl, supabaseSecretKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
     });
-    const { data: userData, error: userErr } = await userClient.auth.getUser();
 
-    if (userErr || !userData.user) {
-      return res.status(401).json({ error: 'Unauthorized user session' });
+    const { data: userData, error: userErr } = await adminClient.auth.getUser(token);
+
+    if (userErr || !userData?.user?.id) {
+      return res.status(401).json({ error: `Unauthorized user session: ${userErr?.message || 'Invalid token'}` });
     }
 
     const userId = userData.user.id;
@@ -51,16 +52,15 @@ export default async function handler(req, res) {
     const buffer = Buffer.from(base64Data, 'base64');
 
     const safePortfolioId = portfolioId && portfolioId !== 'pf_default' ? portfolioId : 'default';
-    const ext = contentType ? contentType.split('/')[1] || 'webp' : 'webp';
+    const ext = contentType?.includes('png') ? 'png' : contentType?.includes('jpeg') || contentType?.includes('jpg') ? 'jpg' : 'webp';
     const storagePath = `${userId}/${safePortfolioId}/avatar.${ext}`;
 
     // 2. Upload to Supabase Storage using adminClient with upsert
-    const adminClient = createClient(supabaseUrl, supabaseSecretKey);
     const { error: uploadErr } = await adminClient.storage
       .from('avatars')
       .upload(storagePath, buffer, {
         upsert: true,
-        contentType: contentType || 'image/webp'
+        contentType: contentType || `image/${ext}`
       });
 
     if (uploadErr) {

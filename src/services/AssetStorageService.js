@@ -36,16 +36,20 @@ export function validateFile(file, allowedTypes, maxSizeBytes) {
 export async function uploadAvatar(file, userId, portfolioId) {
   validateFile(file, ALLOWED_IMAGE_TYPES, MAX_AVATAR_SIZE);
 
-  const { data: sessionData } = await supabase.auth.getSession();
-  const session = sessionData?.session;
-  const activeUser = session?.user;
+  // 1. Retrieve or refresh active Supabase session
+  let { data: sessionData } = await supabase.auth.getSession();
+  let session = sessionData?.session;
 
-  const canonicalUserId = activeUser?.id || (userId && userId !== 'usr_guest' ? userId : null);
-  if (!canonicalUserId) {
+  if (!session?.access_token) {
+    const { data: refreshedData } = await supabase.auth.refreshSession();
+    session = refreshedData?.session;
+  }
+
+  if (!session?.access_token) {
     throw new Error('You must be signed in to upload an avatar.');
   }
 
-  // Convert File / Blob to Base64 data string
+  // 2. Convert File / Blob to Base64 data string
   const base64Data = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
@@ -53,56 +57,48 @@ export async function uploadAvatar(file, userId, portfolioId) {
     reader.readAsDataURL(file);
   });
 
-  const apiRes = await fetch('/api/storage/upload-avatar', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session?.access_token || ''}`
-    },
-    body: JSON.stringify({
-      fileBase64: base64Data,
-      portfolioId: portfolioId || 'default',
-      contentType: file.type || 'image/webp'
-    })
-  }).catch(() => null);
-
-  if (apiRes && apiRes.ok) {
-    const json = await apiRes.json();
-    return {
-      storageBucket: 'avatars',
-      storagePath: json.storagePath,
-      publicUrl: json.publicUrl,
-      updatedAt: json.updatedAt
-    };
-  }
-
-  // Fallback to direct SDK upload if API route is unreachable
-  const ext = file.name ? file.name.split('.').pop().toLowerCase() : 'webp';
-  const sanitizedExt = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) ? ext : 'webp';
-  const safePortfolioId = portfolioId && portfolioId !== 'pf_default' ? portfolioId : 'default';
-  const storagePath = `${canonicalUserId}/${safePortfolioId}/avatar.${sanitizedExt}`;
-
-  const { error: uploadErr } = await supabase.storage
-    .from('avatars')
-    .upload(storagePath, file, {
-      upsert: true,
-      contentType: file.type || `image/${sanitizedExt}`
+  const makeUploadRequest = async (token) => {
+    return fetch('/api/storage/upload-avatar', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        fileBase64: base64Data,
+        portfolioId: portfolioId || 'default',
+        contentType: file.type || 'image/webp'
+      })
     });
+  };
 
-  if (uploadErr) {
-    console.error('Supabase avatar upload error:', uploadErr);
-    throw new Error(`Avatar upload failed: ${uploadErr.message}`);
+  let apiRes = await makeUploadRequest(session.access_token).catch((err) => {
+    throw new Error(`Avatar upload network error: ${err.message}`);
+  });
+
+  // 3. Handle 401 token expiration with exactly ONE session refresh and retry
+  if (apiRes.status === 401) {
+    const { data: refreshed } = await supabase.auth.refreshSession();
+    if (refreshed?.session?.access_token) {
+      session = refreshed.session;
+      apiRes = await makeUploadRequest(session.access_token).catch((err) => {
+        throw new Error(`Avatar upload retry error: ${err.message}`);
+      });
+    }
   }
 
-  const { data: publicData } = supabase.storage
-    .from('avatars')
-    .getPublicUrl(storagePath);
+  // 4. Handle response - NO direct storage fallback
+  if (!apiRes.ok) {
+    const errJson = await apiRes.json().catch(() => ({}));
+    throw new Error(errJson.error || `Avatar upload failed with HTTP ${apiRes.status}`);
+  }
 
+  const json = await apiRes.json();
   return {
     storageBucket: 'avatars',
-    storagePath,
-    publicUrl: publicData.publicUrl,
-    updatedAt: new Date().toISOString()
+    storagePath: json.storagePath,
+    publicUrl: json.publicUrl,
+    updatedAt: json.updatedAt || new Date().toISOString()
   };
 }
 

@@ -841,19 +841,50 @@ function updatePreviewScale() {
   viewport.style.width = `${dim.width}px`;
   viewport.style.height = `${dim.height}px`;
 
-  const availableW = Math.max(100, stage.clientWidth - 32);
-  const availableH = Math.max(100, stage.clientHeight - 32);
+  const stageRect = stage.getBoundingClientRect();
+  const stageW = stageRect.width || stage.clientWidth;
+  const stageH = stageRect.height || stage.clientHeight;
+
+  // If container has not laid out yet, do not scale to tiny values
+  if (stageW < 50 || stageH < 50) return;
+
+  // Account for header offset (56px) and surrounding margins (32px)
+  const availableW = Math.max(80, stageW - 32);
+  const availableH = Math.max(80, stageH - 56 - 32);
 
   const scaleX = availableW / dim.width;
   const scaleY = availableH / dim.height;
-  const scale = Math.min(scaleX, scaleY, 1);
+  const scale = Math.min(scaleX, scaleY);
 
-  scaler.style.transform = `scale(${scale})`;
   scaler.style.width = `${dim.width}px`;
   scaler.style.height = `${dim.height}px`;
+  scaler.style.flexShrink = '0';
+  scaler.style.transformOrigin = 'center center';
+  scaler.style.transform = `scale(${scale.toFixed(4)})`;
 }
 
-window.addEventListener('resize', updatePreviewScale);
+window.updatePreviewScale = updatePreviewScale;
+window.addEventListener('resize', () => requestAnimationFrame(updatePreviewScale));
+window.addEventListener('orientationchange', () => requestAnimationFrame(updatePreviewScale));
+
+let previewResizeObserver = null;
+function setupPreviewResizeObserver() {
+  const stage = document.getElementById('preview-stage');
+  const panel = document.getElementById('preview-panel');
+  if (!stage) return;
+
+  if (previewResizeObserver) {
+    previewResizeObserver.disconnect();
+  }
+
+  if (typeof ResizeObserver !== 'undefined') {
+    previewResizeObserver = new ResizeObserver(() => {
+      requestAnimationFrame(updatePreviewScale);
+    });
+    previewResizeObserver.observe(stage);
+    if (panel) previewResizeObserver.observe(panel);
+  }
+}
 
 // ─── ENGINE INIT ────────────────────────────
 function initEngine() {
@@ -867,9 +898,12 @@ function initEngine() {
   sceneDirector = new SceneDirector(engine);
   sceneDirector.setTheme(theme);
 
+  // Setup ResizeObserver for responsive preview scaling
+  setupPreviewResizeObserver();
+
   // Set default Desktop (1440x900) Virtual Viewport mode & scale
   setPreviewMode('desktop');
-  updatePreviewScale();
+  requestAnimationFrame(updatePreviewScale);
 
   updateHUD();
 
@@ -919,17 +953,20 @@ function initEngine() {
   window.openCVImportModal = openCVImportModal;
   window.openBillingModal = () => openBillingModal('user_saleh_123', () => renderAll());
 
-  runCVParserTestSuite().catch(err => console.warn('[CV Test Suite] error:', err));
-  try {
-    runJobTargetingTestSuite();
-    runPortfolioVariantsTestSuite();
-    runAnalyticsTestSuite();
-    runMonetizationTestSuite();
-    runProductionSecurityTestSuite();
-    runProductionLaunchTestSuite();
-    runSupabaseCutoverTestSuite();
-  } catch (err) {
-    console.warn('[Test Suite] error:', err);
+  // Only run test suites in development environment or explicit debug query flag
+  if (import.meta.env.DEV || window.location.search.includes('run_tests=true')) {
+    runCVParserTestSuite().catch(err => console.warn('[CV Test Suite] error:', err));
+    try {
+      runJobTargetingTestSuite();
+      runPortfolioVariantsTestSuite();
+      runAnalyticsTestSuite();
+      runMonetizationTestSuite();
+      runProductionSecurityTestSuite();
+      runProductionLaunchTestSuite();
+      runSupabaseCutoverTestSuite();
+    } catch (err) {
+      console.warn('[Test Suite] error:', err);
+    }
   }
 }
 
