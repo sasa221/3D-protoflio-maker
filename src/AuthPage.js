@@ -453,6 +453,26 @@ function initAuthCanvas() {
 }
 
 export function renderResetPasswordPage(onSuccess) {
+  // Parse and store recovery session token immediately upon page load
+  try {
+    const hash = window.location.hash || '';
+    if (hash.includes('access_token=')) {
+      const hashPart = hash.replace(/^#/, '');
+      const params = new URLSearchParams(hashPart);
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+      if (accessToken) {
+        window.__recoverySession = { accessToken, refreshToken };
+        import('./services/SupabaseClient.js').then(({ supabase }) => {
+          supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken || ''
+          });
+        });
+      }
+    }
+  } catch (e) {}
+
   document.body.innerHTML = `
 <div id="reset-password-page" style="
   min-height:100vh;width:100vw;
@@ -566,24 +586,17 @@ export function renderResetPasswordPage(onSuccess) {
     if (err) err.style.display = 'none';
 
     try {
-      // Ensure recovery session is active if tokens exist in URL hash or search
-      const hash = window.location.hash || '';
-      if (hash.includes('access_token=')) {
-        const hashPart = hash.replace(/^#/, '');
-        const params = new URLSearchParams(hashPart);
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
-        if (accessToken && refreshToken) {
-          const { supabase } = await import('./services/SupabaseClient.js');
-          await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken
-          });
-        }
+      const { supabase } = await import('./services/SupabaseClient.js');
+
+      if (window.__recoverySession?.accessToken) {
+        await supabase.auth.setSession({
+          access_token: window.__recoverySession.accessToken,
+          refresh_token: window.__recoverySession.refreshToken || ''
+        });
       }
 
-      const { updateUserPassword } = await import('./services/AuthService.js');
-      await updateUserPassword(newPass);
+      const { error } = await supabase.auth.updateUser({ password: newPass });
+      if (error) throw error;
 
       if (succ) {
         succ.innerHTML = `
@@ -602,6 +615,7 @@ export function renderResetPasswordPage(onSuccess) {
 
       if (onSuccess) onSuccess();
     } catch (error) {
+      console.error('Password update error:', error);
       if (err) {
         err.textContent = '❌ ' + (error.message || 'Failed to update password.');
         err.style.display = 'block';
