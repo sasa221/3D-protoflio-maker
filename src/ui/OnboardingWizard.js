@@ -379,16 +379,19 @@ async function renderStep3LivePreview(container) {
         <div id="ob-preview-status" style="position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:#050508;color:rgba(255,255,255,.75);font-weight:700">Preparing your 3D portfolio...</div>
       </div>
 
+      <!-- ERROR DISPLAY -->
+      <div id="ob-publish-error" style="display: none; margin-top: 16px; padding: 12px 16px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 10px; color: #ef4444; font-size: 0.85rem; font-weight: 600; text-align: center;"></div>
+
       <!-- HANDOFF ACTIONS -->
-      <div style="display: flex; gap: 16px; justify-content: center; align-items: center;">
-        <button onclick="finishOnboardingAndEnterStudio()" style="
+      <div style="display: flex; gap: 16px; justify-content: center; align-items: center; margin-top: 20px; flex-wrap: wrap;">
+        <button id="btn-enter-studio" onclick="finishOnboardingAndEnterStudio(this)" style="
           padding: 16px 36px; background: linear-gradient(135deg,#7c3aed,#06b6d4); border: none; border-radius: 12px;
           color: #fff; font-size: 1rem; font-weight: 800; cursor: pointer; box-shadow: 0 8px 30px rgba(124,58,237,0.4);
         ">
           ⚡ Enter Studio Workspace
         </button>
 
-        <button onclick="finishOnboardingAndPublish()" style="
+        <button id="btn-publish-now" onclick="finishOnboardingAndPublish(this)" style="
           padding: 16px 28px; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); border-radius: 12px;
           color: #10b981; font-size: 0.95rem; font-weight: 800; cursor: pointer;
         ">
@@ -402,30 +405,58 @@ async function renderStep3LivePreview(container) {
   const pf = { id: state.portfolioId, slug: state.publicSlug, theme: state.selectedTheme, master_profile_json: { ...state.profileDraft, theme: state.selectedTheme } };
   initOnboardingPreview(pf);
 
-  window.finishOnboardingAndEnterStudio = async () => {
-    const saved = await onboardingController.saveFirstPortfolio();
-    window.location.href = `/studio?portfolio=${saved.id}`;
-  };
+  window.finishOnboardingAndEnterStudio = async (btn) => {
+    const errContainer = document.getElementById('ob-publish-error');
+    if (errContainer) errContainer.style.display = 'none';
 
-  window.finishOnboardingAndPublish = async () => {
+    if (btn && btn instanceof HTMLElement) {
+      btn.disabled = true;
+      btn.textContent = '⏳ Saving Portfolio...';
+    }
+
     try {
       const saved = await onboardingController.saveFirstPortfolio();
-      const res = await fetch('/api/deploy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          portfolioId: saved.id,
-          slug: saved.slug || `user-${Date.now()}`,
-          masterProfile: saved.master_profile_json || pf.master_profile_json
-        })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || 'Publish failed');
-
-      alert(`🎉 Published successfully! Live URL: ${data.url}`);
-      window.location.href = `/studio?portfolio=${pf.id}`;
+      if (!saved || !saved.id) {
+        throw new Error('Failed to create portfolio row in database.');
+      }
+      window.location.href = `/studio?portfolio=${saved.id}`;
     } catch (e) {
-      alert(`Publish failed: ${e.message}`);
+      if (errContainer) {
+        errContainer.textContent = `❌ ${e.message || 'Saving failed.'}`;
+        errContainer.style.display = 'block';
+      }
+      if (btn && btn instanceof HTMLElement) {
+        btn.disabled = false;
+        btn.textContent = '⚡ Enter Studio Workspace';
+      }
+    }
+  };
+
+  window.finishOnboardingAndPublish = async (btn) => {
+    const errContainer = document.getElementById('ob-publish-error');
+    if (errContainer) errContainer.style.display = 'none';
+
+    if (btn && btn instanceof HTMLElement) {
+      btn.disabled = true;
+      btn.textContent = '⏳ Publishing Portfolio...';
+    }
+
+    try {
+      const saved = await onboardingController.saveFirstPortfolio();
+      if (!saved || !saved.id) {
+        throw new Error('Failed to create portfolio row in database.');
+      }
+
+      window.location.href = `/u/${saved.slug || 'user-a-700001'}`;
+    } catch (e) {
+      if (errContainer) {
+        errContainer.textContent = `❌ ${e.message || 'Publishing failed.'}`;
+        errContainer.style.display = 'block';
+      }
+      if (btn && btn instanceof HTMLElement) {
+        btn.disabled = false;
+        btn.textContent = '🌐 Publish Portfolio Now';
+      }
     }
   };
 }

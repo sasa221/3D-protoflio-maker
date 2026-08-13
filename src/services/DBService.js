@@ -262,8 +262,52 @@ export function encodePortfolioToURL(p) {
 export function getAnalytics() {
   return { total_portfolios: 1, total_exports: 0, total_shares: 0, tier_breakdown: { pro: 0 } };
 }
-export async function createPortfolio(data) {
-  savePortfolioDebounced(data);
+export async function createPortfolio(data = {}) {
+  const { data: authData } = await supabase.auth.getUser();
+  const user = authData?.user;
+  if (!user || !user.id) {
+    throw new Error('User must be authenticated to create a portfolio.');
+  }
+
+  const portfolioId = data.id || ('pf_' + Date.now());
+  const slug = data.slug || ('user-' + user.id.substr(0, 8));
+  const masterJson = data.master_profile_json || data;
+  masterJson.id = portfolioId;
+
+  const row = {
+    id: portfolioId,
+    owner_user_id: user.id,
+    name: data.name || masterJson.name || 'My Portfolio',
+    profession: data.profession || masterJson.profession || 'Developer',
+    bio: data.bio || masterJson.bio || '',
+    theme: data.theme || masterJson.theme || 'code',
+    slug: slug,
+    master_profile_json: masterJson,
+    default_variant_id: masterJson.activeVariantId || 'var_default',
+    updated_at: new Date().toISOString()
+  };
+
+  const { data: inserted, error } = await supabase
+    .from('portfolios')
+    .insert([row])
+    .select()
+    .single();
+
+  if (error) {
+    console.warn('Supabase createPortfolio insert error:', error.message);
+    if (error.code === '23505') { // duplicate primary key
+      const { data: updated, error: updErr } = await supabase
+        .from('portfolios')
+        .update(row)
+        .eq('id', portfolioId)
+        .select()
+        .single();
+      if (!updErr && updated) return updated;
+    }
+    throw new Error('Failed to create portfolio in database: ' + error.message);
+  }
+
+  return inserted || row;
 }
 export function getAllPortfolios() {
   return [];

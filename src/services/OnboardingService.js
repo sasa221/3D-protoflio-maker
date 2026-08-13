@@ -6,7 +6,7 @@
  */
 
 import { getCurrentAuthUser } from './AuthService.js';
-import { createPortfolio, saveDraft, loadUserPortfoliosFromSupabase } from './DBService.js';
+import { createPortfolio, saveDraft, publishPortfolio, loadUserPortfoliosFromSupabase } from './DBService.js';
 
 const STORAGE_KEY = 'portfolio_onboarding_state_v3';
 const SESSION_KEY = 'portfolio_onboarding_session_v3';
@@ -131,20 +131,20 @@ export class OnboardingService {
    */
   async saveFirstPortfolio() {
     const authUser = await getCurrentAuthUser();
-    const userId = authUser?.id || 'usr_guest';
+    if (!authUser || authUser.id === 'usr_guest') {
+      throw new Error('Please sign in or create an account to save and publish your portfolio.');
+    }
 
     const draft = this.state.profileDraft;
     const theme = this.state.selectedTheme || 'code';
     const slug = (draft.name || 'portfolio').toLowerCase().trim().replace(/[^a-z0-9]/g, '-') + '-' + Math.floor(Math.random() * 1000);
 
     // 1. Check existing portfolios to prevent duplicates
-    if (userId !== 'usr_guest') {
-      const existing = await loadUserPortfoliosFromSupabase(userId);
-      if (existing && existing.length > 0) {
-        const pf = existing[0];
-        this.saveState({ portfolioId: pf.id, publicSlug: pf.slug, completed: true });
-        return pf;
-      }
+    const existing = await loadUserPortfoliosFromSupabase(authUser.id);
+    if (existing && existing.id) {
+      this.saveState({ portfolioId: existing.id, publicSlug: existing.slug, completed: true });
+      await publishPortfolio(existing.master_profile_json || existing);
+      return existing;
     }
 
     // 2. Create new portfolio row
@@ -165,6 +165,7 @@ export class OnboardingService {
     };
 
     const newPf = await createPortfolio({
+      id: masterProfile.id,
       name: masterProfile.name,
       profession: masterProfile.profession,
       bio: masterProfile.bio,
@@ -173,9 +174,16 @@ export class OnboardingService {
       master_profile_json: masterProfile
     });
 
+    if (!newPf || !newPf.id) {
+      throw new Error('Database did not return a valid portfolio identifier.');
+    }
+
+    // 3. Create initial published snapshot
+    await publishPortfolio(newPf.master_profile_json || masterProfile);
+
     this.saveState({
       portfolioId: newPf.id,
-      publicSlug: slug,
+      publicSlug: newPf.slug || slug,
       completed: true
     });
 

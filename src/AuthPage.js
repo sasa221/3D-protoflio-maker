@@ -94,7 +94,7 @@ export function renderAuthPage(onSuccess) {
       ${authField('signup-password','Password (min 6 chars)','password','••••••••','🔑')}
       ${authField('signup-confirm','Confirm Password','password','••••••••','🔐')}
       <div id="signup-error" style="display:none;font-size:0.8rem;color:#ef4444;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:10px 14px;margin-bottom:16px"></div>
-      <button type="submit" style="
+      <button type="submit" id="signup-btn" style="
         width:100%;padding:13px;
         background:linear-gradient(135deg,#7c3aed,#06b6d4);
         border:none;border-radius:12px;
@@ -129,80 +129,108 @@ export function renderAuthPage(onSuccess) {
   // Global handlers
   window.authSwitchTab = (tab) => {
     const isLogin = tab === 'login';
-    document.getElementById('form-login').style.display = isLogin ? 'block' : 'none';
-    document.getElementById('form-signup').style.display = isLogin ? 'none' : 'block';
+    const formLogin = document.getElementById('form-login');
+    const formSignup = document.getElementById('form-signup');
+    if (formLogin) formLogin.style.display = isLogin ? 'block' : 'none';
+    if (formSignup) formSignup.style.display = isLogin ? 'none' : 'block';
 
     const loginTab = document.getElementById('tab-login');
     const signupTab = document.getElementById('tab-signup');
-    loginTab.style.background = isLogin ? 'linear-gradient(135deg,#7c3aed,#06b6d4)' : 'transparent';
-    loginTab.style.color = isLogin ? '#fff' : 'rgba(255,255,255,0.4)';
-    signupTab.style.background = !isLogin ? 'linear-gradient(135deg,#7c3aed,#06b6d4)' : 'transparent';
-    signupTab.style.color = !isLogin ? '#fff' : 'rgba(255,255,255,0.4)';
+    if (loginTab) {
+      loginTab.style.background = isLogin ? 'linear-gradient(135deg,#7c3aed,#06b6d4)' : 'transparent';
+      loginTab.style.color = isLogin ? '#fff' : 'rgba(255,255,255,0.4)';
+    }
+    if (signupTab) {
+      signupTab.style.background = !isLogin ? 'linear-gradient(135deg,#7c3aed,#06b6d4)' : 'transparent';
+      signupTab.style.color = !isLogin ? '#fff' : 'rgba(255,255,255,0.4)';
+    }
   };
 
   window.authDoLogin = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('login-btn');
-    btn.textContent = 'Signing in...';
-    btn.disabled = true;
     const err = document.getElementById('login-error');
-    err.style.display = 'none';
+    if (btn) {
+      btn.textContent = 'Signing in...';
+      btn.disabled = true;
+    }
+    if (err) err.style.display = 'none';
 
     try {
-      const email = document.getElementById('login-email').value;
-      const password = document.getElementById('login-password').value;
+      const email = document.getElementById('login-email')?.value || '';
+      const password = document.getElementById('login-password')?.value || '';
       const res = await login(email, password);
 
       if (res && res.user) {
         onSuccess(res.user);
       } else {
-        err.textContent = '❌ Login failed. Please check your credentials.';
+        if (err) {
+          err.textContent = '❌ Login failed. Please check your credentials.';
+          err.style.display = 'block';
+        }
+        if (btn) {
+          btn.textContent = '⚡ Sign In to Studio';
+          btn.disabled = false;
+        }
+      }
+    } catch (e) {
+      if (err) {
+        err.textContent = '❌ ' + (e.message || 'Login failed.');
         err.style.display = 'block';
+      }
+      if (btn) {
         btn.textContent = '⚡ Sign In to Studio';
         btn.disabled = false;
       }
-    } catch (e) {
-      err.textContent = '❌ ' + (e.message || 'Login failed.');
-      err.style.display = 'block';
-      btn.textContent = '⚡ Sign In to Studio';
-      btn.disabled = false;
     }
   };
 
   window.authDoSignup = async (e) => {
     e.preventDefault();
-    const email = document.getElementById('signup-email').value;
-    const password = document.getElementById('signup-password').value;
-    const confirm = document.getElementById('signup-confirm').value;
-    const name = document.getElementById('signup-name').value;
+    const email = document.getElementById('signup-email')?.value || '';
+    const password = document.getElementById('signup-password')?.value || '';
+    const confirm = document.getElementById('signup-confirm')?.value || '';
+    const name = document.getElementById('signup-name')?.value || '';
     const err = document.getElementById('signup-error');
-    err.style.display = 'none';
+    if (err) err.style.display = 'none';
 
     if (password !== confirm) {
-      err.textContent = '❌ Passwords do not match!';
-      err.style.display = 'block';
+      if (err) {
+        err.textContent = '❌ Passwords do not match!';
+        err.style.display = 'block';
+      }
       return;
     }
 
     const btn = document.getElementById('signup-btn');
-    btn.textContent = 'Creating account...';
-    btn.disabled = true;
+    if (btn) {
+      btn.textContent = 'Creating account...';
+      btn.disabled = true;
+    }
 
     try {
       const res = await signUp(email, password, name);
       if (res && res.user) {
         onSuccess(res.user);
       } else {
-        err.textContent = '❌ Account created. Please check your email to confirm.';
+        if (err) {
+          err.textContent = '❌ Account created. Please check your email to confirm.';
+          err.style.display = 'block';
+        }
+        if (btn) {
+          btn.textContent = '🚀 Create Free Account';
+          btn.disabled = false;
+        }
+      }
+    } catch (e) {
+      if (err) {
+        err.textContent = '❌ ' + (e.message || 'Signup failed.');
         err.style.display = 'block';
+      }
+      if (btn) {
         btn.textContent = '🚀 Create Free Account';
         btn.disabled = false;
       }
-    } catch (e) {
-      err.textContent = '❌ ' + (e.message || 'Signup failed.');
-      err.style.display = 'block';
-      btn.textContent = '🚀 Create Free Account';
-      btn.disabled = false;
     }
   };
 }
