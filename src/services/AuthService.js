@@ -78,6 +78,22 @@ export async function requestPasswordReset(email) {
   return data;
 }
 
+export async function resendConfirmationEmail(email) {
+  if (!email || !email.includes('@')) {
+    throw new Error('Valid email address required.');
+  }
+
+  const { data, error } = await supabase.auth.resend({
+    type: 'signup',
+    email: email.trim()
+  });
+
+  if (error) throw error;
+  return data;
+}
+
+export const resendConfirmation = resendConfirmationEmail;
+
 export async function updateUserPassword(newPassword) {
   const { data, error } = await supabase.auth.updateUser({
     password: newPassword

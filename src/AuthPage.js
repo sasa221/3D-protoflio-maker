@@ -4,7 +4,7 @@
  */
 
 import {
-  signUp, login, getSession, isLoggedIn, getCurrentUser
+  signUp, login, getSession, isLoggedIn, getCurrentUser, resendConfirmationEmail
 } from './services/AuthService.js';
 import { PLAN_CONFIG } from './services/EntitlementService.js';
 
@@ -144,6 +144,46 @@ export function renderAuthPage(onSuccess) {
     }
   };
 
+  window.authDoResendConfirmation = async (e) => {
+    if (e) e.preventDefault();
+    const email = document.getElementById('login-email')?.value || document.getElementById('signup-email')?.value || '';
+    const err = document.getElementById('login-error') || document.getElementById('signup-error');
+    const resendBtn = document.getElementById('resend-confirm-btn');
+
+    if (!email || !email.includes('@')) {
+      if (err) {
+        err.innerHTML = '❌ Please enter a valid email address first.';
+        err.style.display = 'block';
+      }
+      return;
+    }
+
+    if (resendBtn) {
+      resendBtn.disabled = true;
+      resendBtn.textContent = '⏳ Sending confirmation email...';
+    }
+
+    try {
+      await resendConfirmationEmail(email);
+      if (err) {
+        err.innerHTML = '✅ Confirmation email sent. Please check your inbox.';
+        err.style.color = '#10b981';
+        err.style.background = 'rgba(16,185,129,0.1)';
+        err.style.borderColor = 'rgba(16,185,129,0.25)';
+        err.style.display = 'block';
+      }
+    } catch (error) {
+      if (err) {
+        err.innerHTML = '❌ ' + (error.message || 'Failed to resend confirmation email.');
+        err.style.display = 'block';
+      }
+      if (resendBtn) {
+        resendBtn.disabled = false;
+        resendBtn.textContent = '📧 Resend confirmation email';
+      }
+    }
+  };
+
   window.authDoLogin = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('login-btn');
@@ -152,7 +192,12 @@ export function renderAuthPage(onSuccess) {
       btn.textContent = 'Signing in...';
       btn.disabled = true;
     }
-    if (err) err.style.display = 'none';
+    if (err) {
+      err.style.display = 'none';
+      err.style.color = '#ef4444';
+      err.style.background = 'rgba(239,68,68,0.1)';
+      err.style.borderColor = 'rgba(239,68,68,0.2)';
+    }
 
     try {
       const email = document.getElementById('login-email')?.value || '';
@@ -172,10 +217,27 @@ export function renderAuthPage(onSuccess) {
         }
       }
     } catch (e) {
+      const msg = e.message || '';
+      const isUnconfirmed = msg.toLowerCase().includes('confirm') || msg.toLowerCase().includes('email_not_confirmed');
+
       if (err) {
-        err.textContent = '❌ ' + (e.message || 'Login failed.');
+        if (isUnconfirmed) {
+          err.innerHTML = `
+            <div style="margin-bottom:8px;font-weight:700">❌ Please confirm your email before signing in.</div>
+            <button id="resend-confirm-btn" onclick="authDoResendConfirmation(event)" style="
+              padding:8px 12px;background:rgba(124,58,237,0.25);border:1px solid rgba(124,58,237,0.5);
+              border-radius:8px;color:#fff;font-size:0.75rem;font-weight:700;cursor:pointer;
+              margin-top:4px;width:100%;font-family:'Inter',sans-serif;transition:all 0.2s;
+            ">
+              📧 Resend confirmation email
+            </button>
+          `;
+        } else {
+          err.textContent = '❌ ' + (msg || 'Login failed.');
+        }
         err.style.display = 'block';
       }
+
       if (btn) {
         btn.textContent = '⚡ Sign In to Studio';
         btn.disabled = false;
