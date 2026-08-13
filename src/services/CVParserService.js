@@ -99,7 +99,8 @@ export class DeterministicFallbackProvider extends BaseCVAnalyzerProvider {
 
     const experienceRows = rows('experience');
     const educationRows = rows('education');
-    const skillNames = [...splitList(rows('skills')), ...extractSkillsFromText(fullText)]
+    const extractedSkills = extractSkillsFromText(fullText);
+    const skillNames = (extractedSkills.length ? extractedSkills : splitList(rows('skills')))
       .map(v => v.replace(/^[:\-\s]+/, '').trim())
       .map(canonicalSkillName)
       .filter(v => v && !/^(?:Languages\s*:|English|Arabic)\b/i.test(v));

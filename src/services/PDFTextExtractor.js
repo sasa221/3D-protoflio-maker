@@ -33,16 +33,22 @@ export async function extractTextFromPDF(file) {
 
         // Reconstruct line breaks using item Y positions
         let lastY = null;
+        let lastXEnd = null;
         let pageLines = [];
         let currentLine = '';
 
         textContent.items.forEach(item => {
           const y = item.transform ? item.transform[5] : null;
+          const x = item.transform ? item.transform[4] : null;
           if (lastY !== null && y !== null && Math.abs(y - lastY) > 6) {
             if (currentLine.trim()) pageLines.push(currentLine.trim());
             currentLine = item.str;
+            lastXEnd = x !== null ? x + (item.width || 0) : null;
           } else {
-            currentLine += (currentLine ? ' ' : '') + item.str;
+            const gap = x !== null && lastXEnd !== null ? x - lastXEnd : null;
+            const separator = currentLine && (gap === null || gap > 1.5) ? ' ' : '';
+            currentLine += separator + item.str;
+            lastXEnd = x !== null ? x + (item.width || 0) : null;
           }
           lastY = y;
         });
