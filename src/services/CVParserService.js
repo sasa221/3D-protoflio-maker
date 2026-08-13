@@ -18,6 +18,43 @@ function cleanLine(line = '') {
   return line.replace(/^[#\-•▪*\s]+/, '').trim();
 }
 
+function cleanHeaderLine(line = '') {
+  return cleanLine(line)
+    .replace(/\b(?:LinkedIn|GitHub|Portfolio|Website|Resume|Curriculum Vitae)\b.*$/i, '')
+    .trim();
+}
+
+function canonicalSkillName(value) {
+  const compact = value.replace(/\s+/g, '').toLowerCase();
+  const canonical = {
+    javascript: 'JavaScript', html5: 'HTML5', css3: 'CSS3', mysql: 'MySQL',
+    php: 'PHP', powerbi: 'Power BI', 'c++': 'C++'
+  };
+  return canonical[compact] || value.replace(/\s+/g, ' ').trim();
+}
+
+function inferHeadline(summary, headerCandidates) {
+  const direct = headerCandidates.find(v =>
+    /\b(developer|engineer|designer|analyst|scientist|manager|specialist|consultant)\b/i.test(v)
+  );
+  if (direct) return direct;
+  const match = summary.match(/\b([A-Za-z]+(?:\s*-\s*[A-Za-z]+)?(?:\s+[A-Za-z]+){0,3}\s+(?:Developer|Engineer|Designer|Analyst|Scientist|Manager|Specialist|Consultant))\b/i);
+  return match ? match[1].replace(/\s*-\s*/g, '-').trim() : '';
+}
+
+function extractSkillsFromText(fullText) {
+  const groups = [
+    /Programming\s*&\s*Tools\s*:\s*([\s\S]*?)(?=Data Analysis\s*:|Interpersonal Skills\s*:|Languages\s*:|Volunteering|$)/i,
+    /Data Analysis\s*:\s*([\s\S]*?)(?=Interpersonal Skills\s*:|Languages\s*:|Volunteering|$)/i,
+    /Interpersonal Skills\s*:\s*([\s\S]*?)(?=Languages\s*:|Volunteering|$)/i
+  ];
+  const block = groups.map(pattern => fullText.match(pattern)?.[1] || '').join('\n');
+  const values = block.split(/\n|[,;•]/)
+    .map(value => value.replace(/^[:\-▪*\s]+/, '').replace(/[.]$/, '').trim())
+    .filter(value => value && value.length <= 60 && !/^(?:English|Arabic)\b/i.test(value));
+  return [...new Set(values.map(v => v.replace(/[.]$/, '').trim()))];
+}
+
 function detectSections(lines) {
   const found = [];
   lines.forEach((line, index) => {
@@ -50,18 +87,23 @@ export class DeterministicFallbackProvider extends BaseCVAnalyzerProvider {
 
     const sections = detectSections(lines);
     const firstSectionIndex = Math.min(...Object.values(sections).map(s => s.startIndex), lines.length);
-    const header = lines.slice(0, firstSectionIndex).map(cleanLine).filter(Boolean);
+    const header = lines.slice(0, firstSectionIndex).map(cleanHeaderLine).filter(Boolean);
     const email = fullText.match(/[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0] || '';
     const phone = fullText.match(/(?:\+?\d{1,3}[\s-]?)?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}/)?.[0] || '';
     const links = header.filter(v => /https?:\/\//i.test(v));
     const candidates = header.filter(v => !v.includes('@') && !/https?:\/\//i.test(v) && !/\d{5,}/.test(v));
     const name = candidates.find(v => /^[\p{L}][\p{L} .'-]{2,44}$/u.test(v)) || '';
-    const headline = candidates.find(v => v !== name && v.length <= 80) || '';
     const rows = key => sectionLines(sections, key, lines);
+    const summary = rows('summary').join(' ');
+    const headline = inferHeadline(summary, candidates.filter(v => v !== name));
 
     const experienceRows = rows('experience');
     const educationRows = rows('education');
-    const skills = [...new Set(splitList(rows('skills')).map(v => v.trim()))].map(name => ({ name, category: 'Skills', level: null }));
+    const skillNames = [...splitList(rows('skills')), ...extractSkillsFromText(fullText)]
+      .map(v => v.replace(/^[:\-\s]+/, '').trim())
+      .map(canonicalSkillName)
+      .filter(v => v && !/^(?:Languages\s*:|English|Arabic)\b/i.test(v));
+    const skills = [...new Set(skillNames)].map(name => ({ name, category: 'Skills', level: null }));
     const projects = rows('projects').map((name, i) => ({ id: `project_${i + 1}`, name, description: '', tech: '', url: '', date: '' }));
     const certifications = rows('certifications').map(name => ({ name, title: name, issuer: '', date: '' }));
     const languages = splitList(rows('languages')).map(language => ({ language, proficiency: '' }));
@@ -82,7 +124,7 @@ export class DeterministicFallbackProvider extends BaseCVAnalyzerProvider {
         github: links.find(v => /github\.com/i.test(v)) || '',
         linkedin: links.find(v => /linkedin\.com/i.test(v)) || ''
       },
-      summary: rows('summary').join(' '), experience, education, skills, projects, certifications,
+      summary, experience, education, skills, projects, certifications,
       volunteering: [], languages,
       confidence: { personal: name ? 0.9 : 0.3, experience: experience.length ? 0.65 : 0, education: education.length ? 0.65 : 0, skills: skills.length ? 0.9 : 0 },
       warnings: name && headline ? [] : ['Review name and professional title before continuing.'],
