@@ -5,30 +5,10 @@
  */
 
 import { normalizeCVText } from './CVTextNormalizer.js';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-let pdfjsLoadingPromise = null;
-
-function ensurePdfjsLoaded() {
-  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
-  if (pdfjsLoadingPromise) return pdfjsLoadingPromise;
-
-  pdfjsLoadingPromise = new Promise((resolve) => {
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-    script.onload = () => {
-      if (window.pdfjsLib) {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        resolve(window.pdfjsLib);
-      } else {
-        resolve(null);
-      }
-    };
-    script.onerror = () => resolve(null);
-    document.head.appendChild(script);
-  });
-
-  return pdfjsLoadingPromise;
-}
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 export async function extractTextFromPDF(file) {
   if (!file) throw new Error('No PDF file provided.');
@@ -43,9 +23,8 @@ export async function extractTextFromPDF(file) {
 
   // 1. Attempt PDF.js via CDN auto-injection or global instance
   try {
-    const pdfjs = await ensurePdfjsLoaded();
-    if (pdfjs) {
-      const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+    if (pdfjsLib) {
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       let pageTexts = [];
 
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {

@@ -6,7 +6,6 @@
 
 import { onboardingController } from '../services/OnboardingService.js';
 import { extractTextFromPDF } from '../services/PDFTextExtractor.js';
-import { normalizeCVText } from '../services/CVTextNormalizer.js';
 import { CVParserService } from '../services/CVParserService.js';
 import { mapCVToPortfolioData } from '../services/CVPortfolioMapper.js';
 import { getThemeById } from '../three/ProceduralTheme.js';
@@ -188,21 +187,20 @@ function renderStep1CVUpload(container) {
     if (statusEl) statusEl.textContent = '⏳ Reading PDF & extracting text...';
 
     try {
-      const rawText = await extractTextFromPDF(file);
+      const normalized = await extractTextFromPDF(file);
       if (statusEl) statusEl.textContent = '⚡ Structuring career profile...';
 
-      const normalized = normalizeCVText(rawText);
       const parser = new CVParserService();
       const parsed = await parser.parse(normalized);
       const mapped = mapCVToPortfolioData(parsed);
 
       onboardingController.updateProfileDraft(mapped);
-      if (statusEl) statusEl.textContent = '✓ CV Profile Ready! Proceeding to style selection...';
+      onboardingController.saveState({ importedFromCV: true, startingMethod: 'manual', step: 1 });
+      if (statusEl) statusEl.textContent = '✓ CV Profile Ready! Review the extracted details...';
 
       setTimeout(() => {
-        onboardingController.setStep(2);
         renderCurrentStep();
-      }, 1000);
+      }, 500);
     } catch (err) {
       if (statusEl) statusEl.textContent = '⚠ Could not parse CV automatically. You can enter details manually below.';
     }
@@ -211,15 +209,17 @@ function renderStep1CVUpload(container) {
 
 /** STEP 1: MANUAL FORM */
 function renderStep1ManualForm(container) {
-  const draft = onboardingController.getState().profileDraft;
+  const currentState = onboardingController.getState();
+  const draft = currentState.profileDraft;
+  const isCVReview = Boolean(currentState.importedFromCV);
 
   container.innerHTML = `
     <div style="max-width: 600px; width: 100%; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 36px;">
       <h2 style="font-family: 'Outfit', sans-serif; font-size: 2rem; font-weight: 900; margin-bottom: 8px;">
-        Tell us about yourself
+        ${isCVReview ? 'Review your extracted CV details' : 'Tell us about yourself'}
       </h2>
       <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-bottom: 24px;">
-        Enter your core details to build your first 3D portfolio.
+        ${isCVReview ? 'Check and edit the information before choosing your 3D style.' : 'Enter your core details to build your first 3D portfolio.'}
       </p>
 
       <form id="onboarding-manual-form" onsubmit="handleManualSubmit(event)" style="display: flex; flex-direction: column; gap: 16px;">

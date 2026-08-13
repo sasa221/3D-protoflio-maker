@@ -54,6 +54,7 @@ export function normalizeCVText(rawText) {
     return false;
   };
 
+  let reachedFirstSection = false;
   rawLines.forEach(line => {
     if (!line) {
       if (currentLine) {
@@ -63,7 +64,12 @@ export function normalizeCVText(rawText) {
       return;
     }
 
-    if (isSectionHeader(line) || isBulletOrDateOrTitle(line)) {
+    if (isSectionHeader(line)) reachedFirstSection = true;
+
+    if (!reachedFirstSection) {
+      if (currentLine) { lines.push(currentLine); currentLine = ''; }
+      lines.push(line);
+    } else if (isSectionHeader(line) || isBulletOrDateOrTitle(line)) {
       if (currentLine) {
         lines.push(currentLine);
         currentLine = '';
