@@ -37,16 +37,18 @@ export async function uploadAvatar(file, userId, portfolioId) {
   validateFile(file, ALLOWED_IMAGE_TYPES, MAX_AVATAR_SIZE);
 
   // 1. Retrieve or refresh active Supabase session
-  let { data: sessionData } = await supabase.auth.getSession();
+  let { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
   let session = sessionData?.session;
 
-  if (!session?.access_token) {
-    const { data: refreshedData } = await supabase.auth.refreshSession();
-    session = refreshedData?.session;
-  }
-
-  if (!session?.access_token) {
-    throw new Error('You must be signed in to upload an avatar.');
+  if (sessionErr || !session?.access_token) {
+    const { data: refreshedData, error: refreshErr } = await supabase.auth.refreshSession().catch(() => ({ data: null, error: true }));
+    if (refreshErr || !refreshedData?.session?.access_token) {
+      await supabase.auth.signOut().catch(() => null);
+      try { sessionStorage.clear(); } catch (e) {}
+      window.location.href = '/login';
+      throw new Error('Session expired. Redirecting to sign in...');
+    }
+    session = refreshedData.session;
   }
 
   // 2. Convert File / Blob to Base64 data string
@@ -78,12 +80,25 @@ export async function uploadAvatar(file, userId, portfolioId) {
 
   // 3. Handle 401 token expiration with exactly ONE session refresh and retry
   if (apiRes.status === 401) {
-    const { data: refreshed } = await supabase.auth.refreshSession();
-    if (refreshed?.session?.access_token) {
-      session = refreshed.session;
-      apiRes = await makeUploadRequest(session.access_token).catch((err) => {
-        throw new Error(`Avatar upload retry error: ${err.message}`);
-      });
+    const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession().catch(() => ({ data: null, error: true }));
+    if (refreshErr || !refreshed?.session?.access_token) {
+      // Refresh token is invalid or revoked -> clear stale session and redirect to login
+      await supabase.auth.signOut().catch(() => null);
+      try { sessionStorage.clear(); } catch (e) {}
+      window.location.href = '/login';
+      throw new Error('Session expired or revoked. Please sign in again.');
+    }
+
+    session = refreshed.session;
+    apiRes = await makeUploadRequest(session.access_token).catch((err) => {
+      throw new Error(`Avatar upload retry error: ${err.message}`);
+    });
+
+    if (apiRes.status === 401) {
+      await supabase.auth.signOut().catch(() => null);
+      try { sessionStorage.clear(); } catch (e) {}
+      window.location.href = '/login';
+      throw new Error('Authentication rejected. Please sign in again.');
     }
   }
 

@@ -42,11 +42,23 @@ export async function logoutUser() {
 
 export async function getAuthSession() {
   const { data, error } = await supabase.auth.getSession();
-  if (error) {
-    console.warn('Error fetching Supabase session:', error.message);
+  if (error || !data?.session) {
     return null;
   }
-  return data.session;
+
+  const session = data.session;
+  // If access token is expired or expires within 10 seconds, attempt legitimate refresh
+  const now = Math.floor(Date.now() / 1000);
+  if (session.expires_at && session.expires_at <= now + 10) {
+    const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession().catch(() => ({ data: null, error: true }));
+    if (refreshErr || !refreshed?.session) {
+      await logoutUser();
+      return null;
+    }
+    return refreshed.session;
+  }
+
+  return session;
 }
 
 export const getSession = getAuthSession;
@@ -58,11 +70,16 @@ export const signOut = logoutUser;
 
 export async function getCurrentAuthUser() {
   const session = await getAuthSession();
-  return session ? session.user : null;
+  return session?.user || null;
 }
 
 export function subscribeToAuthStateChange(callback) {
   return supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT') {
+      try { sessionStorage.clear(); } catch (e) {}
+    } else if (event === 'SIGNED_IN' && session?.user) {
+      try { sessionStorage.setItem('supabase_user_cache', JSON.stringify(session.user)); } catch (e) {}
+    }
     callback(event, session);
   });
 }
@@ -102,14 +119,22 @@ export async function updateUserPassword(newPassword) {
   return data;
 }
 
-// Backward compatibility helper wrappers for existing UI forms
+// Session-backed helper wrappers
 export function getCurrentUser() {
-  const sessionUser = JSON.parse(sessionStorage.getItem('supabase_user_cache') || 'null');
-  return sessionUser || { id: 'usr_guest', name: 'Saleh Aborehab', email: 'eng.salehmohammedd@gmail.com' };
+  try {
+    const sessionUser = JSON.parse(sessionStorage.getItem('supabase_user_cache') || 'null');
+    return sessionUser || null;
+  } catch (e) {
+    return null;
+  }
 }
 
 export function isLoggedIn() {
-  return true;
+  try {
+    return Boolean(sessionStorage.getItem('supabase_user_cache'));
+  } catch (e) {
+    return false;
+  }
 }
 
 export function isPro() {

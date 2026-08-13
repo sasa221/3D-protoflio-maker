@@ -287,7 +287,7 @@ async function router() {
   if (path === '/studio') {
     setPageTitle('Creator Studio');
     const authUser = await getCurrentAuthUser();
-    if (!authUser || authUser.id === 'usr_guest') {
+    if (!authUser) {
       window.location.href = '/login';
       return;
     }
@@ -382,12 +382,17 @@ function render404Page(target) {
 function init() {
   router();
 
-  subscribeToAuthStateChange((event) => {
+  subscribeToAuthStateChange((event, session) => {
     if (event === 'PASSWORD_RECOVERY') {
       setPageTitle('Set New Password');
       renderResetPasswordPage(() => {
         window.location.href = '/login';
       });
+    } else if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
+      if (window.location.pathname === '/studio') {
+        try { sessionStorage.clear(); } catch (e) {}
+        window.location.href = '/login';
+      }
     }
   });
 }
@@ -1386,8 +1391,13 @@ window.saveAvatarCrop = function() {
       showToast('info', '⏳', 'Uploading avatar to Supabase Storage...');
       try {
         const authUser = await getCurrentAuthUser();
-        const userId = authUser?.id || 'usr_guest';
-        const portfolioId = portfolioData.id || 'pf_default';
+        if (!authUser) {
+          showToast('error', '🔒', 'Session expired. Redirecting to sign in...');
+          window.location.href = '/login';
+          return;
+        }
+        const userId = authUser.id;
+        const portfolioId = portfolioData.id || 'default';
 
         const file = new File([blob], 'avatar.webp', { type: 'image/webp' });
         const avatarMeta = await uploadAvatar(file, userId, portfolioId);
@@ -1813,8 +1823,13 @@ window.handleResumeUpload = async function(input) {
 
   try {
     const authUser = await getCurrentAuthUser();
-    const userId = authUser?.id || 'usr_guest';
-    const portfolioId = portfolioData.id || 'pf_default';
+    if (!authUser) {
+      showToast('error', '🔒', 'Session expired. Please sign in.');
+      window.location.href = '/login';
+      return;
+    }
+    const userId = authUser.id;
+    const portfolioId = portfolioData.id || 'default';
 
     const resumeMeta = await uploadResume(file, userId, portfolioId);
     portfolioData.resume = {
@@ -1913,8 +1928,13 @@ window.uploadProjectImage = async function(i, inputEl) {
 
   try {
     const authUser = await getCurrentAuthUser();
-    const userId = authUser?.id || 'usr_guest';
-    const portfolioId = portfolioData.id || 'pf_default';
+    if (!authUser) {
+      showToast('error', '🔒', 'Session expired. Please sign in.');
+      window.location.href = '/login';
+      return;
+    }
+    const userId = authUser.id;
+    const portfolioId = portfolioData.id || 'default';
     const projectId = portfolioData.projects[i]?.id || `proj_${i}`;
 
     const mediaMeta = await uploadProjectMedia(file, userId, portfolioId, projectId);
