@@ -5,7 +5,11 @@
 import './index.css';
 import { renderAuthPage, renderResetPasswordPage } from './AuthPage.js';
 import { renderAdminPage } from './AdminPage.js';
+import { supabase } from './services/SupabaseClient.js';
 import { isLoggedIn, getCurrentUser, getCurrentAuthUser, isPro, logout, upgradeToPro, isAdmin, redeemPromoCode, subscribeToAuthStateChange } from './services/AuthService.js';
+
+window.supabase = supabase;
+window.getCurrentAuthUser = getCurrentAuthUser;
 import { HyperEngine } from './three/HyperEngine.js';
 import { classifyProfession, getThemeById, getAllThemes } from './three/ProceduralTheme.js';
 import { exportStandaloneHTML, generateShareableURL } from './exporter/PortfolioExporter.js';
