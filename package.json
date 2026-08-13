@@ -1,0 +1,24 @@
+{
+  "name": "protofolio-maker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^8.2.0"
+  },
+  "dependencies": {
+    "@sentry/browser": "^10.70.0",
+    "@supabase/supabase-js": "^2.112.3",
+    "canvas-confetti": "^1.9.4",
+    "gsap": "^3.15.0",
+    "lucide": "^1.31.0",
+    "qrcode": "^1.5.4",
+    "stripe": "^22.5.0",
+    "three": "^0.185.1"
+  }
+}

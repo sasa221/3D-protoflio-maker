@@ -1,0 +1,458 @@
+/**
+ * OnboardingWizard.js
+ * Dedicated /start Onboarding Route UI.
+ * Fast, guided, non-technical first portfolio creation wizard.
+ */
+
+import { onboardingController } from '../services/OnboardingService.js';
+import { extractTextFromPDF } from '../services/PDFTextExtractor.js';
+import { normalizeCVText } from '../services/CVTextNormalizer.js';
+import { CVParserService } from '../services/CVParserService.js';
+import { mapCVToPortfolioData } from '../services/CVPortfolioMapper.js';
+import { getThemeById } from '../three/ProceduralTheme.js';
+import { HyperEngine } from '../three/HyperEngine.js';
+import { generatePortfolioCSS, generatePortfolioHTMLBody } from '../renderer/PortfolioRenderer.js';
+
+let onboardingEngine = null;
+
+export async function renderOnboardingWizard(container) {
+  if (!container) return;
+
+  window.onboardingController = onboardingController;
+
+  container.style.display = 'block';
+  container.style.height = 'auto';
+  container.style.minHeight = '100vh';
+  container.style.overflowY = 'auto';
+  document.body.style.overflowY = 'auto';
+
+  const state = await onboardingController.initializeForCurrentUser();
+
+  container.innerHTML = `
+    <div style="min-height: 100vh; background: #050508; color: #fff; font-family: 'Inter', sans-serif; display: flex; flex-direction: column;">
+      
+      <!-- TOP MINIMAL ONBOARDING HEADER -->
+      <header style="
+        padding: 18px 40px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex;
+        justify-content: space-between; align-items: center; background: rgba(5,5,12,0.85); backdrop-filter: blur(15px);
+      ">
+        <a href="/" style="display: flex; align-items: center; gap: 10px; text-decoration: none;">
+          <div style="width: 34px; height: 34px; border-radius: 8px; background: linear-gradient(135deg,#7c3aed,#06b6d4); display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">⚡</div>
+          <span style="font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 800; color: #fff;">3D Portfolio Maker</span>
+        </a>
+
+        <!-- PROGRESS STEPS -->
+        <div style="display: flex; gap: 24px; font-size: 0.82rem; font-weight: 700;">
+          <span style="color: ${state.step >= 1 ? '#a855f7' : 'rgba(255,255,255,0.4)'};">1. Your Profile</span>
+          <span style="color: rgba(255,255,255,0.3);">➔</span>
+          <span style="color: ${state.step >= 2 ? '#a855f7' : 'rgba(255,255,255,0.4)'};">2. Your Style</span>
+          <span style="color: rgba(255,255,255,0.3);">➔</span>
+          <span style="color: ${state.step >= 3 ? '#a855f7' : 'rgba(255,255,255,0.4)'};">3. Live Preview</span>
+        </div>
+
+        <a href="/login" style="color: rgba(255,255,255,0.6); font-size: 0.85rem; font-weight: 600; text-decoration:none;">Sign in</a>
+      </header>
+
+      <!-- MAIN STEP CONTAINER -->
+      <main id="onboarding-step-view" style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px 20px;">
+        <!-- Step UI rendered dynamically -->
+      </main>
+    </div>
+  `;
+
+  renderCurrentStep();
+}
+
+function renderCurrentStep() {
+  const stepView = document.getElementById('onboarding-step-view');
+  if (!stepView) return;
+
+  const state = onboardingController.getState();
+
+  if (state.step === 1) {
+    if (!state.startingMethod) {
+      renderStep1ChooseMethod(stepView);
+    } else if (state.startingMethod === 'cv') {
+      renderStep1CVUpload(stepView);
+    } else {
+      renderStep1ManualForm(stepView);
+    }
+  } else if (state.step === 2) {
+    renderStep2ChooseStyle(stepView);
+  } else if (state.step === 3) {
+    renderStep3LivePreview(stepView);
+  }
+}
+
+// Inline handlers in the generated markup need an explicit browser-global bridge.
+window.renderCurrentStep = renderCurrentStep;
+
+/** STEP 1: CHOOSE METHOD */
+function renderStep1ChooseMethod(container) {
+  container.innerHTML = `
+    <div style="max-width: 720px; width: 100%; text-align: center;">
+      <h1 style="font-family: 'Outfit', sans-serif; font-size: 2.4rem; font-weight: 900; margin-bottom: 12px;">
+        How would you like to start?
+      </h1>
+      <p style="color: rgba(255,255,255,0.65); font-size: 1.05rem; margin-bottom: 40px;">
+        Choose the fastest option for your current career materials.
+      </p>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+        <!-- OPTION A: CV IMPORT -->
+        <div onclick="selectMethod('cv')" style="
+          background: rgba(124,58,237,0.08); border: 2px solid #7c3aed; border-radius: 20px; padding: 36px 24px;
+          cursor: pointer; text-align: left; transition: transform 0.2s; position: relative;
+        " onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='none'">
+          <div style="
+            position: absolute; top: -12px; right: 20px; background: #7c3aed; padding: 4px 12px;
+            border-radius: 20px; font-size: 0.7rem; font-weight: 800; color: #fff;
+          ">FASTEST — RECOMMENDED</div>
+          <div style="font-size: 2.5rem; margin-bottom: 16px;">📄</div>
+          <h3 style="font-size: 1.3rem; font-weight: 800; margin-bottom: 8px;">Import My CV</h3>
+          <p style="font-size: 0.88rem; color: rgba(255,255,255,0.65); line-height: 1.6;">
+            Upload your PDF resume. Experience, projects, education, and skills will be extracted automatically for review.
+          </p>
+        </div>
+
+        <!-- OPTION B: MANUAL START -->
+        <div onclick="selectMethod('manual')" style="
+          background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 36px 24px;
+          cursor: pointer; text-align: left; transition: transform 0.2s;
+        " onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='none'">
+          <div style="font-size: 2.5rem; margin-bottom: 16px;">✍️</div>
+          <h3 style="font-size: 1.3rem; font-weight: 800; margin-bottom: 8px;">Start Manually</h3>
+          <p style="font-size: 0.88rem; color: rgba(255,255,255,0.65); line-height: 1.6;">
+            Enter your name, professional title, short bio, and key skills step-by-step.
+          </p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  window.selectMethod = (method) => {
+    onboardingController.setStartingMethod(method);
+    renderCurrentStep();
+  };
+}
+
+/** STEP 1: CV UPLOAD & REVIEW */
+function renderStep1CVUpload(container) {
+  container.innerHTML = `
+    <div style="max-width: 680px; width: 100%; text-align: center;">
+      <h2 style="font-family: 'Outfit', sans-serif; font-size: 2.1rem; font-weight: 900; margin-bottom: 10px;">
+        Upload your CV PDF
+      </h2>
+      <p style="color: rgba(255,255,255,0.65); margin-bottom: 30px;">
+        We'll extract your career data for your review before creating your portfolio.
+      </p>
+
+      <div id="cv-drop-zone" style="
+        border: 2px dashed rgba(124,58,237,0.5); background: rgba(124,58,237,0.05); border-radius: 20px;
+        padding: 50px 30px; text-align: center; cursor: pointer; transition: background 0.2s;
+      " onclick="document.getElementById('cv-file-input').click()">
+        <div style="font-size: 3rem; margin-bottom: 16px;">📄</div>
+        <div style="font-size: 1.1rem; font-weight: 800; margin-bottom: 8px;">Drop your CV here or click to browse</div>
+        <div style="font-size: 0.82rem; color: rgba(255,255,255,0.5);">Supports PDF files up to 10MB</div>
+        <input type="file" id="cv-file-input" accept=".pdf" style="display: none;" onchange="handleCVUpload(event)">
+      </div>
+
+      <div id="cv-upload-status" style="margin-top: 20px; font-weight: 700; font-size: 0.9rem; color: #a855f7;"></div>
+
+      <div style="margin-top: 30px; display: flex; justify-content: space-between; align-items: center;">
+        <button onclick="resetStartingMethod()" style="background: none; border: none; color: rgba(255,255,255,0.5); font-weight: 600; cursor: pointer;">
+          ← Back
+        </button>
+        <button onclick="skipToManualForm()" style="background: none; border: none; color: #06b6d4; font-weight: 700; cursor: pointer;">
+          Enter Details Manually Instead ➔
+        </button>
+      </div>
+    </div>
+  `;
+
+  window.resetStartingMethod = () => {
+    onboardingController.saveState({ startingMethod: null });
+    renderCurrentStep();
+  };
+
+  window.skipToManualForm = () => {
+    onboardingController.saveState({ startingMethod: 'manual' });
+    renderCurrentStep();
+  };
+
+  window.handleCVUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const statusEl = document.getElementById('cv-upload-status');
+    if (statusEl) statusEl.textContent = '⏳ Reading PDF & extracting text...';
+
+    try {
+      const rawText = await extractTextFromPDF(file);
+      if (statusEl) statusEl.textContent = '⚡ Structuring career profile...';
+
+      const normalized = normalizeCVText(rawText);
+      const parser = new CVParserService();
+      const parsed = await parser.parse(normalized);
+      const mapped = mapCVToPortfolioData(parsed);
+
+      onboardingController.updateProfileDraft(mapped);
+      if (statusEl) statusEl.textContent = '✓ CV Profile Ready! Proceeding to style selection...';
+
+      setTimeout(() => {
+        onboardingController.setStep(2);
+        renderCurrentStep();
+      }, 1000);
+    } catch (err) {
+      if (statusEl) statusEl.textContent = '⚠ Could not parse CV automatically. You can enter details manually below.';
+    }
+  };
+}
+
+/** STEP 1: MANUAL FORM */
+function renderStep1ManualForm(container) {
+  const draft = onboardingController.getState().profileDraft;
+
+  container.innerHTML = `
+    <div style="max-width: 600px; width: 100%; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 36px;">
+      <h2 style="font-family: 'Outfit', sans-serif; font-size: 2rem; font-weight: 900; margin-bottom: 8px;">
+        Tell us about yourself
+      </h2>
+      <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-bottom: 24px;">
+        Enter your core details to build your first 3D portfolio.
+      </p>
+
+      <form id="onboarding-manual-form" onsubmit="handleManualSubmit(event)" style="display: flex; flex-direction: column; gap: 16px;">
+        <div>
+          <label style="display: block; font-size: 0.8rem; font-weight: 700; color: rgba(255,255,255,0.8); margin-bottom: 6px;">Your Name *</label>
+          <input type="text" id="ob-name" required value="${draft.name || ''}" placeholder="e.g. Alex Rivera" style="width: 100%; padding: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; color: #fff;">
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 0.8rem; font-weight: 700; color: rgba(255,255,255,0.8); margin-bottom: 6px;">Professional Title *</label>
+          <input type="text" id="ob-profession" required value="${draft.profession || ''}" placeholder="e.g. Front-End Developer / Data Analyst" style="width: 100%; padding: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; color: #fff;">
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 0.8rem; font-weight: 700; color: rgba(255,255,255,0.8); margin-bottom: 6px;">Short Bio</label>
+          <textarea id="ob-bio" rows="3" placeholder="Brief summary of what you build & your core expertise..." style="width: 100%; padding: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; color: #fff; font-family: inherit;">${draft.bio || ''}</textarea>
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 0.8rem; font-weight: 700; color: rgba(255,255,255,0.8); margin-bottom: 6px;">Primary Skills (comma-separated)</label>
+          <input type="text" id="ob-skills" value="${(draft.skills || []).map(s => typeof s === 'string' ? s : s.name).join(', ')}" placeholder="JavaScript, React, Three.js, REST APIs" style="width: 100%; padding: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; color: #fff;">
+        </div>
+
+        <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+          <button type="button" onclick="resetStartingMethod()" style="background: none; border: none; color: rgba(255,255,255,0.5); font-weight: 600; cursor: pointer;">
+            ← Back
+          </button>
+          <button type="submit" style="padding: 12px 28px; background: linear-gradient(135deg,#7c3aed,#06b6d4); border: none; border-radius: 10px; color: #fff; font-weight: 800; cursor: pointer;">
+            Continue to Style ➔
+          </button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  window.handleManualSubmit = (e) => {
+    e.preventDefault();
+    const name = document.getElementById('ob-name').value;
+    const profession = document.getElementById('ob-profession').value;
+    const bio = document.getElementById('ob-bio').value;
+    const skillsRaw = document.getElementById('ob-skills').value;
+    const skills = skillsRaw.split(',').map(s => ({ name: s.trim(), level: 85 })).filter(s => s.name);
+
+    onboardingController.updateProfileDraft({ name, profession, bio, skills });
+    onboardingController.setStep(2);
+    renderCurrentStep();
+  };
+}
+
+/** STEP 2: CHOOSE YOUR STYLE */
+function renderStep2ChooseStyle(container) {
+  const state = onboardingController.getState();
+  const selectedTheme = state.selectedTheme || 'code';
+
+  container.innerHTML = `
+    <div style="max-width: 960px; width: 100%;">
+      <div style="text-align: center; margin-bottom: 30px;">
+        <h2 style="font-family: 'Outfit', sans-serif; font-size: 2.2rem; font-weight: 900; margin-bottom: 8px;">
+          Choose your 3D environment style
+        </h2>
+        <p style="color: rgba(255,255,255,0.65);">
+          Recommended style based on your profession: <strong style="color: #06b6d4;">${(state.profileDraft.profession || '').includes('Data') ? 'Data Galaxy' : 'Code Matrix'}</strong>
+        </p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 36px;">
+        <!-- CODE MATRIX -->
+        <div onclick="selectTheme('code')" style="
+          background: ${selectedTheme === 'code' ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.03)'};
+          border: 2px solid ${selectedTheme === 'code' ? '#7c3aed' : 'rgba(255,255,255,0.1)'};
+          border-radius: 16px; padding: 20px; cursor: pointer; text-align: center; transition: all 0.2s;
+        ">
+          <div style="font-size: 2rem; margin-bottom: 10px;">💻</div>
+          <div style="font-weight: 800; font-size: 1rem; margin-bottom: 4px;">Code Matrix</div>
+          <div style="font-size: 0.72rem; color: rgba(255,255,255,0.5); margin-bottom: 12px;">Web & Software</div>
+          <span style="padding: 2px 8px; background: rgba(16,185,129,0.2); color: #10b981; border-radius: 4px; font-size: 0.68rem; font-weight: 800;">FREE</span>
+        </div>
+
+        <!-- DATA GALAXY -->
+        <div onclick="selectTheme('data')" style="
+          background: ${selectedTheme === 'data' ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.03)'};
+          border: 2px solid ${selectedTheme === 'data' ? '#7c3aed' : 'rgba(255,255,255,0.1)'};
+          border-radius: 16px; padding: 20px; cursor: pointer; text-align: center; transition: all 0.2s;
+        ">
+          <div style="font-size: 2rem; margin-bottom: 10px;">📊</div>
+          <div style="font-weight: 800; font-size: 1rem; margin-bottom: 4px;">Data Galaxy</div>
+          <div style="font-size: 0.72rem; color: rgba(255,255,255,0.5); margin-bottom: 12px;">BI & Data Science</div>
+          <span style="padding: 2px 8px; background: rgba(16,185,129,0.2); color: #10b981; border-radius: 4px; font-size: 0.68rem; font-weight: 800;">FREE</span>
+        </div>
+
+        <!-- CYBER COMMAND -->
+        <div onclick="selectTheme('cyber')" style="
+          background: ${selectedTheme === 'cyber' ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.03)'};
+          border: 2px solid ${selectedTheme === 'cyber' ? '#7c3aed' : 'rgba(255,255,255,0.1)'};
+          border-radius: 16px; padding: 20px; cursor: pointer; text-align: center; transition: all 0.2s;
+        ">
+          <div style="font-size: 2rem; margin-bottom: 10px;">🛡️</div>
+          <div style="font-weight: 800; font-size: 1rem; margin-bottom: 4px;">Cyber Command</div>
+          <div style="font-size: 0.72rem; color: rgba(255,255,255,0.5); margin-bottom: 12px;">Security & Infra</div>
+          <span style="padding: 2px 8px; background: rgba(124,58,237,0.3); color: #a855f7; border-radius: 4px; font-size: 0.68rem; font-weight: 800;">PRO</span>
+        </div>
+
+        <!-- COSMIC ELITE -->
+        <div onclick="selectTheme('cosmic')" style="
+          background: ${selectedTheme === 'cosmic' ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.03)'};
+          border: 2px solid ${selectedTheme === 'cosmic' ? '#7c3aed' : 'rgba(255,255,255,0.1)'};
+          border-radius: 16px; padding: 20px; cursor: pointer; text-align: center; transition: all 0.2s;
+        ">
+          <div style="font-size: 2rem; margin-bottom: 10px;">🌌</div>
+          <div style="font-weight: 800; font-size: 1rem; margin-bottom: 4px;">Cosmic Elite</div>
+          <div style="font-size: 0.72rem; color: rgba(255,255,255,0.5); margin-bottom: 12px;">Executive & General</div>
+          <span style="padding: 2px 8px; background: rgba(124,58,237,0.3); color: #a855f7; border-radius: 4px; font-size: 0.68rem; font-weight: 800;">PRO</span>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <button onclick="onboardingController.setStep(1); renderCurrentStep();" style="background: none; border: none; color: rgba(255,255,255,0.5); font-weight: 600; cursor: pointer;">
+          ← Back
+        </button>
+        <button onclick="onboardingController.setStep(3); renderCurrentStep();" style="padding: 14px 32px; background: linear-gradient(135deg,#7c3aed,#06b6d4); border: none; border-radius: 12px; color: #fff; font-weight: 800; cursor: pointer; box-shadow: 0 4px 20px rgba(124,58,237,0.4);">
+          Generate First Portfolio ➔
+        </button>
+      </div>
+    </div>
+  `;
+
+  window.selectTheme = (themeId) => {
+    onboardingController.setSelectedTheme(themeId);
+    renderCurrentStep();
+  };
+}
+
+/** STEP 3: FIRST LIVE PREVIEW & STUDIO HANDOFF */
+async function renderStep3LivePreview(container) {
+  const state = onboardingController.getState();
+  if (!onboardingController.isProfileValid(state) || !state.selectedTheme) {
+    onboardingController.setStep(onboardingController.isProfileValid(state) ? 2 : 1);
+    renderCurrentStep();
+    return;
+  }
+  container.innerHTML = `
+    <div style="max-width: 1000px; width: 100%; text-align: center;">
+      <div style="font-size: 0.8rem; font-weight: 800; color: #10b981; letter-spacing: 1.5px; margin-bottom: 6px;">
+        ✨ YOUR PORTFOLIO PREVIEW IS READY
+      </div>
+      <h2 style="font-family: 'Outfit', sans-serif; font-size: 2.2rem; font-weight: 900; margin-bottom: 16px;">
+        Here is your live 3D career portfolio
+      </h2>
+
+      <!-- PREVIEW VIEWPORT -->
+      <div id="ob-preview-viewport" style="
+        height: 480px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.12);
+        background: #000; overflow: hidden; position: relative; margin-bottom: 24px;
+      ">
+        <canvas id="ob-preview-canvas" style="width: 100%; height: 100%; display: block;"></canvas>
+        <div id="ob-preview-html" style="position: absolute; inset: 0; overflow-y: auto; z-index: 10;"></div>
+        <div id="ob-preview-status" style="position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:#050508;color:rgba(255,255,255,.75);font-weight:700">Preparing your 3D portfolio...</div>
+      </div>
+
+      <!-- HANDOFF ACTIONS -->
+      <div style="display: flex; gap: 16px; justify-content: center; align-items: center;">
+        <button onclick="finishOnboardingAndEnterStudio()" style="
+          padding: 16px 36px; background: linear-gradient(135deg,#7c3aed,#06b6d4); border: none; border-radius: 12px;
+          color: #fff; font-size: 1rem; font-weight: 800; cursor: pointer; box-shadow: 0 8px 30px rgba(124,58,237,0.4);
+        ">
+          ⚡ Enter Studio Workspace
+        </button>
+
+        <button onclick="finishOnboardingAndPublish()" style="
+          padding: 16px 28px; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); border-radius: 12px;
+          color: #10b981; font-size: 0.95rem; font-weight: 800; cursor: pointer;
+        ">
+          🌐 Publish Portfolio Now
+        </button>
+      </div>
+    </div>
+  `;
+
+  // Preview validated local draft first. Persist only after an explicit user action.
+  const pf = { id: state.portfolioId, slug: state.publicSlug, theme: state.selectedTheme, master_profile_json: { ...state.profileDraft, theme: state.selectedTheme } };
+  initOnboardingPreview(pf);
+
+  window.finishOnboardingAndEnterStudio = async () => {
+    const saved = await onboardingController.saveFirstPortfolio();
+    window.location.href = `/studio?portfolio=${saved.id}`;
+  };
+
+  window.finishOnboardingAndPublish = async () => {
+    try {
+      const saved = await onboardingController.saveFirstPortfolio();
+      const res = await fetch('/api/deploy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          portfolioId: saved.id,
+          slug: saved.slug || `user-${Date.now()}`,
+          masterProfile: saved.master_profile_json || pf.master_profile_json
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Publish failed');
+
+      alert(`🎉 Published successfully! Live URL: ${data.url}`);
+      window.location.href = `/studio?portfolio=${pf.id}`;
+    } catch (e) {
+      alert(`Publish failed: ${e.message}`);
+    }
+  };
+}
+
+function initOnboardingPreview(pf) {
+  const canvas = document.getElementById('ob-preview-canvas');
+  const htmlContainer = document.getElementById('ob-preview-html');
+  if (!canvas || !htmlContainer) return;
+
+  try {
+    const theme = getThemeById(pf.theme || 'code');
+    let styleTag = document.getElementById('onboarding-portfolio-preview-style');
+    if (!styleTag) {
+      styleTag = document.createElement('style');
+      styleTag.id = 'onboarding-portfolio-preview-style';
+      document.head.appendChild(styleTag);
+    }
+    styleTag.textContent = generatePortfolioCSS(theme);
+    onboardingEngine = new HyperEngine(canvas);
+    onboardingEngine.init(theme);
+
+    const html = generatePortfolioHTMLBody(pf.master_profile_json || pf, theme, { deviceMode: 'desktop' });
+    htmlContainer.innerHTML = html;
+    document.getElementById('ob-preview-status')?.remove();
+  } catch (e) {
+    console.warn('[OnboardingWizard] Preview error:', e.message);
+    const status = document.getElementById('ob-preview-status');
+    if (status) status.innerHTML = `<div style="max-width:420px;padding:24px"><div style="font-size:1.1rem;margin-bottom:8px">3D preview could not start</div><div style="font-size:.85rem;color:rgba(255,255,255,.55);margin-bottom:16px">Your portfolio content is safe. Try the preview again.</div><button onclick="renderCurrentStep()" style="padding:10px 18px;border:0;border-radius:8px;background:#7c3aed;color:white;font-weight:700;cursor:pointer">Retry preview</button></div>`;
+  }
+}
