@@ -566,6 +566,22 @@ export function renderResetPasswordPage(onSuccess) {
     if (err) err.style.display = 'none';
 
     try {
+      // Ensure recovery session is active if tokens exist in URL hash or search
+      const hash = window.location.hash || '';
+      if (hash.includes('access_token=')) {
+        const hashPart = hash.replace(/^#/, '');
+        const params = new URLSearchParams(hashPart);
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+        if (accessToken && refreshToken) {
+          const { supabase } = await import('./services/SupabaseClient.js');
+          await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          });
+        }
+      }
+
       const { updateUserPassword } = await import('./services/AuthService.js');
       await updateUserPassword(newPass);
 
