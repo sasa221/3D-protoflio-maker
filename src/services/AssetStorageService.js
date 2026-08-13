@@ -36,18 +36,50 @@ export function validateFile(file, allowedTypes, maxSizeBytes) {
 export async function uploadAvatar(file, userId, portfolioId) {
   validateFile(file, ALLOWED_IMAGE_TYPES, MAX_AVATAR_SIZE);
 
-  // Get active Supabase auth user to ensure canonical user ID matching RLS auth.uid()
-  const { data: authData } = await supabase.auth.getUser();
-  const activeUser = authData?.user;
+  const { data: sessionData } = await supabase.auth.getSession();
+  const session = sessionData?.session;
+  const activeUser = session?.user;
 
   const canonicalUserId = activeUser?.id || (userId && userId !== 'usr_guest' ? userId : null);
   if (!canonicalUserId) {
     throw new Error('You must be signed in to upload an avatar.');
   }
 
+  // Convert File / Blob to Base64 data string
+  const base64Data = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (e) => reject(e);
+    reader.readAsDataURL(file);
+  });
+
+  const apiRes = await fetch('/api/storage/upload-avatar', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session?.access_token || ''}`
+    },
+    body: JSON.stringify({
+      fileBase64: base64Data,
+      portfolioId: portfolioId || 'default',
+      contentType: file.type || 'image/webp'
+    })
+  }).catch(() => null);
+
+  if (apiRes && apiRes.ok) {
+    const json = await apiRes.json();
+    return {
+      storageBucket: 'avatars',
+      storagePath: json.storagePath,
+      publicUrl: json.publicUrl,
+      updatedAt: json.updatedAt
+    };
+  }
+
+  // Fallback to direct SDK upload if API route is unreachable
   const ext = file.name ? file.name.split('.').pop().toLowerCase() : 'webp';
   const sanitizedExt = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) ? ext : 'webp';
-  const safePortfolioId = portfolioId || 'default';
+  const safePortfolioId = portfolioId && portfolioId !== 'pf_default' ? portfolioId : 'default';
   const storagePath = `${canonicalUserId}/${safePortfolioId}/avatar.${sanitizedExt}`;
 
   const { error: uploadErr } = await supabase.storage
