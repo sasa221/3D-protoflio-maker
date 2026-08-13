@@ -1263,7 +1263,18 @@ window.uploadUserAvatar = function(inputEl) {
   reader.readAsDataURL(file);
 };
 
+let isAvatarUploading = false;
+
 window.saveAvatarCrop = function() {
+  if (isAvatarUploading) return;
+
+  const saveBtn = document.getElementById('save-avatar-btn') || document.querySelector('#avatar-crop-modal button.btn-primary');
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = '⏳ Uploading...';
+  }
+  isAvatarUploading = true;
+
   // High-Resolution 600x600 HD HTML5 Canvas Crop Engine
   const canvas = document.createElement('canvas');
   const size = 600;
@@ -1328,9 +1339,23 @@ window.saveAvatarCrop = function() {
         autoSave();
       } catch (err) {
         showToast('error', '❌', `Avatar upload failed: ${err.message}`);
+      } finally {
+        isAvatarUploading = false;
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = '💾 حفظ وتطبيق الصورة';
+        }
       }
     }, 'image/webp', 0.95);
     ctx.restore();
+  };
+  img.onerror = function() {
+    isAvatarUploading = false;
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = '💾 حفظ وتطبيق الصورة';
+    }
+    showToast('error', '❌', 'Failed to load avatar image for cropping.');
   };
   img.src = tempCropState.src;
 };

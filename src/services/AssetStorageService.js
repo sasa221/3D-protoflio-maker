@@ -36,9 +36,19 @@ export function validateFile(file, allowedTypes, maxSizeBytes) {
 export async function uploadAvatar(file, userId, portfolioId) {
   validateFile(file, ALLOWED_IMAGE_TYPES, MAX_AVATAR_SIZE);
 
+  // Get active Supabase auth user to ensure canonical user ID matching RLS auth.uid()
+  const { data: authData } = await supabase.auth.getUser();
+  const activeUser = authData?.user;
+
+  const canonicalUserId = activeUser?.id || (userId && userId !== 'usr_guest' ? userId : null);
+  if (!canonicalUserId) {
+    throw new Error('You must be signed in to upload an avatar.');
+  }
+
   const ext = file.name ? file.name.split('.').pop().toLowerCase() : 'webp';
   const sanitizedExt = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) ? ext : 'webp';
-  const storagePath = `${userId}/${portfolioId}/avatar.${sanitizedExt}`;
+  const safePortfolioId = portfolioId || 'default';
+  const storagePath = `${canonicalUserId}/${safePortfolioId}/avatar.${sanitizedExt}`;
 
   const { error: uploadErr } = await supabase.storage
     .from('avatars')
@@ -70,8 +80,17 @@ export async function uploadAvatar(file, userId, portfolioId) {
 export async function uploadResume(file, userId, portfolioId) {
   validateFile(file, ALLOWED_RESUME_TYPES, MAX_RESUME_SIZE);
 
+  const { data: authData } = await supabase.auth.getUser();
+  const activeUser = authData?.user;
+
+  const canonicalUserId = activeUser?.id || (userId && userId !== 'usr_guest' ? userId : null);
+  if (!canonicalUserId) {
+    throw new Error('You must be signed in to upload a resume.');
+  }
+
   const sanitizedFileName = file.name ? file.name.replace(/[^a-zA-Z0-9._-]/g, '_') : 'resume.pdf';
-  const storagePath = `${userId}/${portfolioId}/resume.pdf`;
+  const safePortfolioId = portfolioId || 'default';
+  const storagePath = `${canonicalUserId}/${safePortfolioId}/resume.pdf`;
 
   const { error: uploadErr } = await supabase.storage
     .from('resumes')
@@ -101,9 +120,19 @@ export async function uploadResume(file, userId, portfolioId) {
 export async function uploadProjectMedia(file, userId, portfolioId, projectId) {
   validateFile(file, ALLOWED_IMAGE_TYPES, MAX_MEDIA_SIZE);
 
+  const { data: authData } = await supabase.auth.getUser();
+  const activeUser = authData?.user;
+
+  const canonicalUserId = activeUser?.id || (userId && userId !== 'usr_guest' ? userId : null);
+  if (!canonicalUserId) {
+    throw new Error('You must be signed in to upload project media.');
+  }
+
   const timestamp = Date.now();
   const sanitizedName = file.name ? file.name.replace(/[^a-zA-Z0-9._-]/g, '_') : `media_${timestamp}.webp`;
-  const storagePath = `${userId}/${portfolioId}/${projectId}/${timestamp}_${sanitizedName}`;
+  const safePortfolioId = portfolioId || 'default';
+  const safeProjectId = projectId || 'p1';
+  const storagePath = `${canonicalUserId}/${safePortfolioId}/${safeProjectId}/${timestamp}_${sanitizedName}`;
 
   const { error: uploadErr } = await supabase.storage
     .from('project-media')
