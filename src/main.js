@@ -33,6 +33,7 @@ import { renderPortfolioVariantManager } from './ui/PortfolioVariantManager.js';
 import { runPortfolioVariantsTestSuite } from './tests/VariantResolverFixtures.js';
 import { renderAnalyticsDashboard } from './ui/AnalyticsDashboard.js';
 import { runAnalyticsTestSuite } from './tests/AnalyticsTestSuite.js';
+import { initPublicPortfolioAnalytics } from './services/AnalyticsService.js';
 import { openBillingModal } from './ui/BillingModal.js';
 import { renderCustomDomainPanel } from './ui/CustomDomainPanel.js';
 import { runMonetizationTestSuite } from './tests/MonetizationTestSuite.js';
@@ -306,7 +307,8 @@ async function handlePublicRoute(username, variantSlug) {
       return;
     }
 
-    let masterData = pf.master_profile_json || {};
+    let masterJson = pf.master_profile_json || {};
+    let masterData = masterJson.publishedProfile || masterJson;
     masterData.id = pf.id;
     let activeData = masterData;
 
@@ -338,6 +340,9 @@ async function handlePublicRoute(username, variantSlug) {
     const canvas = document.getElementById('bg-canvas');
     engine = new HyperEngine(canvas);
     engine.init(theme);
+
+    // Initialize Real Analytics Tracking for Public Visitors
+    initPublicPortfolioAnalytics(pf.id, variantSlug || 'general');
 
   } catch (e) {
     render404Page(username);

@@ -325,3 +325,81 @@ export function aggregateAnalyticsEvents(events = []) {
 }
 
 export const globalAnalytics = new AnalyticsService();
+
+export function initPublicPortfolioAnalytics(portfolioId, variantId = 'general') {
+  if (!portfolioId) return;
+
+  const context = { portfolioId, variantId };
+  const device = window.innerWidth <= 768 ? 'Mobile' : 'Desktop';
+
+  // 1. Initial Portfolio / Variant View
+  globalAnalytics.track('portfolio_view', { device }, context);
+  if (variantId && variantId !== 'general') {
+    globalAnalytics.track('variant_viewed', { variantId, device }, context);
+  }
+
+  // 2. Section Intersection Observer
+  if (typeof IntersectionObserver !== 'undefined') {
+    const sectionObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting && entry.target.id) {
+          globalAnalytics.trackSectionView(entry.target.id, context);
+        }
+      });
+    }, { threshold: 0.3 });
+
+    setTimeout(() => {
+      document.querySelectorAll('section[id]').forEach(sec => sectionObserver.observe(sec));
+    }, 500);
+  }
+
+  // 3. Throttled Scroll Depth Milestones (25%, 50%, 75%, 100%)
+  const appContainer = document.getElementById('app') || window;
+  let scrollTimeout;
+  const handleScroll = () => {
+    if (scrollTimeout) return;
+    scrollTimeout = setTimeout(() => {
+      scrollTimeout = null;
+      const scrollTop = appContainer.scrollTop || window.scrollY || 0;
+      const scrollHeight = appContainer.scrollHeight || document.documentElement.scrollHeight || 1;
+      const clientHeight = appContainer.clientHeight || window.innerHeight || 1;
+      const depthPercent = Math.min(100, Math.round(((scrollTop + clientHeight) / scrollHeight) * 100));
+      globalAnalytics.trackScrollDepth(depthPercent, context);
+    }, 250);
+  };
+
+  appContainer.addEventListener('scroll', handleScroll, { passive: true });
+
+  // 4. Delegated Event Tracking (Projects, Resume, Recruiter Mode, Contacts)
+  document.addEventListener('click', (e) => {
+    const target = e.target.closest('a, button, .project-card, [data-project-id], .card');
+    if (!target) return;
+
+    // Project Opened
+    const projCard = target.closest('.project-card, [data-project-id]');
+    if (projCard) {
+      const projId = projCard.getAttribute('data-project-id') || projCard.querySelector('h3')?.textContent || 'project';
+      globalAnalytics.track('project_opened', { projectId: projId, device }, context);
+    }
+
+    // Resume Download
+    if (target.matches('a[href*="resume"], a[download], button:has-text("Resume"), .resume-download-btn, [data-action="resume"]')) {
+      globalAnalytics.track('resume_download_clicked', { filename: 'resume.pdf', device }, context);
+    }
+
+    // Recruiter View Toggle
+    if (target.matches('#recruiter-mode-toggle, .recruiter-toggle-btn, [data-action="recruiter"]')) {
+      globalAnalytics.track('recruiter_mode_enabled', { device }, context);
+    }
+
+    // Contact Clicks
+    const href = target.getAttribute('href') || '';
+    if (href.startsWith('mailto:')) {
+      globalAnalytics.track('email_clicked', { device }, context);
+    } else if (href.includes('linkedin.com')) {
+      globalAnalytics.track('linkedin_clicked', { device }, context);
+    } else if (href.includes('github.com')) {
+      globalAnalytics.track('github_profile_clicked', { device }, context);
+    }
+  });
+}

@@ -140,56 +140,69 @@ export function renderAuthPage(onSuccess) {
     signupTab.style.color = !isLogin ? '#fff' : 'rgba(255,255,255,0.4)';
   };
 
-  window.authDoLogin = (e) => {
+  window.authDoLogin = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('login-btn');
     btn.textContent = 'Signing in...';
     btn.disabled = true;
+    const err = document.getElementById('login-error');
+    err.style.display = 'none';
 
-    setTimeout(() => {
-      const res = login({
-        email: document.getElementById('login-email').value,
-        password: document.getElementById('login-password').value
-      });
+    try {
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+      const res = await login(email, password);
 
-      if (res.success) {
+      if (res && res.user) {
         onSuccess(res.user);
       } else {
-        const err = document.getElementById('login-error');
-        err.textContent = '❌ ' + res.error;
+        err.textContent = '❌ Login failed. Please check your credentials.';
         err.style.display = 'block';
         btn.textContent = '⚡ Sign In to Studio';
         btn.disabled = false;
-        setTimeout(() => err.style.display = 'none', 4000);
       }
-    }, 400);
+    } catch (e) {
+      err.textContent = '❌ ' + (e.message || 'Login failed.');
+      err.style.display = 'block';
+      btn.textContent = '⚡ Sign In to Studio';
+      btn.disabled = false;
+    }
   };
 
-  window.authDoSignup = (e) => {
+  window.authDoSignup = async (e) => {
     e.preventDefault();
+    const email = document.getElementById('signup-email').value;
     const password = document.getElementById('signup-password').value;
     const confirm = document.getElementById('signup-confirm').value;
+    const name = document.getElementById('signup-name').value;
     const err = document.getElementById('signup-error');
+    err.style.display = 'none';
 
     if (password !== confirm) {
       err.textContent = '❌ Passwords do not match!';
       err.style.display = 'block';
-      setTimeout(() => err.style.display = 'none', 3000);
       return;
     }
 
-    const res = signUp({
-      name: document.getElementById('signup-name').value,
-      email: document.getElementById('signup-email').value,
-      password
-    });
+    const btn = document.getElementById('signup-btn');
+    btn.textContent = 'Creating account...';
+    btn.disabled = true;
 
-    if (res.success) {
-      onSuccess(res.user);
-    } else {
-      err.textContent = '❌ ' + res.error;
+    try {
+      const res = await signUp(email, password, name);
+      if (res && res.user) {
+        onSuccess(res.user);
+      } else {
+        err.textContent = '❌ Account created. Please check your email to confirm.';
+        err.style.display = 'block';
+        btn.textContent = '🚀 Create Free Account';
+        btn.disabled = false;
+      }
+    } catch (e) {
+      err.textContent = '❌ ' + (e.message || 'Signup failed.');
       err.style.display = 'block';
-      setTimeout(() => err.style.display = 'none', 4000);
+      btn.textContent = '🚀 Create Free Account';
+      btn.disabled = false;
     }
   };
 }

@@ -268,3 +268,37 @@ export async function createPortfolio(data) {
 export function getAllPortfolios() {
   return [];
 }
+
+export async function publishPortfolio(masterProfile) {
+  if (!masterProfile || !masterProfile.id) return { success: false, error: 'No portfolio provided.' };
+  try {
+    const publishedAt = new Date().toISOString();
+    // Snapshot current masterProfile as publishedProfile
+    const publishedSnapshot = JSON.parse(JSON.stringify(masterProfile));
+    delete publishedSnapshot.publishedProfile; // avoid recursion
+
+    masterProfile.publishedProfile = publishedSnapshot;
+    masterProfile.publishedAt = publishedAt;
+
+    const { error } = await supabase
+      .from('portfolios')
+      .update({
+        name: masterProfile.name,
+        profession: masterProfile.profession,
+        bio: masterProfile.bio,
+        theme: masterProfile.theme,
+        master_profile_json: masterProfile,
+        updated_at: publishedAt
+      })
+      .eq('id', masterProfile.id);
+
+    if (error) {
+      console.warn('Supabase publish error:', error.message);
+      return { success: false, error: error.message };
+    }
+    return { success: true, publishedAt };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
