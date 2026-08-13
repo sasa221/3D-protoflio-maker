@@ -10,6 +10,7 @@ import { isLoggedIn, getCurrentUser, getCurrentAuthUser, isPro, logout, upgradeT
 
 window.supabase = supabase;
 window.getCurrentAuthUser = getCurrentAuthUser;
+window.uploadAvatar = uploadAvatar;
 import { HyperEngine } from './three/HyperEngine.js';
 import { classifyProfession, getThemeById, getAllThemes } from './three/ProceduralTheme.js';
 import { exportStandaloneHTML, generateShareableURL } from './exporter/PortfolioExporter.js';
