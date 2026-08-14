@@ -123,7 +123,12 @@ export async function updateUserPassword(newPassword) {
 export function getCurrentUser() {
   try {
     const sessionUser = JSON.parse(sessionStorage.getItem('supabase_user_cache') || 'null');
-    return sessionUser || null;
+    if (!sessionUser) return null;
+    const metadata = sessionUser.user_metadata || {};
+    return {
+      ...sessionUser,
+      name: sessionUser.name || metadata.full_name || metadata.name || sessionUser.email?.split('@')[0] || 'User'
+    };
   } catch (e) {
     return null;
   }

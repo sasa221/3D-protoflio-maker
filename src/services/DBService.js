@@ -70,6 +70,16 @@ export async function loadUserPortfoliosFromSupabase(user) {
       masterData.bio = pRow.bio || masterData.bio || '';
       masterData.theme = pRow.theme || masterData.theme || 'code';
       masterData.owner_user_id = pRow.owner_user_id;
+      // Publication state is authoritative at the row level. Never trust a stale
+      // timestamp embedded in an older JSON snapshot.
+      if (pRow.published_at) {
+        masterData.publishedAt = pRow.published_at;
+        masterData.published_at = pRow.published_at;
+      } else {
+        delete masterData.publishedAt;
+        delete masterData.published_at;
+        delete masterData.publicUrl;
+      }
 
       ensureStableIDs(masterData);
 

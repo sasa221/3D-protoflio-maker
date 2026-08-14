@@ -901,7 +901,10 @@ function setupPreviewResizeObserver() {
 function initEngine() {
   const canvas = document.getElementById('preview-canvas');
   engine = new HyperEngine(canvas);
-  const theme = classifyProfession(portfolioData.profession);
+  const theme = portfolioData.theme
+    ? getThemeById(portfolioData.theme)
+    : classifyProfession(portfolioData.profession);
+  portfolioData.theme = theme.id;
   currentTheme = theme;
   engine.init(theme);
 
