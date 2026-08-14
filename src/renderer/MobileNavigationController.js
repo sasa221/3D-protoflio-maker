@@ -9,8 +9,6 @@ export function initMobileNavigationController() {
   if (window.__mobileNavControllerInitialized) return;
   window.__mobileNavControllerInitialized = true;
 
-  console.log('[MobileMenu] Initializing MobileNavigationController event delegation...');
-
   // ─── STABLE GLOBAL EVENT DELEGATION ───
   document.addEventListener('click', function(e) {
     // 1. Mobile Menu Open Toggle Button
@@ -18,7 +16,6 @@ export function initMobileNavigationController() {
     if (menuBtn) {
       e.preventDefault();
       e.stopPropagation();
-      console.log('[MobileMenu] BUTTON CLICK RECEIVED on element:', menuBtn);
       const root = menuBtn.closest('#portfolio-scroll-container') || menuBtn.closest('#preview-scroll-viewport');
       window.toggleMobileMenu(true, root);
       return;
@@ -29,7 +26,6 @@ export function initMobileNavigationController() {
     if (closeBtn) {
       e.preventDefault();
       e.stopPropagation();
-      console.log('[MobileMenu] CLOSE BUTTON CLICKED');
       const root = closeBtn.closest('#portfolio-scroll-container') || closeBtn.closest('#preview-scroll-viewport');
       window.toggleMobileMenu(false, root);
       return;
@@ -41,7 +37,6 @@ export function initMobileNavigationController() {
       const targetSec = navLink.getAttribute('data-section') || navLink.getAttribute('href')?.replace('#sec-', '').replace('#', '');
       if (targetSec) {
         e.preventDefault();
-        console.log('[MobileMenu] NAV LINK CLICKED. Section:', targetSec);
         
         const root = navLink.closest('#portfolio-scroll-container') || navLink.closest('#preview-scroll-viewport') || document;
         window.toggleMobileMenu(false, root);
@@ -62,7 +57,6 @@ export function initMobileNavigationController() {
     if (e.key === 'Escape' || e.keyCode === 27) {
       const activePanel = document.querySelector('#mobile-menu-panel.active, .mobile-menu-panel.active');
       if (activePanel) {
-        console.log('[MobileMenu] ESCAPE PRESSED - CLOSING MENU');
         window.toggleMobileMenu(false);
       }
     }
@@ -93,6 +87,7 @@ export function toggleMobileMenu(forceState, contextEl) {
     panel.style.height = viewportHeight + 'px';
 
     panel.classList.add('active');
+    panel.setAttribute('aria-hidden', 'false');
     panel.style.opacity = '1';
     panel.style.pointerEvents = 'auto';
     panel.style.transform = 'scale(1)';
@@ -100,14 +95,12 @@ export function toggleMobileMenu(forceState, contextEl) {
     if (btn) btn.setAttribute('aria-expanded', 'true');
     if (viewport) viewport.style.overflow = 'hidden';
 
-    const links = panel.querySelectorAll('.mobile-nav-link');
-    console.log('[MobileMenu] MENU OPENED. Links count:', links.length, 'Panel top:', panel.style.top, 'Height:', panel.style.height);
-
     if (closeBtn && typeof closeBtn.focus === 'function') {
       setTimeout(() => closeBtn.focus(), 50);
     }
   } else {
     panel.classList.remove('active');
+    panel.setAttribute('aria-hidden', 'true');
     panel.style.opacity = '0';
     panel.style.pointerEvents = 'none';
     panel.style.transform = 'scale(0.97)';
@@ -141,7 +134,6 @@ export function toggleViewMode(forceMode) {
     }
   });
 
-  console.log('[ViewMode] Switched viewMode to:', next);
 }
 
 export function openMobileMenu(contextEl) { toggleMobileMenu(true, contextEl); }

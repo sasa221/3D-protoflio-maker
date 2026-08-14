@@ -1335,7 +1335,7 @@ export function generatePortfolioHTMLBody(portfolioData, theme, options = {}) {
       </header>
 
       <!-- DEDICATED FULL-SCREEN CINEMATIC MOBILE MENU -->
-      <div id="mobile-menu-panel" class="mobile-menu-panel" role="dialog" aria-modal="true" aria-label="Mobile Navigation Menu">
+      <div id="mobile-menu-panel" class="mobile-menu-panel" role="dialog" aria-modal="true" aria-label="Mobile Navigation Menu" aria-hidden="true">
         <div class="mobile-menu-inner">
           <div class="mobile-menu-top">
             <span class="mobile-menu-brand">${escapeHTML(portfolioData.name || 'PORTFOLIO')}</span>
@@ -1759,6 +1759,7 @@ export function getPortfolioScript(sectionFlyToCallbackName = 'flyToSection') {
 
       if (nextState) {
         panel.classList.add('active');
+        panel.setAttribute('aria-hidden', 'false');
         if (btn) btn.setAttribute('aria-expanded', 'true');
         if (viewport) viewport.style.overflow = 'hidden';
         if (closeBtn && typeof closeBtn.focus === 'function') {
@@ -1766,6 +1767,7 @@ export function getPortfolioScript(sectionFlyToCallbackName = 'flyToSection') {
         }
       } else {
         panel.classList.remove('active');
+        panel.setAttribute('aria-hidden', 'true');
         if (btn) btn.setAttribute('aria-expanded', 'false');
         if (viewport) viewport.style.overflow = 'auto';
         if (btn && typeof btn.focus === 'function') {

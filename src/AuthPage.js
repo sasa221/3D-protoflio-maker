@@ -53,9 +53,9 @@ export function renderAuthPage(onSuccess) {
         font-size:26px;margin-bottom:16px;
         box-shadow:0 0 30px rgba(124,58,237,0.5);
       ">⚡</div>
-      <div style="font-size:1.3rem;font-weight:800;background:linear-gradient(135deg,#7c3aed,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-family:'Outfit',sans-serif">
+      <h1 style="margin:0;font-size:1.3rem;font-weight:800;background:linear-gradient(135deg,#7c3aed,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-family:'Outfit',sans-serif">
         3D Portfolio Maker
-      </div>
+      </h1>
       <div style="font-size:0.7rem;color:rgba(255,255,255,0.3);letter-spacing:2px;text-transform:uppercase;margin-top:4px">
         Ultra Studio
       </div>
@@ -368,12 +368,22 @@ export function renderAuthPage(onSuccess) {
 }
 
 function authField(id, label, type, placeholder, icon) {
+  const autocomplete = id.includes('email')
+    ? 'email'
+    : id.includes('name')
+      ? 'name'
+      : id.includes('confirm')
+        ? 'new-password'
+        : id.includes('signup')
+          ? 'new-password'
+          : 'current-password';
+
   return `
     <div style="margin-bottom:14px">
-      <label style="font-size:0.7rem;color:rgba(255,255,255,0.35);letter-spacing:1.5px;text-transform:uppercase;display:block;margin-bottom:6px">
+      <label for="${id}" style="font-size:0.7rem;color:rgba(255,255,255,0.35);letter-spacing:1.5px;text-transform:uppercase;display:block;margin-bottom:6px">
         ${icon} ${label}
       </label>
-      <input id="${id}" type="${type}" placeholder="${placeholder}" required style="
+      <input id="${id}" name="${id}" type="${type}" autocomplete="${autocomplete}" placeholder="${placeholder}" required style="
         width:100%;padding:11px 14px;
         background:rgba(255,255,255,0.04);
         border:1px solid rgba(255,255,255,0.08);
@@ -507,9 +517,9 @@ export function renderResetPasswordPage(onSuccess) {
         font-size:26px;margin-bottom:16px;
         box-shadow:0 0 30px rgba(124,58,237,0.5);
       ">🔑</div>
-      <div style="font-size:1.3rem;font-weight:800;background:linear-gradient(135deg,#7c3aed,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-family:'Outfit',sans-serif">
+      <h1 style="margin:0;font-size:1.3rem;font-weight:800;background:linear-gradient(135deg,#7c3aed,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-family:'Outfit',sans-serif">
         Set New Password
-      </div>
+      </h1>
       <div style="font-size:0.78rem;color:rgba(255,255,255,0.45);margin-top:6px;line-height:1.5">
         Create a new secure password for your 3D Portfolio account
       </div>
@@ -518,16 +528,16 @@ export function renderResetPasswordPage(onSuccess) {
     <!-- FORM -->
     <form id="form-reset-password" onsubmit="authDoUpdatePassword(event)">
       <div style="margin-bottom:18px">
-        <label style="display:block;font-size:0.75rem;font-weight:600;color:rgba(255,255,255,0.7);margin-bottom:8px">🔑 New Password (min 8 chars)</label>
-        <input type="password" id="reset-new-password" placeholder="••••••••" required minlength="8" style="
+        <label for="reset-new-password" style="display:block;font-size:0.75rem;font-weight:600;color:rgba(255,255,255,0.7);margin-bottom:8px">🔑 New Password (min 8 chars)</label>
+        <input type="password" id="reset-new-password" name="new-password" autocomplete="new-password" placeholder="••••••••" required minlength="8" style="
           width:100%;padding:12px 14px;background:rgba(255,255,255,0.05);
           border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#fff;
           font-size:0.88rem;outline:none;box-sizing:border-box;
         "/>
       </div>
       <div style="margin-bottom:20px">
-        <label style="display:block;font-size:0.75rem;font-weight:600;color:rgba(255,255,255,0.7);margin-bottom:8px">🔐 Confirm New Password</label>
-        <input type="password" id="reset-confirm-password" placeholder="••••••••" required minlength="8" style="
+        <label for="reset-confirm-password" style="display:block;font-size:0.75rem;font-weight:600;color:rgba(255,255,255,0.7);margin-bottom:8px">🔐 Confirm New Password</label>
+        <input type="password" id="reset-confirm-password" name="confirm-password" autocomplete="new-password" placeholder="••••••••" required minlength="8" style="
           width:100%;padding:12px 14px;background:rgba(255,255,255,0.05);
           border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#fff;
           font-size:0.88rem;outline:none;box-sizing:border-box;
