@@ -1,5 +1,40 @@
 import { createClient } from '@supabase/supabase-js';
 
+const RESERVED_SLUGS = new Set(['admin', 'api', 'login', 'studio', 'start', 'privacy', 'terms', 'reset-password']);
+
+async function sendPortfolio(req, res, adminClient, slug) {
+  if (RESERVED_SLUGS.has(slug)) return res.status(400).json({ error: 'Invalid portfolio path' });
+  const variantSlug = String(req.query.variant || '').trim().toLowerCase();
+  if (variantSlug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(variantSlug)) {
+    return res.status(400).json({ error: 'Invalid portfolio path' });
+  }
+
+  const { data: portfolio, error } = await adminClient
+    .from('portfolios')
+    .select('id,slug,theme,master_profile_json,published_at,updated_at')
+    .eq('slug', slug)
+    .not('published_at', 'is', null)
+    .maybeSingle();
+  if (error) return res.status(500).json({ error: 'Unable to load portfolio' });
+  if (!portfolio) return res.status(404).json({ error: 'Portfolio not found' });
+
+  let variant = null;
+  if (variantSlug) {
+    const { data, error: variantError } = await adminClient
+      .from('portfolio_variants')
+      .select('slug,overrides_json')
+      .eq('portfolio_id', portfolio.id)
+      .eq('slug', variantSlug)
+      .maybeSingle();
+    if (variantError) return res.status(500).json({ error: 'Unable to load portfolio variant' });
+    if (!data) return res.status(404).json({ error: 'Portfolio variant not found' });
+    variant = data;
+  }
+
+  res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+  return res.status(200).json({ portfolio, variant });
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -15,6 +50,9 @@ export default async function handler(req, res) {
   const adminClient = createClient(supabaseUrl, supabaseSecretKey);
 
   try {
+    if (req.query.resource === 'portfolio') {
+      return await sendPortfolio(req, res, adminClient, slug);
+    }
     // 1. Query portfolio by published slug
     const { data: pf, error: pfErr } = await adminClient
       .from('portfolios')
