@@ -359,3 +359,26 @@ export async function publishPortfolio(masterProfile) {
     return { success: false, error: e.message };
   }
 }
+
+export async function consumeExportAllowance(masterProfile) {
+  if (!masterProfile?.id) return { success: false, error: 'No portfolio provided.' };
+  try {
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data?.session?.access_token;
+    if (!accessToken) return { success: false, error: 'Please sign in again before exporting.' };
+    const response = await fetch('/api/deploy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({
+        action: 'consume_export',
+        portfolioId: masterProfile.id,
+        slug: masterProfile.slug || `user-${masterProfile.owner_user_id?.slice(0, 8) || 'portfolio'}`
+      })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.success) return { success: false, error: result.error || 'Export limit check failed.' };
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}

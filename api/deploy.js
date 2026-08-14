@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     }
 
     const userId = userData.user.id;
-    const { portfolioId, slug, masterProfile } = req.body || {};
+    const { action, portfolioId, slug, masterProfile } = req.body || {};
 
     if (!portfolioId || !slug) {
       return res.status(400).json({ error: 'Missing portfolioId or slug' });
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
 
     // 2. Server-side ownership check
     const adminClient = createClient(supabaseUrl, supabaseSecretKey);
-    const { data: existingPf } = await adminClient.from('portfolios').select('owner_user_id').eq('id', portfolioId).single();
+    const { data: existingPf } = await adminClient.from('portfolios').select('owner_user_id,master_profile_json').eq('id', portfolioId).maybeSingle();
 
     if (existingPf && existingPf.owner_user_id !== userId) {
       return res.status(403).json({ error: 'Forbidden — You do not own this portfolio' });
@@ -61,6 +61,26 @@ export default async function handler(req, res) {
       .maybeSingle();
 
     const isPro = subscription?.plan_id === 'pro' && subscription?.status === 'active';
+
+    if (action === 'consume_export') {
+      if (!existingPf) return res.status(404).json({ error: 'Portfolio not found' });
+      if (isPro) return res.status(200).json({ success: true, unlimited: true });
+
+      const month = new Date().toISOString().slice(0, 7);
+      const storedProfile = existingPf.master_profile_json || {};
+      const usage = storedProfile.exportUsage || {};
+      const count = usage.month === month ? Number(usage.count || 0) : 0;
+      if (count >= 1) return res.status(403).json({ error: 'Free plan includes 1 HTML export per month.' });
+
+      storedProfile.exportUsage = { month, count: count + 1 };
+      const { error: usageError } = await adminClient
+        .from('portfolios')
+        .update({ master_profile_json: storedProfile, updated_at: new Date().toISOString() })
+        .eq('id', portfolioId)
+        .eq('owner_user_id', userId);
+      if (usageError) return res.status(500).json({ error: 'Unable to record export usage.' });
+      return res.status(200).json({ success: true, usage: storedProfile.exportUsage });
+    }
 
     if (!existingPf) {
       const { count: portfolioCount } = await adminClient

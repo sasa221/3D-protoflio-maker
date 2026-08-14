@@ -2297,8 +2297,15 @@ window.exportHTML = async function() {
 
   showToast('info', '⏳', 'Generating your 3D portfolio...');
   try {
+    const { consumeExportAllowance } = await import('./services/DBService.js');
+    const allowance = await consumeExportAllowance(portfolioData);
+    if (!allowance.success) {
+      showToast('error', '🔒', allowance.error || 'Export limit reached.');
+      if (!isPro()) handleUpgradeClick();
+      return;
+    }
     await exportStandaloneHTML(portfolioData, currentTheme);
-    portfolioData.exportUsage = { month: monthKey, count: currentMonthExports + 1 };
+    portfolioData.exportUsage = allowance.usage || { month: monthKey, count: currentMonthExports + 1 };
     autoSave();
     // Celebrate! 🎉
     confetti({
