@@ -14,12 +14,13 @@ window.uploadAvatar = uploadAvatar;
 import { HyperEngine } from './three/HyperEngine.js';
 import { classifyProfession, getThemeById, getAllThemes } from './three/ProceduralTheme.js';
 import { exportStandaloneHTML, generateShareableURL } from './exporter/PortfolioExporter.js';
+import { globalUsageLimit } from './services/UsageLimitService.js';
 import { generatePortfolioCSS, generatePortfolioHTMLBody } from './renderer/PortfolioRenderer.js';
+import { installProjectCinemaControls } from './renderer/ProjectCinema.js';
 import { SceneDirector } from './three/SceneDirector.js';
 import { ScrollDirector } from './three/ScrollDirector.js';
 import { IntroDirector } from './three/IntroDirector.js';
 import { initMobileNavigationController, toggleMobileMenu } from './renderer/MobileNavigationController.js';
-import { deployToNetlify, getDeployedSites, isNetlifyConfigured } from './services/DeployService.js';
 import {
   createPortfolio, getAllPortfolios,
   getAnalytics, saveDraft, getCurrentDraft, incrementStat,
@@ -301,8 +302,9 @@ async function router() {
     return;
   }
 
-  // Fallback to Landing Page
-  renderLandingPage(getAppContainer());
+  // Unknown routes must not masquerade as a valid marketing page.
+  setPageTitle('Page Not Found');
+  render404Page(path);
 }
 
 async function handlePublicRoute(username, variantSlug) {
@@ -316,13 +318,12 @@ async function handlePublicRoute(username, variantSlug) {
   `;
 
   try {
-    const { data: pf, error } = await supabase
-      .from('portfolios')
-      .select('*')
-      .eq('slug', username.trim().toLowerCase())
-      .single();
-
-    if (error || !pf) {
+    const query = new URLSearchParams({ slug: username.trim().toLowerCase() });
+    if (variantSlug) query.set('variant', variantSlug.trim().toLowerCase());
+    const response = await fetch(`/api/public/portfolio?${query.toString()}`);
+    const payload = await response.json().catch(() => ({}));
+    const pf = payload.portfolio;
+    if (!response.ok || !pf) {
       render404Page(username);
       return;
     }
@@ -333,19 +334,11 @@ async function handlePublicRoute(username, variantSlug) {
     let activeData = masterData;
 
     if (variantSlug) {
-      const { data: variants } = await supabase
-        .from('portfolio_variants')
-        .select('*')
-        .eq('portfolio_id', pf.id)
-        .eq('slug', variantSlug.trim().toLowerCase());
-
-      if (!variants || variants.length === 0) {
+      if (!payload.variant) {
         render404Page(`${username}/${variantSlug}`);
         return;
       }
-
-      const variant = variants[0];
-      const overrides = variant.overrides_json || {};
+      const overrides = payload.variant.overrides_json || {};
       activeData = resolvePortfolioVariant(masterData, overrides);
     }
 
@@ -356,6 +349,7 @@ async function handlePublicRoute(username, variantSlug) {
       <div id="canvas-container"><canvas id="bg-canvas"></canvas></div>
       <div id="app" style="overflow-y:auto;position:relative;z-index:10">${html}</div>
     `;
+    installProjectCinemaControls();
 
     const canvas = document.getElementById('bg-canvas');
     engine = new HyperEngine(canvas);
@@ -404,8 +398,6 @@ function init() {
 }
 
 async function initStudio() {
-  buildHTML();
-  
   try {
     const authUser = await getCurrentAuthUser();
     if (authUser) {
@@ -418,6 +410,14 @@ async function initStudio() {
   } catch (e) {
     console.warn('Supabase studio init warning:', e.message);
   }
+
+  // Render the shell only after server-backed entitlements are known.
+  portfolioData.isPro = isPro();
+  if (!portfolioData.isPro) {
+    portfolioData.hideWatermark = false;
+    portfolioData.hideThemeBadge = false;
+  }
+  buildHTML();
 
   renderAll();
   initEngine();
@@ -1069,6 +1069,7 @@ async function updateHUD() {
 
   const html = generatePortfolioHTMLBody(portfolioData, currentTheme || {});
   viewport.innerHTML = html;
+  installProjectCinemaControls();
 
   // Bind smooth scrolling for nav links
   viewport.querySelectorAll('.nav-link, .hero-actions a, .navbar-brand').forEach(link => {
@@ -1457,6 +1458,10 @@ export function renderPublishTab() {
   const publicUrl = `${window.location.origin}/u/${slug}`;
   const isPublished = Boolean(portfolioData.publishedAt || portfolioData.published_at);
   const pro = isPro();
+  const monthKey = new Date().toISOString().slice(0, 7);
+  const usage = portfolioData.exportUsage || {};
+  const exportsThisMonth = usage.month === monthKey ? Number(usage.count || 0) : 0;
+  const remainingExports = globalUsageLimit.getRemainingExports(exportsThisMonth);
 
   el.innerHTML = `
     <!-- PUBLISH STATUS & PRIMARY CONTROLS -->
@@ -1485,7 +1490,7 @@ export function renderPublishTab() {
         <button id="btn-copy-public-url" class="btn btn-secondary" onclick="copyPublicPortfolioUrl()" style="font-size:0.78rem;padding:8px">
           📋 Copy Public Link
         </button>
-        <a id="link-open-public-portfolio" href="${publicUrl}" target="_blank" class="btn btn-secondary" style="font-size:0.78rem;padding:8px;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">
+        <a id="link-open-public-portfolio" href="${isPublished ? publicUrl : '#'}" ${isPublished ? 'target="_blank" rel="noopener noreferrer"' : 'aria-disabled="true" onclick="return false"'} class="btn btn-secondary" style="font-size:0.78rem;padding:8px;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;${isPublished ? '' : 'opacity:.45;cursor:not-allowed'}">
           🌐 Open Live Site ↗
         </a>
       </div>
@@ -1516,7 +1521,10 @@ export function renderPublishTab() {
         📦 Standalone Export & Backup
       </div>
       <div style="display:flex;flex-direction:column;gap:8px">
-        <button class="btn btn-secondary" onclick="exportHTML()" style="width:100%;font-size:0.8rem">
+        <div style="font-size:0.74rem;color:rgba(255,255,255,.52);margin-bottom:2px">
+          ${pro ? 'Pro plan: unlimited exports and optional branding.' : `Free plan: ${remainingExports} of 1 HTML export remaining this month. Platform branding stays visible.`}
+        </div>
+        <button class="btn btn-secondary" onclick="exportHTML()" ${remainingExports === 0 ? 'disabled aria-disabled="true"' : ''} style="width:100%;font-size:0.8rem">
           📦 Download Standalone HTML (Zero Dependencies)
         </button>
         <button class="btn btn-secondary" onclick="copyShareableLink()" style="width:100%;font-size:0.8rem">
@@ -1566,6 +1574,15 @@ export function renderPublishTab() {
 window.renderPublishTab = renderPublishTab;
 
 window.handlePublishPortfolio = async function() {
+  if (!portfolioData.name?.trim()) {
+    showToast('error', '!', 'Add your name before publishing your portfolio.');
+    switchTab('profile');
+    return;
+  }
+  if (!portfolioData.slug?.trim()) {
+    showToast('error', '!', 'Choose a public slug before publishing.');
+    return;
+  }
   const btn = document.getElementById('btn-publish-portfolio');
   if (btn) {
     btn.disabled = true;
@@ -1577,6 +1594,7 @@ window.handlePublishPortfolio = async function() {
     if (res.success) {
       portfolioData.publishedAt = res.publishedAt;
       portfolioData.published_at = res.publishedAt;
+      if (res.url) portfolioData.publicUrl = res.url;
       showToast('success', '🚀', 'Portfolio published live to Supabase!');
       renderPublishTab();
       if (typeof confetti === 'function') {
@@ -1610,7 +1628,18 @@ window.copyPublicPortfolioUrl = function() {
 };
 
 window.updatePortfolioSlug = function(val) {
-  const clean = (val || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const clean = (val || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-');
+  const reserved = new Set(['admin', 'api', 'login', 'studio', 'start', 'privacy', 'terms', 'reset-password']);
+  if (!clean || reserved.has(clean)) {
+    showToast('error', '⚠️', 'Choose another public slug using letters, numbers, and hyphens.');
+    renderPublishTab();
+    return;
+  }
   portfolioData.slug = clean;
   autoSave();
   renderPublishTab();
@@ -1618,6 +1647,12 @@ window.updatePortfolioSlug = function(val) {
 };
 
 window.toggleProBranding = function(prop, val) {
+  if (!isPro()) {
+    portfolioData.hideWatermark = false;
+    portfolioData.hideThemeBadge = false;
+    handleUpgradeClick();
+    return;
+  }
   portfolioData[prop] = val;
   portfolioData.isPro = isPro();
   autoSave();
@@ -1627,6 +1662,9 @@ window.toggleProBranding = function(prop, val) {
 // ─── DEPLOY LIVE (PRO) ────────────────────────
 let currentDeployUrl = '';
 window.deployLive = async function() {
+  // Keep legacy buttons on the same secure, plan-aware publishing path.
+  return window.handlePublishPortfolio();
+  /* istanbul ignore next -- retained temporarily for old cached markup */
   if (!isPro()) { handleUpgradeClick(); return; }
   if (!portfolioData.name) {
     showToast('error', '⚠️', 'Please enter your name first!');
@@ -2244,9 +2282,21 @@ window.toggleFullscreen = function() {
 // ─── EXPORT ──────────────────────────────────
 window.exportHTML = async function() {
   if (!currentTheme) return;
+
+  const monthKey = new Date().toISOString().slice(0, 7);
+  const exportUsage = portfolioData.exportUsage || { month: monthKey, count: 0 };
+  const currentMonthExports = exportUsage.month === monthKey ? Number(exportUsage.count || 0) : 0;
+  if (!globalUsageLimit.canExportHTML(currentMonthExports)) {
+    showToast('error', '🔒', 'Free plan includes 1 HTML export per month. Upgrade to Pro for unlimited exports.');
+    handleUpgradeClick();
+    return;
+  }
+
   showToast('info', '⏳', 'Generating your 3D portfolio...');
   try {
     await exportStandaloneHTML(portfolioData, currentTheme);
+    portfolioData.exportUsage = { month: monthKey, count: currentMonthExports + 1 };
+    autoSave();
     // Celebrate! 🎉
     confetti({
       particleCount: 200,
@@ -2478,6 +2528,10 @@ window.handleUpgradeClick = function() {
 
 // ─── ADMIN DASHBOARD ─────────────────────────
 window.openAdmin = function() {
+  if (!isAdmin()) {
+    showToast('error', '🔒', 'This account does not have administrator access.');
+    return;
+  }
   const modal = document.getElementById('admin-modal');
   const body = document.getElementById('admin-body');
   const stats = getAnalytics();
@@ -2532,6 +2586,9 @@ window.closeAdmin = function() {
 };
 
 window.upgradeToPro = function() {
+  closeAdmin();
+  openBillingModal();
+  return;
   upgradeToPro();
   document.getElementById('tier-chip').textContent = '💎 PRO';
   document.getElementById('tier-chip').className = 'tier-chip tier-pro';

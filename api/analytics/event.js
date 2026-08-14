@@ -31,10 +31,20 @@ export default async function handler(req, res) {
   }
 
   const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://kupxhrfijkdlcteniqfp.supabase.co';
-  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseSecretKey) return res.status(503).json({ error: 'Analytics service is not configured' });
 
   try {
     const supabase = createClient(supabaseUrl, supabaseSecretKey);
+    const { data: portfolio } = await supabase
+      .from('portfolios')
+      .select('id')
+      .eq('id', portfolioId)
+      .not('published_at', 'is', null)
+      .maybeSingle();
+    if (!portfolio) return res.status(404).json({ error: 'Published portfolio not found' });
+    const metadataJson = metadata && typeof metadata === 'object' ? JSON.stringify(metadata) : '{}';
+    const safeMetadata = metadataJson.length <= 4000 ? JSON.parse(metadataJson) : {};
     const { data, error } = await supabase.from('analytics_events').insert([
       {
         portfolio_id: portfolioId,
@@ -44,7 +54,7 @@ export default async function handler(req, res) {
         project_id: projectId || null,
         device_category: deviceCategory || 'Desktop',
         referrer_category: referrerCategory || 'Direct',
-        metadata: metadata || {}
+        metadata: safeMetadata
       }
     ]).select();
 

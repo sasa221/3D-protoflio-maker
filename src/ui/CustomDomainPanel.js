@@ -71,12 +71,21 @@ export function renderCustomDomainPanel(container, masterProfile, onUpdateMaster
 
   const btnVerify = container.querySelector('#btn-verify-domain');
   if (btnVerify) {
-    btnVerify.addEventListener('click', () => {
+    btnVerify.addEventListener('click', async () => {
       const hostname = container.querySelector('#f-custom-hostname').value;
-      const res = verifyCustomDomainDNS(hostname);
-      masterProfile.customDomain = res;
-      onUpdateMasterProfile(masterProfile);
-      alert(`Domain ${res.hostname}: ${res.status === 'active' ? 'DNS Verified & SSL Connected!' : 'DNS Pending Verification'}`);
+      btnVerify.disabled = true;
+      btnVerify.textContent = 'Checking DNS...';
+      try {
+        const res = await verifyCustomDomainDNS(hostname, masterProfile.id);
+        masterProfile.customDomain = res;
+        onUpdateMasterProfile(masterProfile);
+        alert(`Domain ${res.hostname}: ${res.verified ? 'DNS verified.' : 'DNS pending. Add the required CNAME record and try again.'}`);
+        renderCustomDomainPanel(container, masterProfile, onUpdateMasterProfile);
+      } catch (error) {
+        alert(error.message);
+        btnVerify.disabled = false;
+        btnVerify.textContent = 'Connect & Verify DNS';
+      }
     });
   }
 }

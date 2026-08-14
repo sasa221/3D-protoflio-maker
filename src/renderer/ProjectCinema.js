@@ -654,3 +654,18 @@ export function getProjectCinemaScript() {
     });
   `;
 }
+
+/**
+ * Install the generated cinema controls after portfolio HTML is mounted with innerHTML.
+ * Inline scripts inserted through innerHTML do not execute, so interactive previews and
+ * public portfolios must initialize the trusted renderer script explicitly.
+ */
+export function installProjectCinemaControls() {
+  try {
+    Function(getProjectCinemaScript())();
+    return true;
+  } catch (error) {
+    console.error('[Project Cinema] Failed to initialize controls:', error);
+    return false;
+  }
+}

@@ -14,7 +14,8 @@ export default async function handler(req, res) {
   const token = authHeader.replace('Bearer ', '');
   const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://kupxhrfijkdlcteniqfp.supabase.co';
   const supabaseAnonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || supabaseAnonKey;
+  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseAnonKey || !supabaseSecretKey) return res.status(503).json({ error: 'Domain service is not configured' });
 
   try {
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
@@ -26,10 +27,19 @@ export default async function handler(req, res) {
     const { portfolioId, domain } = req.body || {};
     if (!portfolioId || !domain) return res.status(400).json({ error: 'Missing portfolioId or domain' });
 
-    const cleanHostname = domain.toLowerCase().trim().replace(/^https?:\/\//, '');
+    const cleanHostname = domain.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+    if (!/^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(cleanHostname)) {
+      return res.status(400).json({ error: 'Enter a valid hostname such as portfolio.example.com' });
+    }
     const verificationToken = `verify_cname_${Math.random().toString(36).substr(2, 10)}`;
 
     const adminClient = createClient(supabaseUrl, supabaseSecretKey);
+    const { data: portfolio } = await adminClient.from('portfolios').select('owner_user_id').eq('id', portfolioId).maybeSingle();
+    if (!portfolio || portfolio.owner_user_id !== userData.user.id) return res.status(403).json({ error: 'You do not own this portfolio' });
+    const { data: subscription } = await adminClient.from('subscriptions').select('plan_id,status').eq('user_id', userData.user.id).maybeSingle();
+    if (subscription?.plan_id !== 'pro' || subscription?.status !== 'active') {
+      return res.status(403).json({ error: 'A Pro subscription is required for custom domains' });
+    }
     const { data, error } = await adminClient.from('custom_domains').upsert([
       {
         portfolio_id: portfolioId,

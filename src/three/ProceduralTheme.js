@@ -314,7 +314,8 @@ export function classifyProfession(title = '') {
  * Get theme by ID
  */
 export function getThemeById(id) {
-  return THEMES[id] || THEMES.cosmic;
+  const normalizedId = id === 'cyber' ? 'hacker' : id;
+  return THEMES[normalizedId] || THEMES.cosmic;
 }
 
 /**

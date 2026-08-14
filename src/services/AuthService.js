@@ -146,7 +146,9 @@ export function isAdmin() {
 }
 
 export function upgradeToPro() {}
-export function redeemPromoCode() { return { success: true }; }
+export function redeemPromoCode() {
+  return { success: false, error: 'Promo code redemption is not available yet.' };
+}
 
 export function adminGetAllUsers() {
   return [getCurrentUser()];

@@ -17,21 +17,32 @@ import { THEME_SCENE_CONFIG } from '../three/ThemeSceneConfig.js';
 import { INTRO_PROFILES } from '../three/IntroProfiles.js';
 
 import { resolvePortfolioVariant } from '../services/PortfolioVariantService.js';
+import { globalEntitlements, CAPABILITIES } from '../services/EntitlementService.js';
+
+function applyExportEntitlements(portfolioData = {}) {
+  const canRemoveBranding = globalEntitlements.can(CAPABILITIES.REMOVE_BRANDING);
+  return {
+    ...portfolioData,
+    isPro: canRemoveBranding,
+    hideWatermark: canRemoveBranding && Boolean(portfolioData.hideWatermark),
+    hideThemeBadge: canRemoveBranding && Boolean(portfolioData.hideThemeBadge)
+  };
+}
 
 export async function generateShareableURL(portfolioData) {
-  const resolved = resolvePortfolioVariant(portfolioData);
+  const resolved = resolvePortfolioVariant(applyExportEntitlements(portfolioData));
   await incrementStat('total_shares');
   return encodePortfolioToURL(resolved);
 }
 
 export function buildPortfolioHTMLContent(portfolioData, theme) {
-  const resolved = resolvePortfolioVariant(portfolioData);
+  const resolved = resolvePortfolioVariant(applyExportEntitlements(portfolioData));
   return buildPortfolioHTML(resolved, theme);
 }
 
 export async function exportStandaloneHTML(portfolioData, theme) {
   await incrementStat('total_exports');
-  const resolved = resolvePortfolioVariant(portfolioData);
+  const resolved = resolvePortfolioVariant(applyExportEntitlements(portfolioData));
   const html = buildPortfolioHTML(resolved, theme);
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const url = URL.createObjectURL(blob);

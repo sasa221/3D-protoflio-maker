@@ -316,34 +316,36 @@ export function getAllPortfolios() {
 export async function publishPortfolio(masterProfile) {
   if (!masterProfile || !masterProfile.id) return { success: false, error: 'No portfolio provided.' };
   try {
-    const publishedAt = new Date().toISOString();
-    // Snapshot current masterProfile as publishedProfile
-    const publishedSnapshot = JSON.parse(JSON.stringify(masterProfile));
-    delete publishedSnapshot.publishedProfile; // avoid recursion
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData?.session?.access_token;
+    if (!accessToken) return { success: false, error: 'Please sign in again before publishing.' };
 
-    masterProfile.publishedProfile = publishedSnapshot;
-    masterProfile.publishedAt = publishedAt;
-
-    const { error } = await supabase
-      .from('portfolios')
-      .update({
-        name: masterProfile.name,
-        profession: masterProfile.profession,
-        bio: masterProfile.bio,
-        theme: masterProfile.theme,
-        slug: masterProfile.slug || ('user-' + masterProfile.owner_user_id?.substr(0, 8)),
-        master_profile_json: masterProfile,
-        updated_at: publishedAt
+    const slug = masterProfile.slug || ('user-' + masterProfile.owner_user_id?.substr(0, 8));
+    const response = await fetch('/api/deploy', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({
+        portfolioId: masterProfile.id,
+        slug,
+        masterProfile
       })
-      .eq('id', masterProfile.id);
+    });
 
-    if (error) {
-      console.warn('Supabase publish error:', error.message);
-      return { success: false, error: error.message };
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.success) {
+      return { success: false, error: result.error || 'Publishing failed.' };
     }
-    return { success: true, publishedAt };
+
+    if (result.portfolio?.master_profile_json) {
+      Object.assign(masterProfile, result.portfolio.master_profile_json);
+    }
+    masterProfile.publishedAt = result.publishedAt;
+    masterProfile.published_at = result.publishedAt;
+    return result;
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
-

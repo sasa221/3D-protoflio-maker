@@ -11,6 +11,7 @@ import { mapCVToPortfolioData } from '../services/CVPortfolioMapper.js';
 import { getThemeById } from '../three/ProceduralTheme.js';
 import { HyperEngine } from '../three/HyperEngine.js';
 import { generatePortfolioCSS, generatePortfolioHTMLBody } from '../renderer/PortfolioRenderer.js';
+import { installProjectCinemaControls } from '../renderer/ProjectCinema.js';
 
 let onboardingEngine = null;
 
@@ -224,22 +225,22 @@ function renderStep1ManualForm(container) {
 
       <form id="onboarding-manual-form" onsubmit="handleManualSubmit(event)" style="display: flex; flex-direction: column; gap: 16px;">
         <div>
-          <label style="display: block; font-size: 0.8rem; font-weight: 700; color: rgba(255,255,255,0.8); margin-bottom: 6px;">Your Name *</label>
-          <input type="text" id="ob-name" required value="${draft.name || ''}" placeholder="e.g. Alex Rivera" style="width: 100%; padding: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; color: #fff;">
+          <label for="ob-name" style="display: block; font-size: 0.8rem; font-weight: 700; color: rgba(255,255,255,0.8); margin-bottom: 6px;">Your Name *</label>
+          <input type="text" id="ob-name" autocomplete="name" required value="${draft.name || ''}" placeholder="e.g. Alex Rivera" style="width: 100%; padding: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; color: #fff;">
         </div>
 
         <div>
-          <label style="display: block; font-size: 0.8rem; font-weight: 700; color: rgba(255,255,255,0.8); margin-bottom: 6px;">Professional Title *</label>
+          <label for="ob-profession" style="display: block; font-size: 0.8rem; font-weight: 700; color: rgba(255,255,255,0.8); margin-bottom: 6px;">Professional Title *</label>
           <input type="text" id="ob-profession" required value="${draft.profession || ''}" placeholder="e.g. Front-End Developer / Data Analyst" style="width: 100%; padding: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; color: #fff;">
         </div>
 
         <div>
-          <label style="display: block; font-size: 0.8rem; font-weight: 700; color: rgba(255,255,255,0.8); margin-bottom: 6px;">Short Bio</label>
+          <label for="ob-bio" style="display: block; font-size: 0.8rem; font-weight: 700; color: rgba(255,255,255,0.8); margin-bottom: 6px;">Short Bio</label>
           <textarea id="ob-bio" rows="3" placeholder="Brief summary of what you build & your core expertise..." style="width: 100%; padding: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; color: #fff; font-family: inherit;">${draft.bio || ''}</textarea>
         </div>
 
         <div>
-          <label style="display: block; font-size: 0.8rem; font-weight: 700; color: rgba(255,255,255,0.8); margin-bottom: 6px;">Primary Skills (comma-separated)</label>
+          <label for="ob-skills" style="display: block; font-size: 0.8rem; font-weight: 700; color: rgba(255,255,255,0.8); margin-bottom: 6px;">Primary Skills (comma-separated)</label>
           <input type="text" id="ob-skills" value="${(draft.skills || []).map(s => typeof s === 'string' ? s : s.name).join(', ')}" placeholder="JavaScript, React, Three.js, REST APIs" style="width: 100%; padding: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; color: #fff;">
         </div>
 
@@ -311,9 +312,9 @@ function renderStep2ChooseStyle(container) {
         </div>
 
         <!-- CYBER COMMAND -->
-        <div onclick="selectTheme('cyber')" style="
-          background: ${selectedTheme === 'cyber' ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.03)'};
-          border: 2px solid ${selectedTheme === 'cyber' ? '#7c3aed' : 'rgba(255,255,255,0.1)'};
+        <div onclick="selectTheme('hacker')" style="
+          background: ${selectedTheme === 'hacker' ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.03)'};
+          border: 2px solid ${selectedTheme === 'hacker' ? '#7c3aed' : 'rgba(255,255,255,0.1)'};
           border-radius: 16px; padding: 20px; cursor: pointer; text-align: center; transition: all 0.2s;
         ">
           <div style="font-size: 2rem; margin-bottom: 10px;">🛡️</div>
@@ -480,6 +481,7 @@ function initOnboardingPreview(pf) {
 
     const html = generatePortfolioHTMLBody(pf.master_profile_json || pf, theme, { deviceMode: 'desktop' });
     htmlContainer.innerHTML = html;
+    installProjectCinemaControls();
     document.getElementById('ob-preview-status')?.remove();
   } catch (e) {
     console.warn('[OnboardingWizard] Preview error:', e.message);

@@ -4,12 +4,14 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  const slug = req.query.slug || req.query.username;
-  if (!slug) return res.status(400).json({ error: 'Missing portfolio slug parameter' });
+  const slug = String(req.query.slug || req.query.username || '').trim().toLowerCase();
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return res.status(400).json({ error: 'Invalid portfolio slug' });
 
   const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://kupxhrfijkdlcteniqfp.supabase.co';
-  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseSecretKey) return res.status(503).json({ error: 'Resume service is not configured' });
   const adminClient = createClient(supabaseUrl, supabaseSecretKey);
 
   try {
@@ -18,7 +20,8 @@ export default async function handler(req, res) {
       .from('portfolios')
       .select('master_profile_json, published_at')
       .eq('slug', slug)
-      .single();
+      .not('published_at', 'is', null)
+      .maybeSingle();
 
     if (pfErr || !pf) {
       return res.status(404).json({ error: 'Portfolio not found' });

@@ -6,6 +6,7 @@
 
 import { globalEntitlements, CAPABILITIES } from './EntitlementService.js';
 import { resolvePortfolioVariant } from './PortfolioVariantService.js';
+import { supabase } from './SupabaseClient.js';
 
 export function resolvePublishConfig(masterProfile, variant = null) {
   const resolved = resolvePortfolioVariant(masterProfile, variant);
@@ -27,32 +28,22 @@ export function resolvePublishConfig(masterProfile, variant = null) {
   };
 }
 
-export function verifyCustomDomainDNS(hostname) {
-  if (!hostname || typeof hostname !== 'string') {
-    return { status: 'failed', error: 'Invalid hostname provided.' };
-  }
+export async function verifyCustomDomainDNS(hostname, portfolioId) {
+  const { data } = await supabase.auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) throw new Error('Please sign in again.');
 
-  const cleanHost = hostname.trim().toLowerCase();
-  const cnameTarget = 'cname.3dportfolio.app';
+  const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+  const connectResponse = await fetch('/api/domain/connect', {
+    method: 'POST', headers, body: JSON.stringify({ hostname, domain: hostname, portfolioId })
+  });
+  const connected = await connectResponse.json().catch(() => ({}));
+  if (!connectResponse.ok) throw new Error(connected.error || 'Unable to connect domain.');
 
-  // Simulates DNS lookup
-  const isVerified = cleanHost.includes('.') && !cleanHost.includes(' ') && cleanHost.length > 4;
-
-  if (isVerified) {
-    return {
-      status: 'active',
-      hostname: cleanHost,
-      cnameTarget,
-      sslStatus: 'active',
-      verifiedAt: new Date().toISOString()
-    };
-  }
-
-  return {
-    status: 'pending',
-    hostname: cleanHost,
-    cnameTarget,
-    sslStatus: 'pending',
-    instructions: `Add CNAME record pointing ${cleanHost} -> ${cnameTarget}`
-  };
+  const verifyResponse = await fetch('/api/domain/verify', {
+    method: 'POST', headers, body: JSON.stringify({ domain: hostname, portfolioId })
+  });
+  const verified = await verifyResponse.json().catch(() => ({}));
+  if (!verifyResponse.ok) throw new Error(verified.error || 'Unable to verify domain.');
+  return { ...connected, ...verified, hostname: connected.domain, sslStatus: verified.sslStatus || 'pending' };
 }
