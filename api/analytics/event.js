@@ -1,13 +1,27 @@
 import { createClient } from '@supabase/supabase-js';
 
 const ALLOWED_EVENTS = [
-  'page_view',
-  'variant_view',
-  'project_open',
+  'portfolio_view',
+  'portfolio_session_started',
+  'variant_viewed',
+  'section_viewed',
+  'project_opened',
+  'project_live_demo_clicked',
+  'project_github_clicked',
   'resume_download_clicked',
-  'recruiter_mode_toggled',
-  'cta_clicked',
-  'scroll_depth'
+  'email_clicked',
+  'linkedin_clicked',
+  'github_profile_clicked',
+  'website_clicked',
+  'recruiter_mode_enabled',
+  'recruiter_mode_disabled',
+  'scroll_depth_25',
+  'scroll_depth_50',
+  'scroll_depth_75',
+  'scroll_depth_100',
+  'intro_skipped',
+  'intro_completed',
+  'mobile_menu_opened'
 ];
 
 export default async function handler(req, res) {

@@ -73,23 +73,27 @@ export async function postAnalyticsEvent(eventPayload = {}) {
   // 4. Server-Side PII Stripping (Never store email, phone, raw CV, IP, or tokens!)
   const cleanMetadata = sanitizeServerSideMetadata(metadata);
 
-  // 5. Store event in Central Remote Database
-  const record = {
-    id: 'evt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
-    portfolio_id: cleanPortfolioId,
-    variant_id: cleanVariantId,
-    session_id: cleanSessionId,
-    event_name: eventName,
-    project_id: cleanMetadata.projectId || cleanMetadata.projectName || null,
-    device_category: cleanMetadata.device || 'Desktop',
-    referrer_category: cleanMetadata.referrer || 'Direct',
-    metadata: cleanMetadata,
-    created_at: timestamp || new Date().toISOString()
-  };
-
-  GLOBAL_REMOTE_ANALYTICS_DB.analytics_events.push(record);
-
-  return { success: true, status: 201, eventId: record.id };
+  try {
+    const response = await fetch('/api/analytics/event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        portfolioId: cleanPortfolioId,
+        variantId: cleanVariantId,
+        sessionId: cleanSessionId,
+        eventName,
+        projectId: cleanMetadata.projectId || cleanMetadata.projectName || null,
+        deviceCategory: cleanMetadata.device || 'Desktop',
+        referrerCategory: cleanMetadata.referrer || 'Direct',
+        metadata: cleanMetadata,
+        timestamp
+      })
+    });
+    const result = await response.json().catch(() => ({}));
+    return { ...result, success: response.ok && result.success, status: response.status };
+  } catch (_error) {
+    return { success: false, status: 503, error: 'Analytics service unavailable' };
+  }
 }
 
 /**
@@ -97,28 +101,26 @@ export async function postAnalyticsEvent(eventPayload = {}) {
  */
 export async function getAnalyticsDashboardData(portfolioId, authUser = null) {
   const cleanPortfolioId = sanitizeID(portfolioId || 'saleh_portfolio');
-
-  // 1. Authenticated Creator Owner Authorization Check
-  const targetPortfolio = GLOBAL_REMOTE_ANALYTICS_DB.portfolios.find(p => p.id === cleanPortfolioId);
-
-  // If user is authenticated, verify ownership
-  if (authUser && targetPortfolio && targetPortfolio.owner_user_id !== authUser.id && authUser.role !== 'admin') {
-    return { success: false, status: 403, error: 'Forbidden: You do not own this portfolio' };
+  try {
+    const { supabase } = await import('./SupabaseClient.js');
+    const { data } = await supabase.auth.getSession();
+    const token = data?.session?.access_token;
+    if (!token) return { success: false, status: 401, error: 'Authentication required' };
+    const response = await fetch(`/api/analytics/dashboard?portfolioId=${encodeURIComponent(cleanPortfolioId)}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.success) return { success: false, status: response.status, error: result.error };
+    return {
+      success: true,
+      status: 200,
+      portfolioId: cleanPortfolioId,
+      provider: 'Supabase Production Analytics',
+      ...aggregateServerEvents(result.events || [])
+    };
+  } catch (_error) {
+    return { success: false, status: 503, error: 'Analytics service unavailable' };
   }
-
-  // 2. Query Central Cross-Device Database Events
-  const events = GLOBAL_REMOTE_ANALYTICS_DB.analytics_events.filter(e => e.portfolio_id === cleanPortfolioId);
-
-  // 3. Aggregate Central Data
-  const aggregation = aggregateServerEvents(events);
-
-  return {
-    success: true,
-    status: 200,
-    portfolioId: cleanPortfolioId,
-    provider: 'Central Remote Database (Supabase / Production API)',
-    ...aggregation
-  };
 }
 
 function checkRateLimit(sessionId) {

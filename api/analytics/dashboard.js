@@ -18,7 +18,8 @@ export default async function handler(req, res) {
   const token = authHeader.replace('Bearer ', '');
   const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://kupxhrfijkdlcteniqfp.supabase.co';
   const supabaseAnonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || supabaseAnonKey;
+  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseAnonKey || !supabaseSecretKey) return res.status(503).json({ error: 'Analytics service is not configured' });
 
   try {
     // 1. Authenticate user JWT

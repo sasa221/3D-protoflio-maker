@@ -383,7 +383,9 @@ export function initPublicPortfolioAnalytics(portfolioId, variantId = 'general')
     }
 
     // Resume Download
-    if (target.matches('a[href*="resume"], a[download], button:has-text("Resume"), .resume-download-btn, [data-action="resume"]')) {
+    const isResumeAction = target.matches('a[href*="resume"], a[download], .resume-download-btn, [data-action="resume"]')
+      || (target.tagName === 'BUTTON' && /resume|cv/i.test(target.textContent || ''));
+    if (isResumeAction) {
       globalAnalytics.track('resume_download_clicked', { filename: 'resume.pdf', device }, context);
     }
 
