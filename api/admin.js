@@ -16,7 +16,7 @@ async function requireAdmin(req, res) {
   if (!profile?.is_admin && !allowedEmails.has((data.user.email || '').toLowerCase())) {
     return res.status(403).json({ error: 'Administrator access required' });
   }
-  return { user: data.user, admin };
+  return { user: data.user, admin, allowedEmails };
 }
 
 export default async function handler(req, res) {
@@ -73,7 +73,8 @@ export default async function handler(req, res) {
     const counts = (portfolios || []).reduce((all, item) => ({ ...all, [item.owner_user_id]: (all[item.owner_user_id] || 0) + 1 }), {});
     const users = (profiles || []).map((profile) => ({ id: profile.id, email: profile.email,
       name: profile.display_name || profile.email?.split('@')[0] || 'User', createdAt: profile.created_at,
-      isAdmin: Boolean(profile.is_admin), plan: plans.get(profile.id)?.plan_id || 'free',
+      isAdmin: Boolean(profile.is_admin) || profile.id === context.user.id || context.allowedEmails.has((profile.email || '').toLowerCase()),
+      plan: plans.get(profile.id)?.plan_id || 'free',
       status: plans.get(profile.id)?.status || 'active', portfolioCount: counts[profile.id] || 0 }));
     return res.status(200).json({ users, stats: { users: users.length, proUsers: users.filter((u) => u.plan === 'pro').length,
       admins: users.filter((u) => u.isAdmin).length, portfolios: (portfolios || []).length } });
