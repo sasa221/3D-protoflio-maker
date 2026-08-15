@@ -75,10 +75,14 @@ export function validatePortfolioRuntimeConfig(config) {
  * Generate Portfolio CSS System
  */
 export function generatePortfolioCSS(colors) {
-  const primary = colors.primary || '#7c3aed';
-  const secondary = colors.secondary || '#06b6d4';
-  const accent = colors.accent || '#ff007f';
-  const bg = colors.bg || '#050508';
+  const toCssColor = (value, fallback) => {
+    if (typeof value === 'number') return `#${value.toString(16).padStart(6, '0')}`;
+    return value || fallback;
+  };
+  const primary = toCssColor(colors?.primary ?? colors?.primaryColor, '#7c3aed');
+  const secondary = toCssColor(colors?.secondary ?? colors?.secondaryColor, '#06b6d4');
+  const accent = toCssColor(colors?.accent ?? colors?.accentColor, '#ff007f');
+  const bg = toCssColor(colors?.bg ?? colors?.bgColor, '#050508');
 
   return `
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

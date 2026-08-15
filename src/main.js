@@ -360,6 +360,13 @@ async function handlePublicRoute(username, variantSlug) {
 
     const theme = getThemeById(activeData.theme || 'code');
     const html = generatePortfolioHTMLBody(activeData, theme);
+    let publicStyle = document.getElementById('public-portfolio-render-styles');
+    if (!publicStyle) {
+      publicStyle = document.createElement('style');
+      publicStyle.id = 'public-portfolio-render-styles';
+      document.head.appendChild(publicStyle);
+    }
+    publicStyle.textContent = generatePortfolioCSS(theme);
 
     document.body.innerHTML = `
       <div id="canvas-container"><canvas id="bg-canvas"></canvas></div>

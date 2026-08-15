@@ -4,6 +4,7 @@ import { runJobTargetingTestSuite } from '../src/tests/JobMatcherFixtures.js';
 import { getThemeById } from '../src/three/ProceduralTheme.js';
 import { PLAN_CONFIG } from '../src/services/EntitlementService.js';
 import { PRODUCT_CONFIG } from '../src/config/ProductConfig.js';
+import { generatePortfolioCSS } from '../src/renderer/PortfolioRenderer.js';
 
 const cvResults = await runCVParserTestSuite();
 assert.ok(cvResults.length > 0, 'CV suite must include at least one fixture');
@@ -18,5 +19,8 @@ assert.equal(PLAN_CONFIG.pro.priceMonthly, 12);
 assert.equal(PLAN_CONFIG.pro.limits.variants, 5);
 assert.equal(PLAN_CONFIG.pro.limits.customDomains, 3);
 assert.match(PRODUCT_CONFIG.appDomain, /portfolio-maker-murex\.vercel\.app$/);
+const publishedThemeCss = generatePortfolioCSS(getThemeById('aperture'));
+assert.match(publishedThemeCss, /\.portfolio-navbar/, 'Published portfolio CSS must include the complete layout system');
+assert.match(publishedThemeCss, /--primary:\s*#[0-9a-f]{6}/i, 'Theme numeric colors must serialize to valid CSS colors');
 
 console.log(`Core checks passed: ${cvResults.length} CV fixture(s), ${jobResults.length} job matcher case(s), theme and plan invariants.`);
