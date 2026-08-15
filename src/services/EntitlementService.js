@@ -72,14 +72,19 @@ export class EntitlementService {
   }
 
   setSubscription(subscriptionState) {
-    this.subscription = subscriptionState || { planId: 'free', status: 'active' };
+    const source = subscriptionState || {};
+    this.subscription = {
+      ...source,
+      planId: source.planId || source.plan_id || 'free',
+      status: source.status || 'active'
+    };
   }
 
   getPlanId() {
     if (!this.subscription || this.subscription.status !== 'active') {
       return 'free';
     }
-    return this.subscription.planId || 'free';
+    return this.subscription.planId || this.subscription.plan_id || 'free';
   }
 
   getPlanConfig() {

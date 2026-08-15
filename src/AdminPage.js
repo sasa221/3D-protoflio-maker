@@ -77,6 +77,11 @@ function installPlanControls(refresh) {
       button.textContent = 'Saving…';
       try {
         await adminSetUserPlan(button.dataset.userId, nextPlan);
+        if ('BroadcastChannel' in window) {
+          const channel = new BroadcastChannel('portfolio-entitlements');
+          channel.postMessage({ userId: button.dataset.userId, planId: nextPlan });
+          channel.close();
+        }
         await refresh();
       } catch (error) {
         button.disabled = false;

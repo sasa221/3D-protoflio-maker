@@ -46,6 +46,7 @@ let engine = null;
 let sceneDirector = null;
 let scrollDirector = null;
 let introDirector = null;
+let entitlementChannel = null;
 let currentTheme = null;
 let activeTab = 'profile';
 let activeSection = 'hero';
@@ -455,7 +456,55 @@ async function initStudio() {
   bindEvents();
   renderWorkspaceHeader();
   renderFirstRunChecklist(document.body, portfolioData);
+  installEntitlementRefresh();
   showToast('info', '⚡', 'Studio Ready! Synced with Supabase Postgres.');
+}
+
+async function refreshStudioEntitlements({ notify = false } = {}) {
+  const authUser = await getCurrentAuthUser();
+  if (!authUser) return false;
+  const previousPlan = isPro() ? 'pro' : 'free';
+  await fetchUserProfileAndEntitlements(authUser);
+  const nextPlan = isPro() ? 'pro' : 'free';
+  portfolioData.isPro = nextPlan === 'pro';
+  if (!portfolioData.isPro) {
+    portfolioData.hideWatermark = false;
+    portfolioData.hideThemeBadge = false;
+  }
+  const tierChip = document.getElementById('tier-chip');
+  if (tierChip) {
+    tierChip.textContent = portfolioData.isPro ? '💎 PRO' : '🆓 FREE';
+    tierChip.className = `tier-chip ${portfolioData.isPro ? 'tier-pro' : 'tier-free'}`;
+  }
+  buildThemeGrid();
+  renderPublishTab();
+  const variantContainer = document.getElementById('variant-manager-container');
+  if (variantContainer) renderPortfolioVariantManager(variantContainer, portfolioData, (updatedMaster) => {
+    portfolioData = updatedMaster;
+    renderAll();
+    autoSave();
+  });
+  const jobContainer = document.getElementById('jobtarget-panel-container');
+  if (jobContainer) renderJobTargetPanel(jobContainer, portfolioData, (newData) => {
+    portfolioData = newData;
+    renderAll();
+    autoSave();
+  });
+  if (notify && previousPlan !== nextPlan) {
+    showToast('success', '💎', nextPlan === 'pro' ? 'Pro features are now active.' : 'Your plan was updated to Free.');
+  }
+  return previousPlan !== nextPlan;
+}
+
+function installEntitlementRefresh() {
+  if ('BroadcastChannel' in window && !entitlementChannel) {
+    entitlementChannel = new BroadcastChannel('portfolio-entitlements');
+    entitlementChannel.addEventListener('message', () => refreshStudioEntitlements({ notify: true }));
+  }
+  window.addEventListener('focus', () => refreshStudioEntitlements({ notify: true }));
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refreshStudioEntitlements({ notify: true });
+  });
 }
 
 window.switchWorkspaceNav = function(wsName) {
@@ -1586,9 +1635,10 @@ export function renderPublishTab() {
         <div style="font-size:0.74rem;color:rgba(255,255,255,.52);margin-bottom:2px">
           ${pro ? 'Pro plan: unlimited exports and optional branding.' : `Free plan: ${remainingExports} of 1 HTML export remaining this month. Platform branding stays visible.`}
         </div>
-        <button class="btn btn-secondary" onclick="exportHTML()" ${remainingExports === 0 ? 'disabled aria-disabled="true"' : ''} style="width:100%;font-size:0.8rem">
-          📦 Download Standalone HTML (Zero Dependencies)
+        <button id="btn-export-independent-site" class="btn btn-secondary" onclick="exportHTML()" ${remainingExports === 0 ? 'disabled aria-disabled="true"' : ''} style="width:100%;font-size:0.8rem">
+          📦 Download Independent Website (.html)
         </button>
+        <div style="font-size:0.7rem;color:rgba(255,255,255,.42);line-height:1.45">A complete standalone website you own and can upload to any web host. Pro exports are unlimited and can remove platform branding.</div>
         <button class="btn btn-secondary" onclick="copyShareableLink()" style="width:100%;font-size:0.8rem">
           🔗 Copy Instant Encoded URL (Offline Share)
         </button>
