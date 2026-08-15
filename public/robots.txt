@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /studio
+Disallow: /login
+Disallow: /reset-password
+Disallow: /api/
+
+Sitemap: https://portfolio-maker-murex.vercel.app/sitemap.xml

@@ -110,6 +110,10 @@ export function renderAuthPage(onSuccess) {
       ${authField('signup-email','Email Address','email','your@email.com','✉')}
       ${authField('signup-password','Password (min 6 chars)','password','••••••••','🔑')}
       ${authField('signup-confirm','Confirm Password','password','••••••••','🔐')}
+      <label style="display:flex;align-items:flex-start;gap:9px;margin:2px 0 14px;color:rgba(255,255,255,0.65);font-size:0.76rem;line-height:1.45;cursor:pointer">
+        <input id="signup-terms" type="checkbox" required style="margin-top:2px;accent-color:#7c3aed">
+        <span>I agree to the <a href="/terms" target="_blank" rel="noopener" style="color:#a855f7">Terms of Service</a> and <a href="/privacy" target="_blank" rel="noopener" style="color:#06b6d4">Privacy Policy</a>.</span>
+      </label>
       <div id="signup-error" style="display:none;font-size:0.8rem;color:#ef4444;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:10px 14px;margin-bottom:16px"></div>
       <button type="submit" id="signup-btn" style="
         width:100%;padding:13px;
@@ -323,8 +327,17 @@ export function renderAuthPage(onSuccess) {
     const password = document.getElementById('signup-password')?.value || '';
     const confirm = document.getElementById('signup-confirm')?.value || '';
     const name = document.getElementById('signup-name')?.value || '';
+    const acceptedTerms = Boolean(document.getElementById('signup-terms')?.checked);
     const err = document.getElementById('signup-error');
     if (err) err.style.display = 'none';
+
+    if (!acceptedTerms) {
+      if (err) {
+        err.textContent = 'Please accept the Terms of Service and Privacy Policy.';
+        err.style.display = 'block';
+      }
+      return;
+    }
 
     if (password !== confirm) {
       if (err) {

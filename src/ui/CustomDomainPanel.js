@@ -6,7 +6,6 @@
 
 import { globalEntitlements, CAPABILITIES } from '../services/EntitlementService.js';
 import { verifyCustomDomainDNS } from '../services/PublishService.js';
-import { openBillingModal } from './BillingModal.js';
 
 export function renderCustomDomainPanel(container, masterProfile, onUpdateMasterProfile) {
   if (!container) return;
@@ -66,7 +65,7 @@ export function renderCustomDomainPanel(container, masterProfile, onUpdateMaster
 
   const btnUpgrade = container.querySelector('#btn-domain-upgrade');
   if (btnUpgrade) {
-    btnUpgrade.addEventListener('click', () => openBillingModal('user_saleh_123'));
+    btnUpgrade.addEventListener('click', () => window.openBillingModal?.());
   }
 
   const btnVerify = container.querySelector('#btn-verify-domain');

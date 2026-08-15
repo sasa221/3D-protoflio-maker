@@ -28,25 +28,17 @@ import {
   loadUserPortfoliosFromSupabase, fetchUserProfileAndEntitlements,
   publishPortfolio
 } from './services/DBService.js';
-import { runSupabaseCutoverTestSuite } from './tests/SupabaseCutoverTestSuite.js';
 import { uploadAvatar, uploadResume, uploadProjectMedia, getResumeAccessUrl, deleteAsset } from './services/AssetStorageService.js';
 import { initCVImportModal, openCVImportModal } from './ui/CVImportModal.js';
 import { mapCVToPortfolioData } from './services/CVPortfolioMapper.js';
-import { runCVParserTestSuite } from './tests/CVParserFixtures.js';
 import { renderJobTargetPanel } from './ui/JobTargetPanel.js';
-import { runJobTargetingTestSuite } from './tests/JobMatcherFixtures.js';
 import { resolvePortfolioVariant } from './services/PortfolioVariantService.js';
 import { renderPortfolioVariantManager } from './ui/PortfolioVariantManager.js';
-import { runPortfolioVariantsTestSuite } from './tests/VariantResolverFixtures.js';
 import { renderAnalyticsDashboard } from './ui/AnalyticsDashboard.js';
-import { runAnalyticsTestSuite } from './tests/AnalyticsTestSuite.js';
 import { initPublicPortfolioAnalytics } from './services/AnalyticsService.js';
 import { openBillingModal } from './ui/BillingModal.js';
 import { renderCustomDomainPanel } from './ui/CustomDomainPanel.js';
-import { runMonetizationTestSuite } from './tests/MonetizationTestSuite.js';
 import { renderProductionReadinessPanel } from './ui/ProductionReadinessPanel.js';
-import { runProductionSecurityTestSuite } from './tests/ProductionSecurityTestSuite.js';
-import { runProductionLaunchTestSuite } from './tests/ProductionLaunchTestSuite.js';
 import confetti from 'canvas-confetti';
 
 // ─── STATE ─────────────────────────────────
@@ -285,7 +277,11 @@ async function router() {
   if (path === '/login') {
     setPageTitle('Sign In');
     renderAuthPage((user) => {
-      window.location.href = '/studio';
+      const requestedNext = new URLSearchParams(window.location.search).get('next');
+      const safeNext = requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
+        ? requestedNext
+        : '/studio';
+      window.location.href = safeNext;
     });
     return;
   }
@@ -302,9 +298,29 @@ async function router() {
     return;
   }
 
+  // 8. Server-protected Admin Dashboard
+  if (path === '/admin') {
+    setPageTitle('Admin Dashboard');
+    const authUser = await getCurrentAuthUser();
+    if (!authUser) {
+      window.location.href = '/login?next=/admin';
+      return;
+    }
+    if (!(await isAdmin())) {
+      renderAdminForbidden();
+      return;
+    }
+    await renderAdminPage();
+    return;
+  }
+
   // Unknown routes must not masquerade as a valid marketing page.
   setPageTitle('Page Not Found');
   render404Page(path);
+}
+
+function renderAdminForbidden() {
+  document.body.innerHTML = `<main class="admin-forbidden"><div><span>🔒</span><h1>Admin access required</h1><p>This signed-in account does not have administrator permissions.</p><a href="/studio">Back to Studio</a></div></main>`;
 }
 
 async function handlePublicRoute(username, variantSlug) {
@@ -352,8 +368,10 @@ async function handlePublicRoute(username, variantSlug) {
     installProjectCinemaControls();
 
     const canvas = document.getElementById('bg-canvas');
-    engine = new HyperEngine(canvas);
-    engine.init(theme);
+    if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      engine = new HyperEngine(canvas);
+      engine.init(theme);
+    }
 
     // Initialize Real Analytics Tracking for Public Visitors
     initPublicPortfolioAnalytics(pf.id, variantSlug || 'general');
@@ -364,14 +382,20 @@ async function handlePublicRoute(username, variantSlug) {
 }
 
 function render404Page(target) {
+  const isUnknownPage = String(target || '').startsWith('/');
+  const safeTarget = String(target || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
+  const heading = isUnknownPage ? '404 — Page Not Found' : '404 — Portfolio Not Found';
+  const message = isUnknownPage
+    ? `We couldn't find the page <code style="background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:6px;color:#a855f7">${safeTarget}</code>.`
+    : `We couldn't find a published portfolio for <code style="background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:6px;color:#a855f7">${safeTarget}</code>.`;
   document.body.innerHTML = `
     <div style="min-height:100vh;background:#050508;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-family:'Inter',sans-serif;text-align:center;padding:20px">
       <div style="font-size:4rem;margin-bottom:16px">🔍</div>
       <h1 style="font-size:2.2rem;font-weight:900;margin-bottom:8px;background:linear-gradient(135deg,#7c3aed,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent">
-        404 — Portfolio Not Found
+        ${heading}
       </h1>
       <p style="color:rgba(255,255,255,0.6);max-width:460px;margin-bottom:24px;line-height:1.6">
-        We couldn't find a published portfolio for <code style="background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:6px;color:#a855f7">${target}</code>.
+        ${message}
       </p>
       <a href="/" style="padding:12px 24px;background:#7c3aed;color:#fff;border-radius:10px;text-decoration:none;font-weight:700">⚡ Build Your 3D Portfolio</a>
     </div>
@@ -969,12 +993,39 @@ function initEngine() {
 
   initCVImportModal(handleCVImportData);
   window.openCVImportModal = openCVImportModal;
-  window.openBillingModal = () => openBillingModal('user_saleh_123', () => renderAll());
+  window.openBillingModal = async () => {
+    const authUser = await getCurrentAuthUser();
+    if (!authUser?.id || authUser.id === 'usr_guest') {
+      window.location.href = '/login?next=/studio';
+      return;
+    }
+    openBillingModal(authUser.id, () => renderAll());
+  };
 
   // Only run test suites in development environment or explicit debug query flag
   if (import.meta.env.DEV || window.location.search.includes('run_tests=true')) {
-    runCVParserTestSuite().catch(err => console.warn('[CV Test Suite] error:', err));
-    try {
+    (async () => {
+      try {
+      const [
+        { runCVParserTestSuite },
+        { runJobTargetingTestSuite },
+        { runPortfolioVariantsTestSuite },
+        { runAnalyticsTestSuite },
+        { runMonetizationTestSuite },
+        { runProductionSecurityTestSuite },
+        { runProductionLaunchTestSuite },
+        { runSupabaseCutoverTestSuite }
+      ] = await Promise.all([
+        import('./tests/CVParserFixtures.js'),
+        import('./tests/JobMatcherFixtures.js'),
+        import('./tests/VariantResolverFixtures.js'),
+        import('./tests/AnalyticsTestSuite.js'),
+        import('./tests/MonetizationTestSuite.js'),
+        import('./tests/ProductionSecurityTestSuite.js'),
+        import('./tests/ProductionLaunchTestSuite.js'),
+        import('./tests/SupabaseCutoverTestSuite.js')
+      ]);
+      await runCVParserTestSuite();
       runJobTargetingTestSuite();
       runPortfolioVariantsTestSuite();
       runAnalyticsTestSuite();
@@ -982,9 +1033,10 @@ function initEngine() {
       runProductionSecurityTestSuite();
       runProductionLaunchTestSuite();
       runSupabaseCutoverTestSuite();
-    } catch (err) {
-      console.warn('[Test Suite] error:', err);
-    }
+      } catch (err) {
+        console.warn('[Test Suite] error:', err);
+      }
+    })();
   }
 }
 
@@ -2537,11 +2589,13 @@ window.handleUpgradeClick = function() {
 };
 
 // ─── ADMIN DASHBOARD ─────────────────────────
-window.openAdmin = function() {
-  if (!isAdmin()) {
+window.openAdmin = async function() {
+  if (!(await isAdmin())) {
     showToast('error', '🔒', 'This account does not have administrator access.');
     return;
   }
+  window.location.href = '/admin';
+  return;
   const modal = document.getElementById('admin-modal');
   const body = document.getElementById('admin-body');
   const stats = getAnalytics();

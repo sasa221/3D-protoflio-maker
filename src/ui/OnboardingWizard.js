@@ -29,10 +29,24 @@ export async function renderOnboardingWizard(container) {
   const state = await onboardingController.initializeForCurrentUser();
 
   container.innerHTML = `
+    <style>
+      .ob-header { padding: 18px 40px; }
+      .ob-progress { display:flex; gap:24px; }
+      .ob-method-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+      .ob-theme-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:18px; }
+      .ob-form-card { padding:36px; }
+      @media (max-width: 760px) {
+        .ob-header { padding:14px 16px !important; gap:12px; flex-wrap:wrap; }
+        .ob-progress { order:3; width:100%; justify-content:center; gap:8px !important; font-size:.7rem !important; }
+        .ob-method-grid, .ob-theme-grid { grid-template-columns:1fr !important; }
+        .ob-form-card { padding:22px 16px !important; }
+        #onboarding-step-view { align-items:flex-start !important; padding:28px 14px !important; }
+      }
+    </style>
     <div style="min-height: 100vh; background: #050508; color: #fff; font-family: 'Inter', sans-serif; display: flex; flex-direction: column;">
       
       <!-- TOP MINIMAL ONBOARDING HEADER -->
-      <header style="
+      <header class="ob-header" style="
         padding: 18px 40px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex;
         justify-content: space-between; align-items: center; background: rgba(5,5,12,0.85); backdrop-filter: blur(15px);
       ">
@@ -42,7 +56,7 @@ export async function renderOnboardingWizard(container) {
         </a>
 
         <!-- PROGRESS STEPS -->
-        <div style="display: flex; gap: 24px; font-size: 0.82rem; font-weight: 700;">
+        <div class="ob-progress" style="font-size: 0.82rem; font-weight: 700;">
           <span style="color: ${state.step >= 1 ? '#a855f7' : 'rgba(255,255,255,0.4)'};">1. Your Profile</span>
           <span style="color: rgba(255,255,255,0.3);">➔</span>
           <span style="color: ${state.step >= 2 ? '#a855f7' : 'rgba(255,255,255,0.4)'};">2. Your Style</span>
@@ -98,9 +112,9 @@ function renderStep1ChooseMethod(container) {
         Choose the fastest option for your current career materials.
       </p>
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+      <div class="ob-method-grid">
         <!-- OPTION A: CV IMPORT -->
-        <div onclick="selectMethod('cv')" style="
+        <div role="button" tabindex="0" aria-label="Import my CV" onclick="selectMethod('cv')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectMethod('cv')}" style="
           background: rgba(124,58,237,0.08); border: 2px solid #7c3aed; border-radius: 20px; padding: 36px 24px;
           cursor: pointer; text-align: left; transition: transform 0.2s; position: relative;
         " onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='none'">
@@ -116,7 +130,7 @@ function renderStep1ChooseMethod(container) {
         </div>
 
         <!-- OPTION B: MANUAL START -->
-        <div onclick="selectMethod('manual')" style="
+        <div role="button" tabindex="0" aria-label="Start manually" onclick="selectMethod('manual')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectMethod('manual')}" style="
           background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 36px 24px;
           cursor: pointer; text-align: left; transition: transform 0.2s;
         " onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='none'">
@@ -147,10 +161,10 @@ function renderStep1CVUpload(container) {
         We'll extract your career data for your review before creating your portfolio.
       </p>
 
-      <div id="cv-drop-zone" style="
+      <div id="cv-drop-zone" role="button" tabindex="0" aria-label="Upload CV PDF" style="
         border: 2px dashed rgba(124,58,237,0.5); background: rgba(124,58,237,0.05); border-radius: 20px;
         padding: 50px 30px; text-align: center; cursor: pointer; transition: background 0.2s;
-      " onclick="document.getElementById('cv-file-input').click()">
+      " onclick="document.getElementById('cv-file-input').click()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('cv-file-input').click()}">
         <div style="font-size: 3rem; margin-bottom: 16px;">📄</div>
         <div style="font-size: 1.1rem; font-weight: 800; margin-bottom: 8px;">Drop your CV here or click to browse</div>
         <div style="font-size: 0.82rem; color: rgba(255,255,255,0.5);">Supports PDF files up to 10MB</div>
@@ -215,7 +229,7 @@ function renderStep1ManualForm(container) {
   const isCVReview = Boolean(currentState.importedFromCV);
 
   container.innerHTML = `
-    <div style="max-width: 600px; width: 100%; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 36px;">
+    <div class="ob-form-card" style="max-width: 600px; width: 100%; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 36px;">
       <h2 style="font-family: 'Outfit', sans-serif; font-size: 2rem; font-weight: 900; margin-bottom: 8px;">
         ${isCVReview ? 'Review your extracted CV details' : 'Tell us about yourself'}
       </h2>
@@ -286,9 +300,9 @@ function renderStep2ChooseStyle(container) {
         </p>
       </div>
 
-      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 36px;">
+      <div class="ob-theme-grid" style="margin-bottom: 36px;">
         <!-- CODE MATRIX -->
-        <div onclick="selectTheme('code')" style="
+        <div role="button" tabindex="0" aria-pressed="${selectedTheme === 'code'}" aria-label="Select Code Matrix theme" onclick="selectTheme('code')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectTheme('code')}" style="
           background: ${selectedTheme === 'code' ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.03)'};
           border: 2px solid ${selectedTheme === 'code' ? '#7c3aed' : 'rgba(255,255,255,0.1)'};
           border-radius: 16px; padding: 20px; cursor: pointer; text-align: center; transition: all 0.2s;
@@ -300,7 +314,7 @@ function renderStep2ChooseStyle(container) {
         </div>
 
         <!-- DATA GALAXY -->
-        <div onclick="selectTheme('data')" style="
+        <div role="button" tabindex="0" aria-pressed="${selectedTheme === 'data'}" aria-label="Select Data Galaxy theme" onclick="selectTheme('data')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectTheme('data')}" style="
           background: ${selectedTheme === 'data' ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.03)'};
           border: 2px solid ${selectedTheme === 'data' ? '#7c3aed' : 'rgba(255,255,255,0.1)'};
           border-radius: 16px; padding: 20px; cursor: pointer; text-align: center; transition: all 0.2s;
@@ -312,7 +326,7 @@ function renderStep2ChooseStyle(container) {
         </div>
 
         <!-- CYBER COMMAND -->
-        <div onclick="selectTheme('hacker')" style="
+        <div role="button" tabindex="0" aria-pressed="${selectedTheme === 'hacker'}" aria-label="Select Cyber Command theme" onclick="selectTheme('hacker')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectTheme('hacker')}" style="
           background: ${selectedTheme === 'hacker' ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.03)'};
           border: 2px solid ${selectedTheme === 'hacker' ? '#7c3aed' : 'rgba(255,255,255,0.1)'};
           border-radius: 16px; padding: 20px; cursor: pointer; text-align: center; transition: all 0.2s;
@@ -324,7 +338,7 @@ function renderStep2ChooseStyle(container) {
         </div>
 
         <!-- COSMIC ELITE -->
-        <div onclick="selectTheme('cosmic')" style="
+        <div role="button" tabindex="0" aria-pressed="${selectedTheme === 'cosmic'}" aria-label="Select Cosmic Elite theme" onclick="selectTheme('cosmic')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectTheme('cosmic')}" style="
           background: ${selectedTheme === 'cosmic' ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.03)'};
           border: 2px solid ${selectedTheme === 'cosmic' ? '#7c3aed' : 'rgba(255,255,255,0.1)'};
           border-radius: 16px; padding: 20px; cursor: pointer; text-align: center; transition: all 0.2s;
@@ -416,6 +430,11 @@ async function renderStep3LivePreview(container) {
     }
 
     try {
+      const authUser = await window.getCurrentAuthUser?.();
+      if (!authUser || authUser.id === 'usr_guest') {
+        window.location.href = '/login?next=/start';
+        return;
+      }
       const saved = await onboardingController.saveFirstPortfolio();
       if (!saved || !saved.id) {
         throw new Error('Failed to create portfolio row in database.');
@@ -443,6 +462,11 @@ async function renderStep3LivePreview(container) {
     }
 
     try {
+      const authUser = await window.getCurrentAuthUser?.();
+      if (!authUser || authUser.id === 'usr_guest') {
+        window.location.href = '/login?next=/start';
+        return;
+      }
       const saved = await onboardingController.saveFirstPortfolio();
       if (!saved || !saved.id) {
         throw new Error('Failed to create portfolio row in database.');
@@ -476,8 +500,10 @@ function initOnboardingPreview(pf) {
       document.head.appendChild(styleTag);
     }
     styleTag.textContent = generatePortfolioCSS(theme);
-    onboardingEngine = new HyperEngine(canvas);
-    onboardingEngine.init(theme);
+    if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      onboardingEngine = new HyperEngine(canvas);
+      onboardingEngine.init(theme);
+    }
 
     const html = generatePortfolioHTMLBody(pf.master_profile_json || pf, theme, { deviceMode: 'desktop' });
     htmlContainer.innerHTML = html;

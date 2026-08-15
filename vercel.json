@@ -27,6 +27,10 @@
   ],
   "rewrites": [
     {
+      "source": "/api/health",
+      "destination": "/api/admin?action=health"
+    },
+    {
       "source": "/api/public/portfolio",
       "destination": "/api/public/resume?resource=portfolio"
     },

@@ -77,23 +77,23 @@ function getEmptyCanonicalModel() {
 }
 
 function canonicalizePersonal(raw) {
-  let name = raw.name ? cleanString(raw.name) : 'SALEH MOHAMED ABOREHAB';
+  let name = raw.name ? cleanString(raw.name) : '';
   name = name.replace(/\b(LinkedIn|Portfolio|GitHub|Website|Resume|Curriculum\s*Vitae)\b/gi, '').trim();
 
-  let headline = raw.headline ? cleanString(raw.headline) : 'Front-End Developer';
+  let headline = raw.headline ? cleanString(raw.headline) : '';
   if (headline.toUpperCase().includes('EXPERIENCE') || headline.toUpperCase().includes('EDUCATION')) {
-    headline = 'Front-End Developer';
+    headline = '';
   }
 
   return {
     name,
     headline,
-    email: raw.email ? raw.email.trim() : 'eng.salehmohammedd@gmail.com',
-    phone: raw.phone ? raw.phone.trim() : '+201270024222',
-    location: raw.location ? cleanString(raw.location) : 'Giza, Egypt',
+    email: raw.email ? raw.email.trim() : '',
+    phone: raw.phone ? raw.phone.trim() : '',
+    location: raw.location ? cleanString(raw.location) : '',
     website: raw.website || null,
-    linkedin: raw.linkedin || 'https://www.linkedin.com/in/saleh-mohammedd/',
-    github: raw.github || 'https://github.com/sasa221'
+    linkedin: raw.linkedin || '',
+    github: raw.github || ''
   };
 }
 
@@ -111,7 +111,7 @@ function sanitizeSummary(rawSummary, personal) {
                .replace(/\s+/g, ' ')
                .trim();
 
-  return clean.length > 15 ? clean : 'Motivated Front-End Developer seeking to build responsive, interactive web interfaces and high-performance user experiences.';
+  return clean.length > 15 ? clean : '';
 }
 
 function separateSkillsAndLanguages(rawSkills, rawLanguages = []) {
@@ -152,17 +152,17 @@ function categorizeSkill(name) {
 function deduplicateExperience(rawExp) {
   let list = [];
   rawExp.forEach(exp => {
-    const role = cleanString(exp.role || 'Trainee');
-    const company = cleanString(exp.company || 'Organization');
+    const role = cleanString(exp.role || '');
+    const company = cleanString(exp.company || '');
     const isDuplicate = list.some(e => e.role === role && e.company === company);
     if (!isDuplicate) {
       list.push({
         id: exp.id || 'exp_' + Math.random().toString(36).substr(2, 9),
         role,
         company,
-        location: cleanString(exp.location || 'Giza, Egypt'),
-        startDate: exp.startDate || 'Sept 2025',
-        endDate: exp.endDate || 'Oct 2025',
+        location: cleanString(exp.location || ''),
+        startDate: exp.startDate || '',
+        endDate: exp.endDate || '',
         current: Boolean(exp.current),
         description: cleanString(exp.description || ''),
         achievements: Array.isArray(exp.achievements) ? exp.achievements.map(cleanString).filter(Boolean) : [],
@@ -176,12 +176,12 @@ function deduplicateExperience(rawExp) {
 function canonicalizeEducation(rawEdu) {
   return {
     id: rawEdu.id || 'edu_' + Math.random().toString(36).substr(2, 9),
-    degree: cleanString(rawEdu.degree) || 'Bachelor',
-    institution: cleanString(rawEdu.institution) || 'Helwan University',
-    field: cleanString(rawEdu.field || 'Computer Science and Artificial Intelligence'),
-    startDate: rawEdu.startDate || 'Sept 2023',
-    endDate: rawEdu.endDate || 'June 2027',
-    grade: cleanString(rawEdu.grade || '3.35'),
+    degree: cleanString(rawEdu.degree),
+    institution: cleanString(rawEdu.institution),
+    field: cleanString(rawEdu.field || ''),
+    startDate: rawEdu.startDate || '',
+    endDate: rawEdu.endDate || '',
+    grade: cleanString(rawEdu.grade || ''),
     description: cleanString(rawEdu.description || '')
   };
 }
@@ -195,7 +195,7 @@ function deduplicateCertifications(rawCerts) {
         name,
         title: name,
         issuer: cleanString(c.issuer || ''),
-        date: c.date || '2025'
+        date: c.date || ''
       });
     }
   });
@@ -242,18 +242,13 @@ function deduplicateVolunteering(rawVol) {
   allAchievements = Array.from(new Set(allAchievements.map(cleanString))).filter(Boolean);
 
   return [{
-    organization: cleanString(first.organization) || 'Central Family/Organization Helwan',
-    role: cleanString(first.role) || 'Organizing Committee Member',
-    startDate: first.startDate || 'Nov 2024',
-    endDate: first.endDate || 'Present',
-    current: true,
-    description: 'Organized and managed major student activities, ceremonies, and university programs.',
-    achievements: allAchievements.length > 0 ? allAchievements : [
-      'Organized and managed events including Red Bull promotional event, Grand Mufti public lecture, and Street of Science',
-      'Contributed to Gen-Z program on DMC',
-      'Organized graduation ceremonies and theatre performances',
-      'Awarded Best Member multiple times'
-    ]
+    organization: cleanString(first.organization),
+    role: cleanString(first.role),
+    startDate: first.startDate || '',
+    endDate: first.endDate || '',
+    current: Boolean(first.current),
+    description: cleanString(first.description || ''),
+    achievements: allAchievements
   }];
 }
 

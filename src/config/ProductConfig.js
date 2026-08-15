@@ -9,8 +9,8 @@ export const PRODUCT_CONFIG = {
   productTagline: 'Turn your CV into a cinematic 3D portfolio recruiters remember.',
   companyName: '3D Portfolio Technologies Inc.',
   supportEmail: 'support@3dportfolio.app',
-  appDomain: 'https://portfolio-maker.vercel.app',
-  marketingDomain: 'https://portfolio-maker.vercel.app',
+  appDomain: 'https://portfolio-maker-murex.vercel.app',
+  marketingDomain: 'https://portfolio-maker-murex.vercel.app',
   cnameTarget: 'cname.3dportfolio.app',
   version: '3.0.4',
   legal: {

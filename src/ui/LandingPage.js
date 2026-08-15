@@ -8,6 +8,7 @@ import { MARKETING_DEMO_PORTFOLIO } from '../demo/MarketingDemoPortfolio.js';
 import { HyperEngine } from '../three/HyperEngine.js';
 import { getThemeById } from '../three/ProceduralTheme.js';
 import { generatePortfolioCSS, generatePortfolioHTMLBody } from '../renderer/PortfolioRenderer.js';
+import { installProjectCinemaControls } from '../renderer/ProjectCinema.js';
 import { resolvePortfolioVariant } from '../services/PortfolioVariantService.js';
 import { getCurrentAuthUser } from '../services/AuthService.js';
 import { PLAN_CONFIG } from '../services/EntitlementService.js';
@@ -417,7 +418,7 @@ export async function renderLandingPage(container) {
                   </div>
                   <div style="font-size: 1.1rem; font-weight: 900; color: #fff;">Alex Morgan</div>
                   <div style="font-size: 0.78rem; color: #a855f7; font-weight: 700; margin-bottom: 10px;">Frontend Developer</div>
-                  <button style="padding: 6px 16px; background: linear-gradient(135deg, #7c3aed, #06b6d4); border: none; border-radius: 20px; color: #fff; font-size: 0.72rem; font-weight: 800;">▶ Project Cinema</button>
+                  <span style="padding: 6px 16px; background: linear-gradient(135deg, #7c3aed, #06b6d4); border-radius: 20px; color: #fff; font-size: 0.72rem; font-weight: 800;">▶ Project Cinema Preview</span>
                 </div>
               </div>
               <div style="font-size: 0.8rem; color: rgba(255,255,255,0.6); line-height: 1.5;">
@@ -447,7 +448,7 @@ export async function renderLandingPage(container) {
                       <div style="font-size: 0.95rem; font-weight: 800; color: #fff;">Alex Morgan</div>
                       <div style="font-size: 0.72rem; color: #06b6d4; font-weight: 700;">Senior Frontend Engineer</div>
                     </div>
-                    <button style="padding: 5px 12px; background: #06b6d4; border: none; border-radius: 6px; color: #000; font-size: 0.72rem; font-weight: 800;">📄 Resume PDF</button>
+                    <span style="padding: 5px 12px; background: #06b6d4; border-radius: 6px; color: #000; font-size: 0.72rem; font-weight: 800;">📄 Resume PDF Action</span>
                   </div>
                   <div style="display: flex; gap: 4px; flex-wrap: wrap;">
                     <span style="padding: 2px 6px; background: rgba(255,255,255,0.06); border-radius: 4px; font-size: 0.68rem; color: rgba(255,255,255,0.7);">JavaScript</span>
@@ -700,6 +701,7 @@ function renderScaledDemoHTML(viewport, html) {
     </div>
   `;
   viewport.scrollTop = 0;
+  installProjectCinemaControls();
   updateLandingDemoScale();
 }
 
@@ -708,6 +710,7 @@ let themeShowcaseEngine = null;
 function initThemeShowcaseCanvas(theme) {
   const canvas = document.getElementById('theme-showcase-canvas');
   if (!canvas) return;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
   try {
     if (!themeShowcaseEngine) {
       themeShowcaseEngine = new HyperEngine(canvas);
@@ -739,8 +742,10 @@ function initLandingHeroDemo() {
     }
     styleTag.textContent = generatePortfolioCSS(heroTheme);
 
-    demoEngine = new HyperEngine(canvas);
-    demoEngine.init(heroTheme);
+    if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      demoEngine = new HyperEngine(canvas);
+      demoEngine.init(heroTheme);
+    }
 
     // Initialize Theme Showcase canvas with initial theme
     const showcaseTheme = getThemeById('code');
@@ -757,7 +762,8 @@ function initLandingHeroDemo() {
 }
 
 window.switchDemoTheme = function(themeId) {
-  const theme = getThemeById(themeId);
+  const normalizedThemeId = themeId === 'cyber' ? 'hacker' : themeId;
+  const theme = getThemeById(normalizedThemeId);
 
   // 1. Update Theme Showcase badge and description
   const badge = document.getElementById('theme-preview-badge');

@@ -6,6 +6,7 @@
  */
 
 import { globalEntitlements } from './EntitlementService.js';
+import { supabase } from './SupabaseClient.js';
 
 // Central Database for User Subscriptions
 const SERVER_SUBSCRIPTIONS_DB = new Map([
@@ -41,16 +42,45 @@ export class BillingService {
       throw new Error('User authentication required for billing checkout.');
     }
 
-    const checkoutSessionId = 'cs_test_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
-    const checkoutUrl = `https://checkout.stripe.com/pay/${checkoutSessionId}`;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      throw new Error('Please sign in again before upgrading.');
+    }
 
-    return {
-      success: true,
-      sessionId: checkoutSessionId,
-      checkoutUrl,
-      targetPlanId,
-      interval
-    };
+    const response = await fetch('/api/billing/checkout', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ targetPlanId, interval })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.url) {
+      throw new Error(payload.error || 'Checkout is temporarily unavailable.');
+    }
+
+    return { ...payload, checkoutUrl: payload.url };
+  }
+
+  async createBillingPortalSession(userId) {
+    if (!userId) throw new Error('User authentication required for billing.');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) throw new Error('Please sign in again to manage billing.');
+
+    const response = await fetch('/api/billing/portal', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({})
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.url) {
+      throw new Error(payload.error || 'Billing portal is temporarily unavailable.');
+    }
+    return payload;
   }
 
   /**

@@ -146,23 +146,43 @@ export function isPro() {
   return globalEntitlements.getPlanId() === 'pro';
 }
 
-export function isAdmin() {
-  return false;
+async function adminRequest(path, options = {}) {
+  const session = await getAuthSession();
+  if (!session?.access_token) throw new Error('Please sign in first.');
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+      ...(options.headers || {})
+    }
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || 'Admin request failed.');
+  return payload;
+}
+
+export async function isAdmin() {
+  try {
+    const result = await adminRequest('/api/admin?action=me');
+    return result.isAdmin === true;
+  } catch (_) {
+    return false;
+  }
+}
+
+export function adminGetOverview() {
+  return adminRequest('/api/admin?action=overview');
+}
+
+export function adminSetUserPlan(userId, planId) {
+  return adminRequest('/api/admin?action=user-plan', {
+    method: 'PATCH',
+    body: JSON.stringify({ userId, planId })
+  });
 }
 
 export function upgradeToPro() {}
 export function redeemPromoCode() {
   return { success: false, error: 'Promo code redemption is not available yet.' };
 }
-
-export function adminGetAllUsers() {
-  return [getCurrentUser()];
-}
-
-export function adminCreatePromoCode() { return { success: true }; }
-export function adminGetPromoCodes() { return []; }
-export function adminRevokePromoCode() { return { success: true }; }
-export function adminDeletePromoCode() { return { success: true }; }
-export function adminDeleteUser() { return { success: true }; }
-export function adminGetPromos() { return []; }
-export function adminToggleUserTier() { return { success: true }; }

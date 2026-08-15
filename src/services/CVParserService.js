@@ -1,66 +1,36 @@
-/** Deterministic, data-faithful CV parser. It never invents candidate records. */
+/** Deterministic, evidence-only CV parser. It never invents candidate records. */
 export class BaseCVAnalyzerProvider {
   async analyze() { throw new Error('Analyzer provider must implement analyze().'); }
 }
 
 const SECTION_PATTERNS = {
-  summary: /^(summary|profile|about me|professional summary|objective)s?\b/i,
+  summary: /^(summary|profile|about me|professional summary|objectives?)\b/i,
   experience: /^(experience|work experience|professional experience|employment|career history)\b/i,
   education: /^(education|academic background|qualifications|academics)\b/i,
-  skills: /^(skills|technical skills|core skills|tools|technologies|competencies)\b/i,
+  skills: /^(skills|technical skills|core skills|tools(?:\s*&\s*technologies)?|technologies|competencies)\b/i,
   projects: /^(projects|selected projects|featured projects|key projects|personal projects)\b/i,
   certifications: /^(certifications|certificates|licenses|courses)\b/i,
   volunteering: /^(volunteering|volunteer experience|activities|community involvement)\b/i,
   languages: /^(languages|foreign languages)\b/i
 };
 
+const DATE_TOKEN = '(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|Q[1-4])';
+const DATE_LINE_RE = new RegExp(`(?:${DATE_TOKEN}\\s+)?(?:19|20)\\d{2}(?:\\s*(?:-|to)\\s*(?:(?:${DATE_TOKEN}\\s+)?(?:19|20)\\d{2}|Present|Current))?`, 'i');
+
 function cleanLine(line = '') {
-  return line.replace(/^[#\-•▪*\s]+/, '').trim();
+  return String(line).replace(/^[#\-•▪*\s]+/, '').replace(/\s+/g, ' ').trim();
 }
 
 function cleanHeaderLine(line = '') {
-  return cleanLine(line)
-    .replace(/\b(?:LinkedIn|GitHub|Portfolio|Website|Resume|Curriculum Vitae)\b.*$/i, '')
-    .trim();
-}
-
-function canonicalSkillName(value) {
-  const compact = value.replace(/\s+/g, '').toLowerCase();
-  const canonical = {
-    javascript: 'JavaScript', html5: 'HTML5', css3: 'CSS3', mysql: 'MySQL',
-    php: 'PHP', powerbi: 'Power BI', 'c++': 'C++'
-  };
-  return canonical[compact] || value.replace(/\s+/g, ' ').trim();
-}
-
-function inferHeadline(summary, headerCandidates) {
-  const direct = headerCandidates.find(v =>
-    /\b(developer|engineer|designer|analyst|scientist|manager|specialist|consultant)\b/i.test(v)
-  );
-  if (direct) return direct;
-  const match = summary.match(/\b([A-Za-z]+(?:\s*-\s*[A-Za-z]+)?(?:\s+[A-Za-z]+){0,3}\s+(?:Developer|Engineer|Designer|Analyst|Scientist|Manager|Specialist|Consultant))\b/i);
-  return match ? match[1].replace(/\s*-\s*/g, '-').trim() : '';
-}
-
-function extractSkillsFromText(fullText) {
-  const groups = [
-    /Programming\s*&\s*Tools\s*:\s*([\s\S]*?)(?=Data Analysis\s*:|Interpersonal Skills\s*:|Languages\s*:|Volunteering|$)/i,
-    /Data Analysis\s*:\s*([\s\S]*?)(?=Interpersonal Skills\s*:|Languages\s*:|Volunteering|$)/i,
-    /Interpersonal Skills\s*:\s*([\s\S]*?)(?=Languages\s*:|Volunteering|$)/i
-  ];
-  const block = groups.map(pattern => fullText.match(pattern)?.[1] || '').join('\n');
-  const values = block.split(/\n|[,;•]/)
-    .map(value => value.replace(/^[:\-▪*\s]+/, '').replace(/[.]$/, '').trim())
-    .filter(value => value && value.length <= 60 && !/^(?:English|Arabic)\b/i.test(value));
-  return [...new Set(values.map(v => v.replace(/[.]$/, '').trim()))];
+  return cleanLine(line).replace(/\b(?:LinkedIn|GitHub|Portfolio|Website|Resume|Curriculum Vitae)\b.*$/i, '').trim();
 }
 
 function detectSections(lines) {
   const found = [];
   lines.forEach((line, index) => {
-    const clean = cleanLine(line);
+    const value = cleanLine(line);
     for (const [key, pattern] of Object.entries(SECTION_PATTERNS)) {
-      if (pattern.test(clean)) { found.push({ key, index }); break; }
+      if (pattern.test(value)) { found.push({ key, index }); break; }
     }
   });
   const sections = {};
@@ -75,8 +45,103 @@ function sectionLines(sections, key, lines) {
   return section ? lines.slice(section.startIndex + 1, section.endIndex).map(cleanLine).filter(Boolean) : [];
 }
 
-function splitList(rows) {
-  return rows.flatMap(row => row.split(/[,|•]/)).map(cleanLine).filter(Boolean);
+function splitTitleOrganization(value = '') {
+  const parts = value.split(/\s+-\s+/).map(cleanLine).filter(Boolean);
+  return { title: parts.shift() || '', organization: parts.join(' - ') };
+}
+
+function parseDateRange(value = '') {
+  const parts = value.split(/\s+(?:-|to)\s+/i).map(cleanLine);
+  return { startDate: parts[0] || '', endDate: parts[1] || '', current: /present|current/i.test(parts[1] || '') };
+}
+
+function parseExperience(rows) {
+  const entries = [];
+  for (let index = 0; index < rows.length;) {
+    if (!DATE_LINE_RE.test(rows[index + 1] || '')) { index += 1; continue; }
+    const { title: role, organization: company } = splitTitleOrganization(rows[index]);
+    const dates = parseDateRange(rows[index + 1]);
+    index += 2;
+    const details = [];
+    while (index < rows.length && !DATE_LINE_RE.test(rows[index + 1] || '')) details.push(cleanLine(rows[index++]));
+    entries.push({
+      id: `exp_${entries.length + 1}`, role, company, location: '', ...dates,
+      description: details.join(' '), achievements: details, technologies: []
+    });
+  }
+  return entries;
+}
+
+function parseEducation(rows) {
+  if (!rows.length) return [];
+  const dateIndex = rows.findIndex(row => DATE_LINE_RE.test(row));
+  const beforeDates = dateIndex >= 0 ? rows.slice(0, dateIndex) : rows;
+  const degreeParts = splitTitleOrganization(beforeDates[0] || '');
+  const dates = dateIndex >= 0 ? parseDateRange(rows[dateIndex]) : { startDate: '', endDate: '', current: false };
+  const grade = rows.find(row => /^(?:gpa|grade)\s*:/i.test(row))?.split(':').slice(1).join(':').trim() || '';
+  return [{
+    id: 'edu_1', degree: degreeParts.title, field: degreeParts.organization,
+    institution: beforeDates[1] || '', startDate: dates.startDate, endDate: dates.endDate,
+    grade, description: rows.slice(Math.max(dateIndex + 1, 2)).filter(row => !/^(?:gpa|grade)\s*:/i.test(row)).join(' ')
+  }];
+}
+
+function parseProjects(rows) {
+  const projects = [];
+  for (let index = 0; index < rows.length;) {
+    if (!DATE_LINE_RE.test(rows[index + 1] || '')) { index += 1; continue; }
+    const name = rows[index];
+    const date = rows[index + 1];
+    index += 2;
+    const details = [];
+    while (index < rows.length && !DATE_LINE_RE.test(rows[index + 1] || '')) details.push(rows[index++]);
+    const techRows = details.filter(row => /(?:·|\||,)/.test(row) && row.length < 100);
+    projects.push({
+      id: `project_${projects.length + 1}`, name, date,
+      description: details.filter(row => !techRows.includes(row)).join(' '),
+      tech: techRows.join(' · '), url: ''
+    });
+  }
+  return projects;
+}
+
+function parseCertifications(rows) {
+  return rows.map(row => {
+    const { title, organization } = splitTitleOrganization(row);
+    return { name: title, title, issuer: organization, date: '' };
+  }).filter(item => item.name);
+}
+
+function parseLanguages(rows) {
+  const text = rows.join(' ');
+  const matches = [...text.matchAll(/([\p{L}][\p{L} -]{1,30}?)\s+(Native|Fluent|Professional|Intermediate|Beginner|Basic|A1|A2|B1|B2|C1|C2)\b/giu)];
+  if (matches.length) return matches.map(match => ({ language: cleanLine(match[1]), proficiency: match[2] }));
+  return rows.flatMap(row => row.split(/[,|•]/)).map(cleanLine).filter(Boolean).map(language => ({ language, proficiency: '' }));
+}
+
+function parseVolunteering(rows) {
+  if (!rows.length) return [];
+  const { title: role, organization } = splitTitleOrganization(rows[0]);
+  const hasDates = DATE_LINE_RE.test(rows[1] || '');
+  const dates = hasDates ? parseDateRange(rows[1]) : { startDate: '', endDate: '', current: false };
+  const details = rows.slice(hasDates ? 2 : 1);
+  return [{ organization, role, ...dates, description: details.join(' '), achievements: details }];
+}
+
+function inferSkills(fullText, explicitRows) {
+  const evidenceSkills = [
+    'JavaScript', 'TypeScript', 'React', 'Vue', 'Angular', 'HTML', 'CSS', 'Bootstrap',
+    'PHP', 'Laravel', 'Python', 'Java', 'C++', 'C#', 'SQL', 'MySQL', 'PostgreSQL',
+    'Power BI', 'Tableau', 'Excel', 'Git', 'Node.js', 'Three.js', 'WebGL'
+  ];
+  const explicit = explicitRows.flatMap(row => row.split(/[,;|•·]/)).map(cleanLine).filter(Boolean);
+  const inferred = evidenceSkills.filter(skill => new RegExp(`(^|[^\\p{L}\\p{N}])${skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\p{L}\\p{N}]|$)`, 'iu').test(fullText));
+  return [...new Set([...explicit, ...inferred])].map(name => ({ name, category: 'Skills', level: null }));
+}
+
+function inferHeadline(summary, candidates) {
+  return candidates.find(value => /\b(developer|engineer|designer|analyst|scientist|manager|specialist|consultant)\b/i.test(value)) ||
+    summary.match(/\b[\p{L}-]+(?:\s+[\p{L}-]+){0,3}\s+(?:Developer|Engineer|Designer|Analyst|Scientist|Manager|Specialist|Consultant)\b/iu)?.[0] || '';
 }
 
 export class DeterministicFallbackProvider extends BaseCVAnalyzerProvider {
@@ -86,48 +151,34 @@ export class DeterministicFallbackProvider extends BaseCVAnalyzerProvider {
     if (!lines.length) throw new Error('CV text content is empty or unreadable.');
 
     const sections = detectSections(lines);
-    const firstSectionIndex = Math.min(...Object.values(sections).map(s => s.startIndex), lines.length);
+    const firstSectionIndex = Math.min(...Object.values(sections).map(section => section.startIndex), lines.length);
     const header = lines.slice(0, firstSectionIndex).map(cleanHeaderLine).filter(Boolean);
     const email = fullText.match(/[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0] || '';
     const phone = fullText.match(/(?:\+?\d{1,3}[\s-]?)?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}/)?.[0] || '';
-    const links = header.filter(v => /https?:\/\//i.test(v));
-    const candidates = header.filter(v => !v.includes('@') && !/https?:\/\//i.test(v) && !/\d{5,}/.test(v));
-    const name = candidates.find(v => /^[\p{L}][\p{L} .'-]{2,44}$/u.test(v)) || '';
+    const links = fullText.match(/(?:https?:\/\/|www\.)[^\s|]+/gi) || [];
+    const candidates = header.filter(value => !value.includes('@') && !/(?:https?:\/\/|www\.)/i.test(value) && !/\d{5,}/.test(value));
+    const name = candidates.find(value => /^[\p{L}][\p{L} .'-]{2,44}$/u.test(value)) || '';
     const rows = key => sectionLines(sections, key, lines);
     const summary = rows('summary').join(' ');
-    const headline = inferHeadline(summary, candidates.filter(v => v !== name));
+    const headline = inferHeadline(summary, candidates.filter(value => value !== name));
+    const skills = inferSkills(fullText, rows('skills'));
 
-    const experienceRows = rows('experience');
-    const educationRows = rows('education');
-    const extractedSkills = extractSkillsFromText(fullText);
-    const skillNames = (extractedSkills.length ? extractedSkills : splitList(rows('skills')))
-      .map(v => v.replace(/^[:\-\s]+/, '').trim())
-      .map(canonicalSkillName)
-      .filter(v => v && !/^(?:Languages\s*:|English|Arabic)\b/i.test(v));
-    const skills = [...new Set(skillNames)].map(name => ({ name, category: 'Skills', level: null }));
-    const projects = rows('projects').map((name, i) => ({ id: `project_${i + 1}`, name, description: '', tech: '', url: '', date: '' }));
-    const certifications = rows('certifications').map(name => ({ name, title: name, issuer: '', date: '' }));
-    const languages = splitList(rows('languages')).map(language => ({ language, proficiency: '' }));
-
-    const experience = experienceRows.length ? [{
-      id: 'exp_1', role: experienceRows[0], company: '', location: '', startDate: '', endDate: '', current: false,
-      description: experienceRows.slice(1).join(' '), achievements: [], technologies: []
-    }] : [];
-    const education = educationRows.length ? [{
-      id: 'edu_1', institution: educationRows[0], degree: '', field: '', startDate: '', endDate: '', grade: '',
-      description: educationRows.slice(1).join(' ')
-    }] : [];
+    const experience = parseExperience(rows('experience'));
+    const education = parseEducation(rows('education'));
+    const projects = parseProjects(rows('projects'));
+    const certifications = parseCertifications(rows('certifications'));
+    const volunteering = parseVolunteering(rows('volunteering'));
+    const languages = parseLanguages(rows('languages'));
 
     return {
       personal: {
         name, headline, email, phone,
-        location: candidates.find(v => v !== name && v !== headline && /,/.test(v)) || '',
-        github: links.find(v => /github\.com/i.test(v)) || '',
-        linkedin: links.find(v => /linkedin\.com/i.test(v)) || ''
+        location: header.find(value => value !== name && value !== headline && value.includes(','))?.split('|')[0].trim() || '',
+        github: links.find(value => /github\.com/i.test(value)) || '',
+        linkedin: links.find(value => /linkedin\.com/i.test(value)) || ''
       },
-      summary, experience, education, skills, projects, certifications,
-      volunteering: [], languages,
-      confidence: { personal: name ? 0.9 : 0.3, experience: experience.length ? 0.65 : 0, education: education.length ? 0.65 : 0, skills: skills.length ? 0.9 : 0 },
+      summary, experience, education, skills, projects, certifications, volunteering, languages,
+      confidence: { personal: name ? 0.9 : 0.3, experience: experience.length ? 0.85 : 0, education: education.length ? 0.85 : 0, skills: skills.length ? 0.8 : 0 },
       warnings: name && headline ? [] : ['Review name and professional title before continuing.'],
       missingProjects: projects.length === 0,
       providerType: 'Local PDF parser'

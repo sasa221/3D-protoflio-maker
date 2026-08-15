@@ -10,9 +10,13 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   email TEXT NOT NULL,
   display_name TEXT,
   username TEXT UNIQUE,
+  is_admin BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Safe to run when upgrading an existing database.
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- 2. PORTFOLIOS TABLE
 CREATE TABLE IF NOT EXISTS public.portfolios (
@@ -230,4 +234,3 @@ CREATE POLICY "Users can delete own storage files" ON storage.objects
     AND auth.role() = 'authenticated'
     AND (storage.foldername(name))[1] = auth.uid()::text
   );
-

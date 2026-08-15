@@ -44,19 +44,21 @@ export const MARKETING_DEMO_PORTFOLIO = {
   projects: [
     {
       id: 'proj_1',
-      title: 'Commerce UI Platform',
+      name: 'Commerce UI Platform',
       description: 'Ultra-fast responsive storefront interface with real-time inventory sync.',
-      technologies: ['JavaScript', 'CSS3', 'WebGL'],
-      demoUrl: 'https://example.com/demo1',
-      githubUrl: 'https://github.com/example/demo1'
+      tech: 'JavaScript · CSS3 · WebGL',
+      problem: 'Storefront teams needed instant inventory feedback without slowing down browsing.',
+      solution: 'A component-driven frontend with real-time inventory synchronization and GPU-assisted visuals.',
+      impact: 'Reduced render latency by 45% in the fictional demo scenario.'
     },
     {
       id: 'proj_2',
-      title: 'Analytics Dashboard',
+      name: 'Analytics Dashboard',
       description: 'Interactive data dashboard with high-fps WebGL rendering.',
-      technologies: ['JavaScript', 'Three.js'],
-      demoUrl: 'https://example.com/demo2',
-      githubUrl: 'https://github.com/example/demo2'
+      tech: 'JavaScript · Three.js',
+      problem: 'Dense operational data was difficult to scan and explore.',
+      solution: 'An interactive dashboard combining accessible summaries with high-fps WebGL exploration.',
+      impact: 'Made the most important trends visible in a single recruiter-friendly case study.'
     }
   ],
   education: [

@@ -18,6 +18,7 @@ const SKILL_ALIASES = {
   'c#': ['csharp', 'c#'],
   'python': ['py', 'python'],
   'sql': ['mysql', 'postgresql', 'postgres', 'sql', 'tsql'],
+  'excel': ['excel', 'microsoft excel', 'ms excel'],
   'rest api': ['rest', 'restful', 'apis', 'rest api', 'api integration']
 };
 
@@ -70,7 +71,7 @@ export class JobAnalyzerService {
     const knownSkillsList = [
       'JavaScript', 'TypeScript', 'HTML5', 'CSS3', 'React', 'Vue', 'Next.js', 'Node.js',
       'Python', 'C++', 'C', 'Java', 'PHP', 'Laravel', 'Bootstrap', 'Tailwind', 'Three.js',
-      'Power BI', 'Data Cleaning', 'Data Transformation', 'Data Visualization', 'SQL', 'MySQL',
+      'Power BI', 'Data Cleaning', 'Data Transformation', 'Data Visualization', 'SQL', 'MySQL', 'Excel',
       'PostgreSQL', 'Docker', 'Kubernetes', 'AWS', 'Git', 'REST APIs', 'GraphQL', 'Redux',
       'Figma', 'UI/UX', 'Analytical Thinking'
     ];

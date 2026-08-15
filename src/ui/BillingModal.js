@@ -8,7 +8,11 @@ import { globalBilling } from '../services/BillingService.js';
 
 let modalContainer = null;
 
-export function openBillingModal(currentUserId = 'user_saleh_123', onSubscriptionUpdated) {
+export function openBillingModal(currentUserId, onSubscriptionUpdated) {
+  if (!currentUserId) {
+    window.location.href = '/login?next=/studio';
+    return;
+  }
   if (modalContainer) modalContainer.remove();
 
   modalContainer = document.createElement('div');
@@ -30,7 +34,7 @@ export function openBillingModal(currentUserId = 'user_saleh_123', onSubscriptio
         <span style="font-size: 0.75rem; font-weight: 800; color: var(--primary, #7c3aed); letter-spacing: 1.5px; text-transform: uppercase;">💎 SaaS MONETIZATION & PRICING</span>
         <h2 style="font-size: 1.6rem; font-weight: 900; margin: 6px 0 8px 0;">Upgrade Your 3D Portfolio Experience</h2>
         <p style="font-size: 0.85rem; color: rgba(255,255,255,0.6); max-width: 500px; margin: 0 auto;">
-          Choose the plan that fits your career goals. Upgrade to unlock custom domains, unlimited variants, and advanced themes.
+          Choose the plan that fits your career goals. Upgrade to unlock up to ${PLAN_CONFIG.pro.limits.variants} targeted variants, ${PLAN_CONFIG.pro.limits.customDomains} custom domains, and advanced themes.
         </p>
       </div>
 
@@ -66,7 +70,7 @@ export function openBillingModal(currentUserId = 'user_saleh_123', onSubscriptio
           box-shadow: 0 0 30px rgba(124,58,237,0.2);
         ">
           ${isPro ? '<span style="position: absolute; top: 16px; right: 16px; font-size: 0.68rem; color: #10b981; font-weight: 800; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); border-radius: 12px; padding: 2px 10px;">CURRENT PLAN</span>' : '<span style="position: absolute; top: 16px; right: 16px; font-size: 0.68rem; color: #f59e0b; font-weight: 800; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3); border-radius: 12px; padding: 2px 10px;">RECOMMENDED</span>'}
-          <h3 style="font-size: 1.2rem; font-weight: 800; margin: 0 0 6px 0; color: #a855f7;">PRO UNLIMITED</h3>
+          <h3 style="font-size: 1.2rem; font-weight: 800; margin: 0 0 6px 0; color: #a855f7;">PRO</h3>
           <div style="font-size: 1.8rem; font-weight: 900; color: #fff; margin-bottom: 12px;">$12 <span style="font-size: 0.8rem; font-weight: 400; color: rgba(255,255,255,0.5);">/month</span></div>
 
           <ul style="font-size: 0.78rem; color: rgba(255,255,255,0.9); line-height: 1.8; margin: 0 0 20px 0; padding-left: 18px;">
@@ -101,30 +105,30 @@ export function openBillingModal(currentUserId = 'user_saleh_123', onSubscriptio
   if (btnCheckout) {
     btnCheckout.addEventListener('click', async () => {
       btnCheckout.textContent = '⏳ Creating Checkout Session...';
-      const checkout = await globalBilling.createCheckoutSession(currentUserId, 'pro', 'monthly');
-
-      // Simulate Stripe Webhook Execution
-      setTimeout(async () => {
-        await globalBilling.handleWebhookEvent({
-          type: 'checkout.session.completed',
-          data: { userId: currentUserId, planId: 'pro', customerId: 'cus_saleh_pro' }
-        }, 'valid_stripe_signature');
-
-        alert('🎉 Upgrade Successful! Pro capabilities unlocked.');
-        modalContainer.remove();
-        if (onSubscriptionUpdated) onSubscriptionUpdated();
-      }, 800);
+      btnCheckout.disabled = true;
+      try {
+        const checkout = await globalBilling.createCheckoutSession(currentUserId, 'pro', 'monthly');
+        window.location.assign(checkout.checkoutUrl);
+      } catch (error) {
+        btnCheckout.disabled = false;
+        btnCheckout.textContent = 'Upgrade to Pro ($12/mo)';
+        alert(error.message || 'Checkout is temporarily unavailable.');
+      }
     });
   }
 
   const btnDowngrade = modalContainer.querySelector('#btn-downgrade-free');
   if (btnDowngrade) {
     btnDowngrade.addEventListener('click', async () => {
-      if (confirm('Downgrade to Free plan? (Your variants and projects will NOT be deleted; excess items will simply be locked).')) {
-        await globalBilling.downgradeUserToFree(currentUserId);
-        alert('Downgraded to Free plan. User data retained safely.');
-        modalContainer.remove();
-        if (onSubscriptionUpdated) onSubscriptionUpdated();
+      btnDowngrade.disabled = true;
+      btnDowngrade.textContent = 'Opening secure billing portal...';
+      try {
+        const portal = await globalBilling.createBillingPortalSession(currentUserId);
+        window.location.assign(portal.url);
+      } catch (error) {
+        btnDowngrade.disabled = false;
+        btnDowngrade.textContent = 'Manage or Downgrade Plan';
+        alert(error.message || 'Billing portal is temporarily unavailable.');
       }
     });
   }

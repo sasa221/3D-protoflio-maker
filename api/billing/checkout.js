@@ -46,16 +46,16 @@ export default async function handler(req, res) {
             currency: 'usd',
             product_data: {
               name: 'Pro Tier Subscription',
-              description: 'Unlimited variants, custom domains, 4K rendering & analytics'
+              description: 'Up to 5 targeted variants, 3 custom domains, advanced themes & 90-day analytics'
             },
-            unit_amount: 1900,
+            unit_amount: 1200,
             recurring: { interval: 'month' }
           },
           quantity: 1
         }
       ],
-      success_url: `${req.headers.origin || 'https://portfolio-maker.vercel.app'}/?billing=success`,
-      cancel_url: `${req.headers.origin || 'https://portfolio-maker.vercel.app'}/?billing=cancelled`
+      success_url: `${req.headers.origin || 'https://portfolio-maker-murex.vercel.app'}/?billing=success`,
+      cancel_url: `${req.headers.origin || 'https://portfolio-maker-murex.vercel.app'}/?billing=cancelled`
     });
 
     return res.status(200).json({ success: true, url: session.url, sessionId: session.id });

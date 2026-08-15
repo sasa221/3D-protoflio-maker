@@ -17,6 +17,7 @@ export default async function handler(req, res) {
   const token = authHeader.replace('Bearer ', '');
   const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://kupxhrfijkdlcteniqfp.supabase.co';
   const supabaseAnonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
 
   try {
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -28,12 +29,21 @@ export default async function handler(req, res) {
 
     const stripeKey = process.env.STRIPE_SECRET_KEY;
     if (!stripeKey) return res.status(503).json({ error: 'Stripe is not configured' });
-    if (!req.body.customerId) return res.status(400).json({ error: 'Missing Stripe customer ID' });
+    if (!supabaseSecretKey) return res.status(503).json({ error: 'Billing database access is not configured' });
+    const supabaseAdmin = createClient(supabaseUrl, supabaseSecretKey);
+    const { data: subscription, error: subscriptionError } = await supabaseAdmin
+      .from('subscriptions')
+      .select('customer_id')
+      .eq('user_id', userData.user.id)
+      .single();
+    if (subscriptionError || !subscription?.customer_id) {
+      return res.status(404).json({ error: 'No billing account was found for this user' });
+    }
     const stripe = new Stripe(stripeKey);
 
     const session = await stripe.billingPortal.sessions.create({
-      customer: req.body.customerId,
-      return_url: `${req.headers.origin || 'https://portfolio-maker.vercel.app'}/`
+      customer: subscription.customer_id,
+      return_url: `${req.headers.origin || 'https://portfolio-maker-murex.vercel.app'}/`
     });
 
     return res.status(200).json({ success: true, url: session.url });
