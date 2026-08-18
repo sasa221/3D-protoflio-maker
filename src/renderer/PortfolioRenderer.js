@@ -139,6 +139,7 @@ export function generatePortfolioCSS(colors) {
       -webkit-backdrop-filter: blur(20px);
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
       width: 100%;
+      box-sizing: border-box;
     }
 
     .navbar-brand {
@@ -962,13 +963,32 @@ export function generatePortfolioCSS(colors) {
       .navbar-links { display: none !important; }
       .mobile-menu-btn { display: flex !important; }
       .portfolio-navbar {
-        padding: 0 16px;
+        padding: 0 14px;
         padding-top: env(safe-area-inset-top, 0px);
         height: calc(56px + env(safe-area-inset-top, 0px));
+        box-sizing: border-box;
+        max-width: 100vw;
+      }
+      .navbar-brand {
+        font-size: 0.95rem;
+        gap: 8px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .view-mode-btn {
+        margin-left: 6px;
+        padding: 5px 8px;
+        font-size: 0.72rem;
+      }
+      @media (max-width: 480px) {
+        .mode-label { display: none; }
       }
       .portfolio-section {
-        padding-inline: clamp(16px, 5vw, 24px);
+        padding-inline: clamp(14px, 4vw, 20px);
         min-height: 100svh;
+        box-sizing: border-box;
+        max-width: 100vw;
       }
       .hero-section {
         min-height: 100svh;
