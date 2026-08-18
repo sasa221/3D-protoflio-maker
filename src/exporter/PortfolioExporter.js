@@ -480,6 +480,21 @@ function buildPortfolioHTML(data, theme) {
     window.openMobileMenu = function(ctx) { window.toggleMobileMenu(true, ctx); };
     window.closeMobileMenu = function(ctx) { window.toggleMobileMenu(false, ctx); };
 
+    window.toggleViewMode = function(forceMode) {
+      const container = document.getElementById('portfolio-scroll-container') || document.body;
+      const current = container.getAttribute('data-view-mode') || 'cinematic';
+      const next = forceMode || (current === 'cinematic' ? 'recruiter' : 'cinematic');
+      container.setAttribute('data-view-mode', next);
+      document.body.setAttribute('data-view-mode', next);
+      document.querySelectorAll('.view-mode-btn').forEach(btn => {
+        if (next === 'recruiter') {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+    };
+
     document.addEventListener('click', function(e) {
       const menuBtn = e.target.closest('#mobile-menu-btn, .mobile-menu-btn');
       if (menuBtn) {
