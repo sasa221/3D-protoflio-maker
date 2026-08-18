@@ -617,7 +617,7 @@ function buildHTML() {
           <button class="btn btn-primary" onclick="openCVImportModal()" style="width: 100%; font-weight: 800; padding: 10px;">📄 Upload CV & Auto-Build Portfolio ✨</button>
         </div>
 
-        <div class="section-label">Your Profile Photo</div>
+        <div class="section-label">Profile Photo</div>
         <div style="
           background:linear-gradient(135deg,rgba(124,58,237,0.12),rgba(6,182,212,0.08));
           border:2px dashed rgba(124,58,237,0.4);border-radius:18px;padding:20px;
@@ -635,25 +635,25 @@ function buildHTML() {
 
               <!-- ZOOM CONTROLS -->
               <div style="display:flex;align-items:center;gap:10px;background:rgba(0,0,0,0.3);padding:6px 14px;border-radius:30px;border:1px solid rgba(255,255,255,0.1)">
-                <button onclick="changeAvatarZoom(-0.15)" style="background:rgba(255,255,255,0.1);border:none;color:#fff;border-radius:50%;width:28px;height:28px;font-size:16px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center" title="تصغير">➖</button>
+                <button onclick="changeAvatarZoom(-0.15)" style="background:rgba(255,255,255,0.1);border:none;color:#fff;border-radius:50%;width:28px;height:28px;font-size:16px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center" title="Zoom out">➖</button>
                 <span style="font-size:0.8rem;font-weight:700;color:var(--primary);min-width:45px;text-align:center">${Math.round((portfolioData.avatarZoom || 1) * 100)}%</span>
-                <button onclick="changeAvatarZoom(0.15)" style="background:rgba(255,255,255,0.1);border:none;color:#fff;border-radius:50%;width:28px;height:28px;font-size:16px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center" title="تكبير">➕</button>
+                <button onclick="changeAvatarZoom(0.15)" style="background:rgba(255,255,255,0.1);border:none;color:#fff;border-radius:50%;width:28px;height:28px;font-size:16px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center" title="Zoom in">➕</button>
               </div>
 
               <div style="display:flex;gap:10px;margin-top:4px">
                 <label style="background:rgba(124,58,237,0.2);border:1px solid rgba(124,58,237,0.4);border-radius:8px;padding:6px 14px;color:#fff;font-size:0.75rem;font-weight:700;cursor:pointer">
-                  🔄 تغيير الصورة
+                  🔄 Change Photo
                   <input type="file" accept="image/*" style="display:none" onchange="uploadUserAvatar(this)"/>
                 </label>
-                <button onclick="updateUserAvatar('');renderAll();" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:6px 14px;color:#ef4444;font-size:0.75rem;font-weight:700;cursor:pointer">إزالة ✕</button>
+                <button onclick="updateUserAvatar('');renderAll();" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:6px 14px;color:#ef4444;font-size:0.75rem;font-weight:700;cursor:pointer">Remove ✕</button>
               </div>
             </div>
           ` : `
             <label style="cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px">
               <div style="font-size:2.4rem">📷</div>
-              <div style="font-size:0.95rem;font-weight:800;color:#fff">إضافة صورتك الشخصية (Profile Photo)</div>
-              <div style="font-size:0.75rem;color:rgba(255,255,255,0.5)">انقر هنا لاختيار صورة من جهازك أونلاين</div>
-              <span style="margin-top:6px;padding:8px 20px;background:linear-gradient(135deg,var(--primary),var(--secondary));border-radius:20px;font-size:0.8rem;font-weight:800;color:#fff">📁 اختر صورة الآن</span>
+              <div style="font-size:0.95rem;font-weight:800;color:#fff">Add Profile Photo</div>
+              <div style="font-size:0.75rem;color:rgba(255,255,255,0.5)">Upload a clear photo to personalize your 3D portfolio.</div>
+              <span style="margin-top:6px;padding:8px 20px;background:linear-gradient(135deg,var(--primary),var(--secondary));border-radius:20px;font-size:0.8rem;font-weight:800;color:#fff">📁 Choose Photo</span>
               <input type="file" accept="image/*" style="display:none" onchange="uploadUserAvatar(this)"/>
             </label>
           `}
@@ -753,22 +753,29 @@ function buildHTML() {
 
       <!-- DESIGN TAB -->
       <div class="tab-panel" id="panel-design">
-        <div class="section-label">3D Theme World</div>
+        <div class="section-label">Choose 3D Visual Style</div>
         <div class="theme-grid" id="theme-grid"></div>
 
-        <div class="section-label" style="margin-top:8px">Camera & Animation Speed</div>
-        <div class="field-group">
-          <label class="field-label">Particle Count <span id="particle-val" style="color:var(--primary)"></span></label>
-          <input type="range" class="range-input" id="r-particles" min="500" max="6000" step="100" value="3000"/>
-        </div>
-        <div class="field-group">
-          <label class="field-label">Camera Sensitivity</label>
-          <input type="range" class="range-input" id="r-camera" min="1" max="10" step="1" value="5"/>
-        </div>
-        <div class="field-group">
-          <label class="field-label">Glow Intensity</label>
-          <input type="range" class="range-input" id="r-glow" min="1" max="10" step="1" value="5"/>
-        </div>
+        <!-- COLLAPSED ADVANCED VISUAL SETTINGS -->
+        <details style="margin-top:16px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:12px 14px">
+          <summary style="font-size:0.8rem;font-weight:700;color:rgba(255,255,255,0.8);cursor:pointer;user-select:none">
+            ⚙️ Advanced Visual Settings
+          </summary>
+          <div style="margin-top:14px;display:flex;flex-direction:column;gap:12px">
+            <div class="field-group">
+              <label class="field-label">Particle Density <span id="particle-val" style="color:var(--primary)"></span></label>
+              <input type="range" class="range-input" id="r-particles" min="500" max="6000" step="100" value="3000"/>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Camera Motion Sensitivity</label>
+              <input type="range" class="range-input" id="r-camera" min="1" max="10" step="1" value="5"/>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Glow & Lighting Intensity</label>
+              <input type="range" class="range-input" id="r-glow" min="1" max="10" step="1" value="5"/>
+            </div>
+          </div>
+        </details>
       </div>
 
       <!-- PUBLISH TAB -->
@@ -1476,7 +1483,7 @@ window.uploadUserAvatar = function(inputEl) {
   if (!file) return;
 
   if (file.size > 4 * 1024 * 1024) {
-    showToast('error', '⚠️', 'حجم الصورة كبير جداً، برجاء اختيار صورة أقل من 4 ميجابايت');
+    showToast('error', '⚠️', 'Image file is too large. Please select a photo under 4MB.');
     return;
   }
 
@@ -1509,19 +1516,13 @@ window.saveAvatarCrop = function() {
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.onload = function() {
-    // Fill background
     ctx.clearRect(0, 0, size, size);
-
-    // Apply Transformations matching user's crop selections exactly
     ctx.save();
-
-    // Clip to smooth HD circle
     ctx.beginPath();
     ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
     ctx.closePath();
     ctx.clip();
 
-    // Center matrix calculations
     const scale = tempCropState.zoom;
     const dx = (tempCropState.posX / 180) * size;
     const dy = (tempCropState.posY / 180) * size;
@@ -1529,7 +1530,6 @@ window.saveAvatarCrop = function() {
     ctx.translate(size / 2 + dx, size / 2 + dy);
     ctx.scale(scale, scale);
 
-    // Calculate aspect ratio cover fit
     let drawWidth, drawHeight;
     if (img.width > img.height) {
       drawHeight = size;
@@ -1543,7 +1543,7 @@ window.saveAvatarCrop = function() {
     ctx.restore();
 
     canvas.toBlob(async (blob) => {
-      showToast('info', '⏳', 'Uploading avatar to Supabase Storage...');
+      showToast('info', '⏳', 'Saving profile photo...');
       try {
         const authUser = await getCurrentAuthUser();
         if (!authUser) {
@@ -1564,15 +1564,15 @@ window.saveAvatarCrop = function() {
 
         window.closeAvatarCropper();
         renderAll();
-        showToast('success', '👤', 'Avatar uploaded to Supabase Storage!');
+        showToast('success', '👤', 'Profile photo updated!');
         autoSave();
       } catch (err) {
-        showToast('error', '❌', `Avatar upload failed: ${err.message}`);
+        showToast('error', '❌', `Photo upload failed: ${err.message}`);
       } finally {
         isAvatarUploading = false;
         if (saveBtn) {
           saveBtn.disabled = false;
-          saveBtn.textContent = '💾 حفظ وتطبيق الصورة';
+          saveBtn.textContent = '💾 Save and Apply Photo';
         }
       }
     }, 'image/webp', 0.95);
@@ -1582,9 +1582,9 @@ window.saveAvatarCrop = function() {
     isAvatarUploading = false;
     if (saveBtn) {
       saveBtn.disabled = false;
-      saveBtn.textContent = '💾 حفظ وتطبيق الصورة';
+      saveBtn.textContent = '💾 Save and Apply Photo';
     }
-    showToast('error', '❌', 'Failed to load avatar image for cropping.');
+    showToast('error', '❌', 'Failed to load photo for cropping.');
   };
   img.src = tempCropState.src;
 };
@@ -1893,10 +1893,23 @@ function renderSkills() {
   const el = document.getElementById('skills-list');
   if (!el) return;
   if (!Array.isArray(portfolioData.skills)) portfolioData.skills = [];
+
+  if (!portfolioData.skills.length) {
+    el.innerHTML = `
+      <div style="background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.12);border-radius:12px;padding:20px 16px;text-align:center;color:rgba(255,255,255,0.6);margin-bottom:12px">
+        <div style="font-size:1.3rem;margin-bottom:4px">⚡</div>
+        <div style="font-size:0.85rem;font-weight:700;color:rgba(255,255,255,0.85);margin-bottom:4px">No skills added yet</div>
+        <div style="font-size:0.75rem;margin-bottom:10px">Add your primary technical and professional skills.</div>
+        <button class="btn btn-secondary" onclick="addSkill()" style="margin:0 auto;padding:6px 16px;font-size:0.78rem">+ Add Skill</button>
+      </div>
+    `;
+    return;
+  }
+
   el.innerHTML = portfolioData.skills.map((s, i) => `
     <div class="skill-row" id="skill-${i}" style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
-      <input value="${s.name || ''}" placeholder="Skill name..." oninput="updateSkill(${i},'name',this.value)" style="flex:1"/>
-      <input class="skill-level-input" type="number" min="0" max="100" value="${s.level || 80}" oninput="updateSkill(${i},'level',parseInt(this.value)||0)" style="width:58px"/>
+      <input class="field-input" value="${s.name || ''}" placeholder="Skill name (e.g. JavaScript, React)..." oninput="updateSkill(${i},'name',this.value)" style="flex:1"/>
+      <input class="skill-level-input field-input" type="number" min="0" max="100" value="${s.level || 80}" oninput="updateSkill(${i},'level',parseInt(this.value)||0)" style="width:58px;text-align:center"/>
       <div style="display:flex;gap:2px">
         <button onclick="moveSkill(${i},-1)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:0.7rem;display:flex;align-items:center;justify-content:center" title="Move Up" ${i === 0 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>↑</button>
         <button onclick="moveSkill(${i},1)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:0.7rem;display:flex;align-items:center;justify-content:center" title="Move Down" ${i === portfolioData.skills.length - 1 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>↓</button>
@@ -1944,6 +1957,18 @@ function renderExperience() {
   if (!el) return;
   if (!Array.isArray(portfolioData.experience)) portfolioData.experience = [];
 
+  if (!portfolioData.experience.length) {
+    el.innerHTML = `
+      <div style="background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.12);border-radius:12px;padding:20px 16px;text-align:center;color:rgba(255,255,255,0.6);margin-bottom:12px">
+        <div style="font-size:1.3rem;margin-bottom:4px">💼</div>
+        <div style="font-size:0.85rem;font-weight:700;color:rgba(255,255,255,0.85);margin-bottom:4px">No experience added yet</div>
+        <div style="font-size:0.75rem;margin-bottom:10px">Add your past or current roles to highlight your career.</div>
+        <button class="btn btn-secondary" onclick="addExperience()" style="margin:0 auto;padding:6px 16px;font-size:0.78rem">+ Add Experience</button>
+      </div>
+    `;
+    return;
+  }
+
   el.innerHTML = portfolioData.experience.map((exp, i) => `
     <div class="experience-item" style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:16px;margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -1957,7 +1982,7 @@ function renderExperience() {
       <input class="field-input" value="${exp.role || ''}" placeholder="Job Title / Role (e.g. Senior Frontend Engineer)" oninput="updateExperience(${i},'role',this.value)" style="margin-bottom:8px;font-weight:700"/>
       <div style="display:flex;gap:8px;margin-bottom:8px">
         <input class="field-input" value="${exp.company || ''}" placeholder="Company Name" oninput="updateExperience(${i},'company',this.value)" style="flex:1"/>
-        <input class="field-input" value="${exp.location || ''}" placeholder="Location (e.g. Cairo / Remote)" oninput="updateExperience(${i},'location',this.value)" style="flex:1"/>
+        <input class="field-input" value="${exp.location || ''}" placeholder="Location (e.g. Remote / Cairo)" oninput="updateExperience(${i},'location',this.value)" style="flex:1"/>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
         <input class="field-input" value="${exp.startDate || ''}" placeholder="Start Date (e.g. 2024)" oninput="updateExperience(${i},'startDate',this.value)" style="flex:1"/>
@@ -1966,7 +1991,7 @@ function renderExperience() {
           <input type="checkbox" ${exp.current ? 'checked' : ''} onchange="updateExperience(${i},'current',this.checked)"/> Current
         </label>
       </div>
-      <textarea class="field-textarea" style="min-height:55px;margin-bottom:8px" placeholder="Role description & summary..." oninput="updateExperience(${i},'description',this.value)">${exp.description || ''}</textarea>
+      <textarea class="field-textarea" style="min-height:55px;margin-bottom:8px" placeholder="Role description and achievements..." oninput="updateExperience(${i},'description',this.value)">${exp.description || ''}</textarea>
       <input class="field-input" value="${Array.isArray(exp.achievements) ? exp.achievements.join(' ; ') : ''}" placeholder="Key Achievements (separated by semicolons ';')" oninput="updateExperienceAchievements(${i},this.value)" style="margin-bottom:8px"/>
       <input class="field-input" value="${Array.isArray(exp.technologies) ? exp.technologies.join(', ') : ''}" placeholder="Technologies used (comma separated, e.g. React, Three.js)" oninput="updateExperienceTechnologies(${i},this.value)"/>
     </div>
@@ -2033,6 +2058,18 @@ function renderEducation() {
   const el = document.getElementById('education-list');
   if (!el) return;
   if (!Array.isArray(portfolioData.education)) portfolioData.education = [];
+
+  if (!portfolioData.education.length) {
+    el.innerHTML = `
+      <div style="background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.12);border-radius:12px;padding:20px 16px;text-align:center;color:rgba(255,255,255,0.6);margin-bottom:12px">
+        <div style="font-size:1.3rem;margin-bottom:4px">🎓</div>
+        <div style="font-size:0.85rem;font-weight:700;color:rgba(255,255,255,0.85);margin-bottom:4px">No education records yet</div>
+        <div style="font-size:0.75rem;margin-bottom:10px">Add your degrees, certifications, or educational background.</div>
+        <button class="btn btn-secondary" onclick="addEducation()" style="margin:0 auto;padding:6px 16px;font-size:0.78rem">+ Add Education</button>
+      </div>
+    `;
+    return;
+  }
 
   el.innerHTML = portfolioData.education.map((edu, i) => `
     <div class="education-item" style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:16px;margin-bottom:12px">
@@ -2173,10 +2210,24 @@ window.removeResume = function() {
   showToast('info', '🗑️', 'Resume removed.');
 };
 
+// ─── PROJECTS ────────────────────────────────
 function renderProjects() {
   const el = document.getElementById('projects-list');
   if (!el) return;
   if (!Array.isArray(portfolioData.projects)) portfolioData.projects = [];
+
+  if (!portfolioData.projects.length) {
+    el.innerHTML = `
+      <div style="background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.12);border-radius:12px;padding:20px 16px;text-align:center;color:rgba(255,255,255,0.6);margin-bottom:12px">
+        <div style="font-size:1.3rem;margin-bottom:4px">🚀</div>
+        <div style="font-size:0.85rem;font-weight:700;color:rgba(255,255,255,0.85);margin-bottom:4px">No projects added yet</div>
+        <div style="font-size:0.75rem;margin-bottom:10px">Add the projects and case studies you are most proud of.</div>
+        <button class="btn btn-secondary" onclick="addProject()" style="margin:0 auto;padding:6px 16px;font-size:0.78rem">+ Add Project</button>
+      </div>
+    `;
+    return;
+  }
+
   el.innerHTML = portfolioData.projects.map((p, i) => `
     <div class="project-item" style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:16px;margin-bottom:12px">
       <div class="project-item-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -2184,21 +2235,21 @@ function renderProjects() {
         <div style="display:flex;align-items:center;gap:6px">
           <button onclick="moveProject(${i},-1)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:0.75rem" title="Move Up" ${i === 0 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>↑</button>
           <button onclick="moveProject(${i},1)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:0.75rem" title="Move Down" ${i === portfolioData.projects.length - 1 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>↓</button>
-          <button class="del-btn" onclick="removeProject(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;margin-left:4px">✕</button>
+          <button class="del-btn" onclick="removeProject(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;margin-left:4px">✕ Remove</button>
         </div>
       </div>
-      <input class="field-input" value="${p.name || ''}" placeholder="📌 اسم المشروع (e.g. AI E-Commerce App)" oninput="updateProject(${i},'name',this.value)" style="margin-bottom:8px;font-weight:700"/>
-      <textarea class="field-textarea" style="min-height:55px;margin-bottom:8px" placeholder="📝 وصف عن المشروع ومميزاته..." oninput="updateProject(${i},'description',this.value)">${p.description || ''}</textarea>
+      <input class="field-input" value="${p.name || ''}" placeholder="Project Name (e.g. AI E-Commerce Platform)" oninput="updateProject(${i},'name',this.value)" style="margin-bottom:8px;font-weight:700"/>
+      <textarea class="field-textarea" style="min-height:55px;margin-bottom:8px" placeholder="Brief summary of what this project does and key achievements..." oninput="updateProject(${i},'description',this.value)">${p.description || ''}</textarea>
       
       <!-- IMAGE UPLOADER SECTION -->
       <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center">
-        <input class="field-input" id="project-img-input-${i}" value="${p.image || ''}" placeholder="🖼️ رابط الصورة أو اختر من جهازك ←" oninput="updateProject(${i},'image',this.value)" style="flex:1"/>
+        <input class="field-input" id="project-img-input-${i}" value="${p.image || ''}" placeholder="Project image URL or choose file ←" oninput="updateProject(${i},'image',this.value)" style="flex:1"/>
         <label style="
           padding:9px 12px;background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);
           border-radius:8px;color:#fff;font-size:0.78rem;font-weight:600;cursor:pointer;
           display:flex;align-items:center;gap:6px;white-space:nowrap;transition:all 0.2s;
         " onmouseover="this.style.background='rgba(124,58,237,0.25)'" onmouseout="this.style.background='rgba(124,58,237,0.15)'">
-          📁 اختيار صورة
+          📁 Choose File
           <input type="file" accept="image/*" style="display:none" onchange="uploadProjectImage(${i}, this)"/>
         </label>
       </div>
@@ -2210,34 +2261,34 @@ function renderProjects() {
         </div>
       ` : ''}
 
-      <input class="field-input" value="${p.tech || ''}" placeholder="⚡ التقنيات (e.g. React · Node.js · MongoDB)" oninput="updateProject(${i},'tech',this.value)" style="margin-bottom:8px"/>
+      <input class="field-input" value="${p.tech || ''}" placeholder="Technologies used (e.g. React · Three.js · Node.js)" oninput="updateProject(${i},'tech',this.value)" style="margin-bottom:8px"/>
       
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-        <input class="field-input" value="${p.github || ''}" placeholder="💻 رابط GitHub Repo" oninput="updateProject(${i},'github',this.value)"/>
-        <input class="field-input" value="${p.url || ''}" placeholder="🌐 رابط الموقع (Live Demo)" oninput="updateProject(${i},'url',this.value)"/>
+        <input class="field-input" value="${p.github || ''}" placeholder="GitHub URL (Optional)" oninput="updateProject(${i},'github',this.value)"/>
+        <input class="field-input" value="${p.url || ''}" placeholder="Live Demo URL (Optional)" oninput="updateProject(${i},'url',this.value)"/>
       </div>
 
       <!-- ADVANCED CASE STUDY EXPANDABLE ACCORDION -->
       <details style="margin-top:8px;background:rgba(124,58,237,0.06);border:1px dashed rgba(124,58,237,0.3);border-radius:10px;padding:10px">
         <summary style="font-size:0.78rem;font-weight:700;color:var(--primary);cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between">
-          <span>🎬 Advanced Case Study Details (Project Cinema)</span>
+          <span>🎬 Case Study & Cinema Details</span>
           <span style="font-size:0.68rem;opacity:0.7">Optional ✨</span>
         </summary>
         
         <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
-            <input class="field-input" value="${p.role || ''}" placeholder="👤 دورك (e.g. Lead Dev)" oninput="updateProject(${i},'role',this.value)"/>
-            <input class="field-input" value="${p.duration || ''}" placeholder="⏱️ المدة (e.g. 3 Months)" oninput="updateProject(${i},'duration',this.value)"/>
-            <input class="field-input" value="${p.team || ''}" placeholder="👥 الفريق (e.g. 4 Devs)" oninput="updateProject(${i},'team',this.value)"/>
+            <input class="field-input" value="${p.role || ''}" placeholder="Your Role (e.g. Lead Dev)" oninput="updateProject(${i},'role',this.value)"/>
+            <input class="field-input" value="${p.duration || ''}" placeholder="Duration (e.g. 3 Months)" oninput="updateProject(${i},'duration',this.value)"/>
+            <input class="field-input" value="${p.team || ''}" placeholder="Team Size (e.g. 4 Devs)" oninput="updateProject(${i},'team',this.value)"/>
           </div>
 
-          <textarea class="field-textarea" style="min-height:50px" placeholder="🎯 المشكلة (The Problem statement...)" oninput="updateProject(${i},'problem',this.value)">${p.problem || ''}</textarea>
-          <textarea class="field-textarea" style="min-height:50px" placeholder="💡 الحل (The Technical Solution...)" oninput="updateProject(${i},'solution',this.value)">${p.solution || ''}</textarea>
-          <textarea class="field-textarea" style="min-height:50px" placeholder="⚙️ العملية والمعمارية (Process & Architecture...)" oninput="updateProject(${i},'process',this.value)">${p.process || ''}</textarea>
-          <textarea class="field-textarea" style="min-height:50px" placeholder="🚀 التأثير (Business Impact...)" oninput="updateProject(${i},'impact',this.value)">${p.impact || ''}</textarea>
+          <textarea class="field-textarea" style="min-height:50px" placeholder="The Problem (What challenge did this solve?)" oninput="updateProject(${i},'problem',this.value)">${p.problem || ''}</textarea>
+          <textarea class="field-textarea" style="min-height:50px" placeholder="The Technical Solution (Architecture & stack choices...)" oninput="updateProject(${i},'solution',this.value)">${p.solution || ''}</textarea>
+          <textarea class="field-textarea" style="min-height:50px" placeholder="Engineering Process & Implementation notes..." oninput="updateProject(${i},'process',this.value)">${p.process || ''}</textarea>
+          <textarea class="field-textarea" style="min-height:50px" placeholder="Business Impact & Key Outcomes..." oninput="updateProject(${i},'impact',this.value)">${p.impact || ''}</textarea>
 
-          <input class="field-input" value="${typeof p.metrics === 'string' ? p.metrics : (Array.isArray(p.metrics) ? p.metrics.map(m => typeof m === 'object' ? `${m.val || m.value}:${m.label}` : m).join(', ') : '')}" placeholder="📊 النتائج والأرقام (e.g. 45% Faster Response, 2M+ Daily Events)" oninput="updateProject(${i},'metrics',this.value)"/>
-          <input class="field-input" value="${p.video || ''}" placeholder="🎥 رابط فيديو للمشروع (Optional Video Embed URL)" oninput="updateProject(${i},'video',this.value)"/>
+          <input class="field-input" value="${typeof p.metrics === 'string' ? p.metrics : (Array.isArray(p.metrics) ? p.metrics.map(m => typeof m === 'object' ? `${m.val || m.value}:${m.label}` : m).join(', ') : '')}" placeholder="Key Metrics (e.g. 45% Faster Load, 2M+ Daily Events)" oninput="updateProject(${i},'metrics',this.value)"/>
+          <input class="field-input" value="${p.video || ''}" placeholder="Video Demo URL (Optional)" oninput="updateProject(${i},'video',this.value)"/>
         </div>
       </details>
     </div>
@@ -2248,7 +2299,7 @@ window.uploadProjectImage = async function(i, inputEl) {
   const file = inputEl.files[0];
   if (!file) return;
 
-  showToast('info', '⏳', 'Uploading project image to Supabase Storage...');
+  showToast('info', '⏳', 'Uploading project image...');
 
   try {
     const authUser = await getCurrentAuthUser();
@@ -2269,7 +2320,7 @@ window.uploadProjectImage = async function(i, inputEl) {
     renderProjects();
     updateHUD();
     autoSave();
-    showToast('success', '🖼️', 'Project image uploaded to Supabase Storage!');
+    showToast('success', '🖼️', 'Project image uploaded!');
   } catch (err) {
     showToast('error', '❌', `Project image upload failed: ${err.message}`);
     inputEl.value = '';
@@ -2314,6 +2365,18 @@ function renderCerts() {
   if (!el) return;
   if (!portfolioData.certs) portfolioData.certs = [];
 
+  if (!portfolioData.certs.length) {
+    el.innerHTML = `
+      <div style="background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.12);border-radius:12px;padding:20px 16px;text-align:center;color:rgba(255,255,255,0.6);margin-bottom:12px">
+        <div style="font-size:1.3rem;margin-bottom:4px">📜</div>
+        <div style="font-size:0.85rem;font-weight:700;color:rgba(255,255,255,0.85);margin-bottom:4px">No certificates added yet</div>
+        <div style="font-size:0.75rem;margin-bottom:10px">Add relevant licenses, certifications, or credentials.</div>
+        <button class="btn btn-secondary" onclick="addCert()" style="margin:0 auto;padding:6px 16px;font-size:0.78rem">+ Add Certificate</button>
+      </div>
+    `;
+    return;
+  }
+
   el.innerHTML = portfolioData.certs.map((c, i) => `
     <div class="cert-item" style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:16px;margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -2321,22 +2384,22 @@ function renderCerts() {
         <div style="display:flex;align-items:center;gap:6px">
           <button onclick="moveCert(${i},-1)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:0.75rem" title="Move Up" ${i === 0 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>↑</button>
           <button onclick="moveCert(${i},1)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:0.75rem" title="Move Down" ${i === portfolioData.certs.length - 1 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>↓</button>
-          <button class="del-btn" onclick="removeCert(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;margin-left:4px">✕</button>
+          <button class="del-btn" onclick="removeCert(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;margin-left:4px">✕ Remove</button>
         </div>
       </div>
-      <input class="field-input" value="${c.title || ''}" placeholder="📜 اسم الشهادة (e.g. AWS Certified Developer)" oninput="updateCert(${i},'title',this.value)" style="margin-bottom:8px;font-weight:700"/>
-      <input class="field-input" value="${c.issuer || ''}" placeholder="🏛️ الجهة المانحة (e.g. Amazon Web Services / Google)" oninput="updateCert(${i},'issuer',this.value)" style="margin-bottom:8px"/>
-      <input class="field-input" value="${c.date || ''}" placeholder="📅 سنة الاصدار (e.g. 2024)" oninput="updateCert(${i},'date',this.value)" style="margin-bottom:8px"/>
+      <input class="field-input" value="${c.title || ''}" placeholder="Certificate Title (e.g. AWS Certified Developer)" oninput="updateCert(${i},'title',this.value)" style="margin-bottom:8px;font-weight:700"/>
+      <input class="field-input" value="${c.issuer || ''}" placeholder="Issuing Organization (e.g. Amazon Web Services / Google)" oninput="updateCert(${i},'issuer',this.value)" style="margin-bottom:8px"/>
+      <input class="field-input" value="${c.date || ''}" placeholder="Issue Year / Date (e.g. 2024)" oninput="updateCert(${i},'date',this.value)" style="margin-bottom:8px"/>
       
       <!-- CERT IMAGE UPLOADER -->
       <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center">
-        <input class="field-input" id="cert-img-input-${i}" value="${c.image || ''}" placeholder="🖼️ صورة الشهادة أو اختر من جهازك ←" oninput="updateCert(${i},'image',this.value)" style="flex:1"/>
+        <input class="field-input" id="cert-img-input-${i}" value="${c.image || ''}" placeholder="Certificate image URL or choose file ←" oninput="updateCert(${i},'image',this.value)" style="flex:1"/>
         <label style="
           padding:9px 12px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);
           border-radius:8px;color:#fff;font-size:0.78rem;font-weight:600;cursor:pointer;
           display:flex;align-items:center;gap:6px;white-space:nowrap;transition:all 0.2s;
         " onmouseover="this.style.background='rgba(16,185,129,0.25)'" onmouseout="this.style.background='rgba(16,185,129,0.15)'">
-          📁 صورة الشهادة
+          📁 Choose File
           <input type="file" accept="image/*" style="display:none" onchange="uploadCertImage(${i}, this)"/>
         </label>
       </div>
@@ -2356,7 +2419,7 @@ window.uploadCertImage = function(i, inputEl) {
   if (!file) return;
 
   if (file.size > 4 * 1024 * 1024) {
-    showToast('error', '⚠️', 'حجم صورة الشهادة كبير جداً، برجاء اختيار صورة أقل من 4 ميجابايت');
+    showToast('error', '⚠️', 'File size exceeds 4MB. Please choose a smaller image.');
     return;
   }
 
@@ -2365,7 +2428,7 @@ window.uploadCertImage = function(i, inputEl) {
     updateCert(i, 'image', e.target.result);
     renderCerts();
     updateHUD();
-    showToast('success', '📜', 'تم رفع صورة الشهادة من جهازك بنجاح!');
+    showToast('success', '📜', 'Certificate image attached!');
   };
   reader.readAsDataURL(file);
 };
@@ -2403,6 +2466,21 @@ window.removeCert = function(i) {
 };
 
 // ─── THEME GRID ─────────────────────────────
+const THEME_DESCRIPTORS = {
+  code: { tag: 'Tech & Dev', desc: 'Code matrix neon flow' },
+  hacker: { tag: 'Cybersecurity', desc: 'Command shield and stream' },
+  data: { tag: 'Data & AI', desc: 'Dense galactic orbital chart' },
+  blueprint: { tag: 'Engineering', desc: 'Precision structural grid' },
+  creative: { tag: 'Creative UI', desc: 'Vibrant fluid prism' },
+  media: { tag: 'Cinema & Media', desc: 'Aperture camera ring' },
+  health: { tag: 'Health & Bio', desc: 'Double-helix cellular pulse' },
+  marketing: { tag: 'Growth & Biz', desc: 'Dynamic ascending energy' },
+  finance: { tag: 'Finance & Fintech', desc: 'Golden metrics & orbital rings' },
+  education: { tag: 'Academia', desc: 'Cosmic nebula knowledge flow' },
+  legal: { tag: 'Prestige & Legal', desc: 'Understated structured lines' },
+  cosmic: { tag: 'Executive Minimal', desc: 'Starlight atmospheric depth' }
+};
+
 function buildThemeGrid() {
   const el = document.getElementById('theme-grid');
   if (!el) return;
@@ -2410,10 +2488,17 @@ function buildThemeGrid() {
   el.innerHTML = themes.map(t => {
     const freeThemes = ['cosmic', 'code', 'creative', 'media'];
     const isLocked = !isPro() && !freeThemes.includes(t.id);
+    const meta = THEME_DESCRIPTORS[t.id] || { tag: 'Visual Theme', desc: t.name };
     return `
-      <div class="theme-card ${currentTheme?.id === t.id ? 'active' : ''}" onclick="selectTheme('${t.id}', ${isLocked})">
-        <span class="theme-emoji">${t.emoji}</span>
-        <div class="theme-name">${t.name}${isLocked ? '<span class="pro-badge">PRO</span>' : ''}</div>
+      <div class="theme-card ${currentTheme?.id === t.id ? 'active' : ''}" onclick="selectTheme('${t.id}', ${isLocked})" style="display:flex;flex-direction:column;gap:4px;padding:12px 10px;text-align:left;position:relative">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="theme-emoji" style="font-size:1.4rem">${t.emoji}</span>
+          <span style="font-size:0.62rem;font-weight:800;color:var(--primary);background:rgba(124,58,237,0.15);padding:2px 6px;border-radius:8px">${meta.tag}</span>
+        </div>
+        <div class="theme-name" style="font-size:0.82rem;font-weight:800;color:#fff;margin-top:2px">
+          ${t.name} ${isLocked ? '<span class="pro-badge" style="font-size:0.6rem;padding:1px 5px">PRO</span>' : ''}
+        </div>
+        <div style="font-size:0.68rem;color:rgba(255,255,255,0.5);line-height:1.3">${meta.desc}</div>
       </div>
     `;
   }).join('');
