@@ -21,16 +21,41 @@ export class HyperEngine {
     this.objects = { particles: null, core: null, rings: [], floatingMeshes: [], radar: null };
     this.uniforms = {};
     this.isRunning = false;
+    this.contextLost = false;
     this._resizeHandler = this._onResize.bind(this);
     this._mouseMoveHandler = this._onMouseMove.bind(this);
+    this._contextLostHandler = (e) => {
+      e.preventDefault();
+      this.contextLost = true;
+      console.warn('[HyperEngine] WebGL context lost. Rendering paused.');
+    };
+    this._contextRestoredHandler = () => {
+      this.contextLost = false;
+      if (this.currentTheme) this.applyTheme(this.currentTheme);
+      console.log('[HyperEngine] WebGL context restored.');
+    };
+  }
+
+  static isWebGLSupported() {
+    try {
+      const canvas = document.createElement('canvas');
+      return Boolean(window.WebGLRenderingContext && (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
+    } catch (e) {
+      return false;
+    }
   }
 
   init(theme) {
-    this._setup();
-    this.applyTheme(theme);
-    this._bindEvents();
-    this._startLoop();
-    this.isRunning = true;
+    try {
+      this._setup();
+      this.applyTheme(theme);
+      this._bindEvents();
+      this._startLoop();
+      this.isRunning = true;
+    } catch (err) {
+      console.warn('[HyperEngine] 3D initialization fallback:', err.message);
+      this.isRunning = false;
+    }
   }
 
   _setup() {
@@ -63,6 +88,11 @@ export class HyperEngine {
     this.renderer.setSize(this.canvas.clientWidth, this.canvas.clientHeight);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.2;
+
+    if (this.canvas && this.canvas.addEventListener) {
+      this.canvas.addEventListener('webglcontextlost', this._contextLostHandler, false);
+      this.canvas.addEventListener('webglcontextrestored', this._contextRestoredHandler, false);
+    }
   }
 
   applyTheme(theme) {
@@ -925,7 +955,9 @@ export class HyperEngine {
       }
     });
 
-    this.renderer.render(this.scene, this.camera);
+    if (!this.contextLost && this.renderer && this.scene && this.camera) {
+      this.renderer.render(this.scene, this.camera);
+    }
   }
 
   _clearScene() {
@@ -986,7 +1018,7 @@ export class HyperEngine {
   }
 
   _onResize() {
-    if (!this.renderer) return;
+    if (!this.renderer || !this.camera) return;
     const vp = document.getElementById('virtual-viewport');
     const w = vp ? (vp.clientWidth || 1440) : (this.canvas.clientWidth || window.innerWidth);
     const h = vp ? (vp.clientHeight || 900) : (this.canvas.clientHeight || window.innerHeight);
@@ -1012,6 +1044,10 @@ export class HyperEngine {
     cancelAnimationFrame(this.animFrame);
     window.removeEventListener('resize', this._resizeHandler);
     window.removeEventListener('mousemove', this._mouseMoveHandler);
+    if (this.canvas && this.canvas.removeEventListener) {
+      this.canvas.removeEventListener('webglcontextlost', this._contextLostHandler);
+      this.canvas.removeEventListener('webglcontextrestored', this._contextRestoredHandler);
+    }
     this._clearScene();
     this.renderer?.dispose();
     this.isRunning = false;

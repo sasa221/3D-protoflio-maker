@@ -376,15 +376,20 @@ async function handlePublicRoute(username, variantSlug) {
     installProjectCinemaControls();
 
     const canvas = document.getElementById('bg-canvas');
-    if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-      engine = new HyperEngine(canvas);
-      engine.init(theme);
+    try {
+      if (canvas && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        engine = new HyperEngine(canvas);
+        engine.init(theme);
+      }
+    } catch (engineErr) {
+      console.warn('[Public 3D] WebGL unavailable, falling back to CSS theme styling:', engineErr);
     }
 
     // Initialize Real Analytics Tracking for Public Visitors
     initPublicPortfolioAnalytics(pf.id, variantSlug || 'general');
 
   } catch (e) {
+    console.error('[Public Route] Failed to load portfolio:', e);
     render404Page(username);
   }
 }
@@ -980,17 +985,26 @@ function setupPreviewResizeObserver() {
 // ─── ENGINE INIT ────────────────────────────
 function initEngine() {
   const canvas = document.getElementById('preview-canvas');
-  engine = new HyperEngine(canvas);
   const theme = portfolioData.theme
     ? getThemeById(portfolioData.theme)
     : classifyProfession(portfolioData.profession);
   portfolioData.theme = theme.id;
   currentTheme = theme;
-  engine.init(theme);
+
+  try {
+    if (canvas && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      engine = new HyperEngine(canvas);
+      engine.init(theme);
+    }
+  } catch (engineErr) {
+    console.warn('[Studio 3D] WebGL initialization fallback:', engineErr);
+  }
 
   // Initialize Cinematic SceneDirector & ScrollDirector
-  sceneDirector = new SceneDirector(engine);
-  sceneDirector.setTheme(theme);
+  if (engine) {
+    sceneDirector = new SceneDirector(engine);
+    sceneDirector.setTheme(theme);
+  }
 
   // Setup ResizeObserver for responsive preview scaling
   setupPreviewResizeObserver();
@@ -1856,21 +1870,22 @@ window.copyDeployUrl = function() {
 function renderSkills() {
   const el = document.getElementById('skills-list');
   if (!el) return;
+  if (!Array.isArray(portfolioData.skills)) portfolioData.skills = [];
   el.innerHTML = portfolioData.skills.map((s, i) => `
-    <div class="skill-row" id="skill-${i}">
-      <input value="${s.name || ''}" placeholder="Skill name..." oninput="updateSkill(${i},'name',this.value)"/>
-      <input class="skill-level-input" type="number" min="0" max="100" value="${s.level || 80}" oninput="updateSkill(${i},'level',parseInt(this.value)||0)"/>
-      <button class="del-btn" onclick="removeSkill(${i})">✕</button>
+    <div class="skill-row" id="skill-${i}" style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+      <input value="${s.name || ''}" placeholder="Skill name..." oninput="updateSkill(${i},'name',this.value)" style="flex:1"/>
+      <input class="skill-level-input" type="number" min="0" max="100" value="${s.level || 80}" oninput="updateSkill(${i},'level',parseInt(this.value)||0)" style="width:58px"/>
+      <div style="display:flex;gap:2px">
+        <button onclick="moveSkill(${i},-1)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:0.7rem;display:flex;align-items:center;justify-content:center" title="Move Up" ${i === 0 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>↑</button>
+        <button onclick="moveSkill(${i},1)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:0.7rem;display:flex;align-items:center;justify-content:center" title="Move Down" ${i === portfolioData.skills.length - 1 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>↓</button>
+      </div>
+      <button class="del-btn" onclick="removeSkill(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;padding:4px 8px">✕</button>
     </div>
   `).join('');
 }
 
 window.addSkill = function() {
-  portfolioData.skills.push({ name: '', level: 80 });
-  renderSkills();
-  autoSave();
-};
-window.addSkill = function() {
+  if (!Array.isArray(portfolioData.skills)) portfolioData.skills = [];
   portfolioData.skills.push({ name: '', level: 80 });
   renderSkills();
   updateHUD();
@@ -1878,7 +1893,19 @@ window.addSkill = function() {
   autoSave();
 };
 window.updateSkill = function(i, key, val) {
-  portfolioData.skills[i][key] = val;
+  if (portfolioData.skills[i]) {
+    portfolioData.skills[i][key] = val;
+    updateHUD();
+    autoSave();
+  }
+};
+window.moveSkill = function(i, dir) {
+  const targetIdx = i + dir;
+  if (!portfolioData.skills || targetIdx < 0 || targetIdx >= portfolioData.skills.length) return;
+  const temp = portfolioData.skills[i];
+  portfolioData.skills[i] = portfolioData.skills[targetIdx];
+  portfolioData.skills[targetIdx] = temp;
+  renderSkills();
   updateHUD();
   autoSave();
 };
@@ -1899,7 +1926,11 @@ function renderExperience() {
     <div class="experience-item" style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:16px;margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <span style="font-size:0.78rem;font-weight:700;color:var(--primary)">Role 0${i+1}</span>
-        <button onclick="removeExperience(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;font-weight:bold">✕ Remove</button>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button onclick="moveExperience(${i},-1)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:0.75rem" title="Move Up" ${i === 0 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>↑</button>
+          <button onclick="moveExperience(${i},1)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:0.75rem" title="Move Down" ${i === portfolioData.experience.length - 1 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>↓</button>
+          <button onclick="removeExperience(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;font-weight:bold;margin-left:4px">✕ Remove</button>
+        </div>
       </div>
       <input class="field-input" value="${exp.role || ''}" placeholder="Job Title / Role (e.g. Senior Frontend Engineer)" oninput="updateExperience(${i},'role',this.value)" style="margin-bottom:8px;font-weight:700"/>
       <div style="display:flex;gap:8px;margin-bottom:8px">
@@ -1957,6 +1988,17 @@ window.updateExperienceTechnologies = function(i, text) {
   }
 };
 
+window.moveExperience = function(i, dir) {
+  const targetIdx = i + dir;
+  if (!portfolioData.experience || targetIdx < 0 || targetIdx >= portfolioData.experience.length) return;
+  const temp = portfolioData.experience[i];
+  portfolioData.experience[i] = portfolioData.experience[targetIdx];
+  portfolioData.experience[targetIdx] = temp;
+  renderExperience();
+  updateHUD();
+  autoSave();
+};
+
 window.removeExperience = function(i) {
   portfolioData.experience.splice(i, 1);
   renderExperience();
@@ -1974,7 +2016,11 @@ function renderEducation() {
     <div class="education-item" style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:16px;margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <span style="font-size:0.78rem;font-weight:700;color:var(--secondary)">Degree 0${i+1}</span>
-        <button onclick="removeEducation(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;font-weight:bold">✕ Remove</button>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button onclick="moveEducation(${i},-1)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:0.75rem" title="Move Up" ${i === 0 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>↑</button>
+          <button onclick="moveEducation(${i},1)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:0.75rem" title="Move Down" ${i === portfolioData.education.length - 1 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>↓</button>
+          <button onclick="removeEducation(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;font-weight:bold;margin-left:4px">✕ Remove</button>
+        </div>
       </div>
       <input class="field-input" value="${edu.degree || ''}" placeholder="Degree (e.g. B.Sc. Computer Science)" oninput="updateEducation(${i},'degree',this.value)" style="margin-bottom:8px;font-weight:700"/>
       <div style="display:flex;gap:8px;margin-bottom:8px">
@@ -2009,6 +2055,17 @@ window.updateEducation = function(i, key, val) {
     updateHUD();
     autoSave();
   }
+};
+
+window.moveEducation = function(i, dir) {
+  const targetIdx = i + dir;
+  if (!portfolioData.education || targetIdx < 0 || targetIdx >= portfolioData.education.length) return;
+  const temp = portfolioData.education[i];
+  portfolioData.education[i] = portfolioData.education[targetIdx];
+  portfolioData.education[targetIdx] = temp;
+  renderEducation();
+  updateHUD();
+  autoSave();
 };
 
 window.removeEducation = function(i) {
@@ -2093,14 +2150,20 @@ window.removeResume = function() {
   autoSave();
   showToast('info', '🗑️', 'Resume removed.');
 };
+
 function renderProjects() {
   const el = document.getElementById('projects-list');
   if (!el) return;
+  if (!Array.isArray(portfolioData.projects)) portfolioData.projects = [];
   el.innerHTML = portfolioData.projects.map((p, i) => `
     <div class="project-item" style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:16px;margin-bottom:12px">
       <div class="project-item-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <span class="project-num-badge" style="font-size:0.75rem;font-weight:700;color:var(--primary)">Project 0${i+1}</span>
-        <button class="del-btn" onclick="removeProject(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer">✕</button>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button onclick="moveProject(${i},-1)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:0.75rem" title="Move Up" ${i === 0 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>↑</button>
+          <button onclick="moveProject(${i},1)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:0.75rem" title="Move Down" ${i === portfolioData.projects.length - 1 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>↓</button>
+          <button class="del-btn" onclick="removeProject(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;margin-left:4px">✕</button>
+        </div>
       </div>
       <input class="field-input" value="${p.name || ''}" placeholder="📌 اسم المشروع (e.g. AI E-Commerce App)" oninput="updateProject(${i},'name',this.value)" style="margin-bottom:8px;font-weight:700"/>
       <textarea class="field-textarea" style="min-height:55px;margin-bottom:8px" placeholder="📝 وصف عن المشروع ومميزاته..." oninput="updateProject(${i},'description',this.value)">${p.description || ''}</textarea>
@@ -2192,6 +2255,7 @@ window.uploadProjectImage = async function(i, inputEl) {
 };
 
 window.addProject = function() {
+  if (!Array.isArray(portfolioData.projects)) portfolioData.projects = [];
   portfolioData.projects.push({ name: '', description: '', tech: '', url: '', github: '', image: '' });
   renderProjects();
   updateHUD();
@@ -2199,7 +2263,19 @@ window.addProject = function() {
   autoSave();
 };
 window.updateProject = function(i, key, val) {
-  portfolioData.projects[i][key] = val;
+  if (portfolioData.projects[i]) {
+    portfolioData.projects[i][key] = val;
+    updateHUD();
+    autoSave();
+  }
+};
+window.moveProject = function(i, dir) {
+  const targetIdx = i + dir;
+  if (!portfolioData.projects || targetIdx < 0 || targetIdx >= portfolioData.projects.length) return;
+  const temp = portfolioData.projects[i];
+  portfolioData.projects[i] = portfolioData.projects[targetIdx];
+  portfolioData.projects[targetIdx] = temp;
+  renderProjects();
   updateHUD();
   autoSave();
 };
@@ -2220,7 +2296,11 @@ function renderCerts() {
     <div class="cert-item" style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:16px;margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <span style="font-size:0.75rem;font-weight:700;color:#10b981">📜 Certificate 0${i+1}</span>
-        <button class="del-btn" onclick="removeCert(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer">✕</button>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button onclick="moveCert(${i},-1)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:0.75rem" title="Move Up" ${i === 0 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>↑</button>
+          <button onclick="moveCert(${i},1)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:0.75rem" title="Move Down" ${i === portfolioData.certs.length - 1 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>↓</button>
+          <button class="del-btn" onclick="removeCert(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;margin-left:4px">✕</button>
+        </div>
       </div>
       <input class="field-input" value="${c.title || ''}" placeholder="📜 اسم الشهادة (e.g. AWS Certified Developer)" oninput="updateCert(${i},'title',this.value)" style="margin-bottom:8px;font-weight:700"/>
       <input class="field-input" value="${c.issuer || ''}" placeholder="🏛️ الجهة المانحة (e.g. Amazon Web Services / Google)" oninput="updateCert(${i},'issuer',this.value)" style="margin-bottom:8px"/>
@@ -2279,6 +2359,16 @@ window.addCert = function() {
 window.updateCert = function(i, key, val) {
   if (!portfolioData.certs) portfolioData.certs = [];
   portfolioData.certs[i][key] = val;
+  updateHUD();
+  autoSave();
+};
+window.moveCert = function(i, dir) {
+  const targetIdx = i + dir;
+  if (!portfolioData.certs || targetIdx < 0 || targetIdx >= portfolioData.certs.length) return;
+  const temp = portfolioData.certs[i];
+  portfolioData.certs[i] = portfolioData.certs[targetIdx];
+  portfolioData.certs[targetIdx] = temp;
+  renderCerts();
   updateHUD();
   autoSave();
 };
@@ -2460,23 +2550,39 @@ window.saveToDB = async function() {
   showToast('success', '💾', 'Portfolio saved successfully!');
 };
 
+let lastClearedBackup = null;
+
 window.clearAll = function() {
   if (!confirm('Clear all data and start fresh?')) return;
+  lastClearedBackup = JSON.parse(JSON.stringify(portfolioData));
   portfolioData = {
     name:'',tagline:'',profession:'',bio:'',location:'',avatar:'',
     social:{github:'',linkedin:'',twitter:'',email:'',website:''},
-    skills:[],projects:[],contactMessage:"I'm always open to new opportunities.",
+    skills:[],projects:[],experience:[],education:[],certs:[],
+    contactMessage:"I'm always open to new opportunities.",
     theme:'cosmic',customColors:null
   };
   document.querySelectorAll('input,textarea').forEach(el => el.value = '');
   renderSkills();
   renderProjects();
+  renderExperience();
+  renderEducation();
+  renderCerts();
   const theme = getThemeById('cosmic');
   currentTheme = theme;
   engine?.applyTheme(theme);
   updateHUD();
   buildThemeGrid();
-  showToast('info', '🗑️', 'Cleared! Ready for a fresh start.');
+  showToast('info', '🗑️', 'Cleared! <button onclick="window.restoreClearedPortfolio()" style="background:none;border:none;color:#06b6d4;font-weight:700;cursor:pointer;text-decoration:underline;margin-left:6px">Undo</button>');
+};
+
+window.restoreClearedPortfolio = function() {
+  if (!lastClearedBackup) return;
+  portfolioData = JSON.parse(JSON.stringify(lastClearedBackup));
+  renderAll();
+  updateHUD();
+  autoSave();
+  showToast('success', '✨', 'Portfolio content restored!');
 };
 
 function autoSave() {

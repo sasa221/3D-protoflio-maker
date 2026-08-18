@@ -13,15 +13,24 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 export async function extractTextFromPDF(file) {
   if (!file) throw new Error('No PDF file provided.');
 
+  if (file.size === 0) {
+    throw new Error('The uploaded PDF file is empty (0 bytes). Please upload a valid CV document.');
+  }
+
+  const isPDF = (file.name && file.name.toLowerCase().endsWith('.pdf')) || file.type === 'application/pdf';
+  if (!isPDF) {
+    throw new Error('Unsupported file format. Please upload a standard PDF CV (.pdf).');
+  }
+
   const MAX_SIZE_MB = 10;
   if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-    throw new Error(`PDF file size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds maximum limit of 10MB.`);
+    throw new Error(`PDF file size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds the 10MB limit.`);
   }
 
   const arrayBuffer = await file.arrayBuffer();
   let rawText = '';
 
-  // 1. Attempt PDF.js via CDN auto-injection or global instance
+  // 1. Attempt PDF.js extraction
   try {
     if (pdfjsLib) {
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -60,6 +69,9 @@ export async function extractTextFromPDF(file) {
       rawText = pageTexts.join('\n\n');
     }
   } catch (err) {
+    if (err.name === 'PasswordException' || String(err.message).toLowerCase().includes('password')) {
+      throw new Error('This PDF is password-protected. Please upload an unlocked PDF CV.');
+    }
     console.warn('[PDFTextExtractor] PDF.js extraction notice:', err.message);
   }
 
