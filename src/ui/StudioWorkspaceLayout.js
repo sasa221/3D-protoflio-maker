@@ -14,33 +14,33 @@ export const WORKSPACES = {
 
 export const WORKSPACE_METADATA = {
   create: {
-    title: 'Create Workspace',
-    sub: 'Build and maintain your factual professional profile.',
-    badge: 'MASTER PROFILE — Applies to all portfolio versions',
+    title: 'Profile Content',
+    sub: 'Edit your core profile, experience, education, projects, and skills.',
+    badge: 'PROFILE',
     badgeType: 'master'
   },
   customize: {
-    title: 'Customize Workspace',
-    sub: 'Control how this portfolio version looks and feels visually.',
-    badge: 'THIS VERSION — Visual styling for selected version',
+    title: '3D Visual Style',
+    sub: 'Choose your 3D environment, colors, lighting, and theme styling.',
+    badge: 'STYLE',
     badgeType: 'variant'
   },
   optimize: {
-    title: 'Optimize Workspace',
-    sub: 'Tailor your portfolio for specific target jobs and opportunities.',
-    badge: 'JOB TARGETING & VARIANTS',
+    title: 'Job Match',
+    sub: 'Check how well your portfolio matches target job roles and get suggestions.',
+    badge: 'JOB MATCH',
     badgeType: 'optimize'
   },
   publish: {
-    title: 'Publish Workspace',
-    sub: 'Preview, publish, and manage custom domains for your public portfolio.',
-    badge: 'DEPLOYMENT & PUBLIC ACCESS',
+    title: 'Publish & Share',
+    sub: 'Get your public web link, share your portfolio, and export offline files.',
+    badge: 'PUBLISH',
     badgeType: 'publish'
   },
   measure: {
-    title: 'Measure Workspace',
-    sub: 'Understand how recruiters and visitors interact with your portfolio.',
-    badge: 'RECRUITER BEHAVIOR ANALYTICS',
+    title: 'Visitor Insights',
+    sub: 'See who visits your portfolio and which projects they explore.',
+    badge: 'INSIGHTS',
     badgeType: 'measure'
   }
 };
@@ -74,21 +74,21 @@ export function renderWorkspaceNav(container) {
   if (!target) return;
 
   target.innerHTML = `
-    <div style="display: flex; gap: 8px; font-family: 'Inter', sans-serif;">
-      <button onclick="window.switchWorkspace('create')" class="ws-nav-btn ${currentWorkspace === WORKSPACES.CREATE ? 'active' : ''}">
-        <span>✏️</span> <span>1. Create</span>
+    <div style="display: flex; gap: 6px; font-family: 'Inter', sans-serif; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; max-width: 100%;">
+      <button onclick="window.switchWorkspace('create')" class="ws-nav-btn ${currentWorkspace === WORKSPACES.CREATE ? 'active' : ''}" style="white-space: nowrap; flex-shrink: 0; padding: 8px 12px; font-size: 0.78rem;">
+        <span>✏️</span> <span>1. Content</span>
       </button>
-      <button onclick="window.switchWorkspace('customize')" class="ws-nav-btn ${currentWorkspace === WORKSPACES.CUSTOMIZE ? 'active' : ''}">
-        <span>🎨</span> <span>2. Customize</span>
+      <button onclick="window.switchWorkspace('customize')" class="ws-nav-btn ${currentWorkspace === WORKSPACES.CUSTOMIZE ? 'active' : ''}" style="white-space: nowrap; flex-shrink: 0; padding: 8px 12px; font-size: 0.78rem;">
+        <span>🎨</span> <span>2. Style</span>
       </button>
-      <button onclick="window.switchWorkspace('optimize')" class="ws-nav-btn ${currentWorkspace === WORKSPACES.OPTIMIZE ? 'active' : ''}">
-        <span>🎯</span> <span>3. Optimize</span>
+      <button onclick="window.switchWorkspace('optimize')" class="ws-nav-btn ${currentWorkspace === WORKSPACES.OPTIMIZE ? 'active' : ''}" style="white-space: nowrap; flex-shrink: 0; padding: 8px 12px; font-size: 0.78rem;">
+        <span>🎯</span> <span>3. Job Match</span>
       </button>
-      <button onclick="window.switchWorkspace('publish')" class="ws-nav-btn ${currentWorkspace === WORKSPACES.PUBLISH ? 'active' : ''}">
+      <button onclick="window.switchWorkspace('publish')" class="ws-nav-btn ${currentWorkspace === WORKSPACES.PUBLISH ? 'active' : ''}" style="white-space: nowrap; flex-shrink: 0; padding: 8px 12px; font-size: 0.78rem;">
         <span>🌐</span> <span>4. Publish</span>
       </button>
-      <button onclick="window.switchWorkspace('measure')" class="ws-nav-btn ${currentWorkspace === WORKSPACES.MEASURE ? 'active' : ''}">
-        <span>📊</span> <span>5. Measure</span>
+      <button onclick="window.switchWorkspace('measure')" class="ws-nav-btn ${currentWorkspace === WORKSPACES.MEASURE ? 'active' : ''}" style="white-space: nowrap; flex-shrink: 0; padding: 8px 12px; font-size: 0.78rem;">
+        <span>📊</span> <span>5. Insights</span>
       </button>
     </div>
   `;
@@ -101,18 +101,18 @@ export function renderWorkspaceHeader(container) {
   const meta = WORKSPACE_METADATA[currentWorkspace] || WORKSPACE_METADATA.create;
 
   target.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08);">
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08); flex-wrap: wrap; gap: 8px;">
       <div>
-        <div style="font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 800; color: #fff; margin-bottom: 2px;">
+        <div style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 800; color: #fff; margin-bottom: 2px;">
           ${meta.title}
         </div>
-        <div style="font-size: 0.78rem; color: rgba(255,255,255,0.6);">
+        <div style="font-size: 0.76rem; color: rgba(255,255,255,0.6);">
           ${meta.sub}
         </div>
       </div>
 
       <div style="
-        font-size: 0.7rem; font-weight: 800; padding: 4px 12px; border-radius: 20px; font-family: 'JetBrains Mono', monospace;
+        font-size: 0.68rem; font-weight: 800; padding: 3px 10px; border-radius: 20px; font-family: 'JetBrains Mono', monospace;
         ${meta.badgeType === 'master' ? 'background: rgba(124,58,237,0.2); border: 1px solid rgba(124,58,237,0.4); color: #a855f7;' :
           meta.badgeType === 'variant' ? 'background: rgba(6,182,212,0.2); border: 1px solid rgba(6,182,212,0.4); color: #06b6d4;' :
           'background: rgba(16,185,129,0.2); border: 1px solid rgba(16,185,129,0.4); color: #10b981;'}

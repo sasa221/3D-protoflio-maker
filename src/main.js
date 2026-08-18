@@ -370,8 +370,8 @@ async function handlePublicRoute(username, variantSlug) {
     publicStyle.textContent = generatePortfolioCSS(theme);
 
     document.body.innerHTML = `
-      <div id="canvas-container"><canvas id="bg-canvas"></canvas></div>
-      <div id="app" style="overflow-y:auto;position:relative;z-index:10">${html}</div>
+      <canvas id="bg-canvas"></canvas>
+      ${html}
     `;
     installProjectCinemaControls();
 
@@ -380,6 +380,24 @@ async function handlePublicRoute(username, variantSlug) {
       if (canvas && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
         engine = new HyperEngine(canvas);
         engine.init(theme);
+        sceneDirector = new SceneDirector(engine);
+        sceneDirector.setTheme(theme);
+        scrollDirector = new ScrollDirector(window, sceneDirector);
+        introDirector = new IntroDirector(engine, sceneDirector, scrollDirector);
+
+        const syncDeviceMode = () => {
+          const w = window.innerWidth;
+          const dev = w <= 640 ? 'mobile' : (w <= 1024 ? 'tablet' : 'desktop');
+          document.documentElement.dataset.device = dev;
+          document.body.dataset.device = dev;
+          const scrollContainer = document.getElementById('portfolio-scroll-container');
+          if (scrollContainer) scrollContainer.dataset.device = dev;
+          if (sceneDirector) sceneDirector.setDeviceMode(dev);
+        };
+        syncDeviceMode();
+        window.addEventListener('resize', syncDeviceMode);
+
+        introDirector.play(activeData.introMode || 'short', theme, document);
       }
     } catch (engineErr) {
       console.warn('[Public 3D] WebGL unavailable, falling back to CSS theme styling:', engineErr);
@@ -762,12 +780,16 @@ function buildHTML() {
 
     <!-- FOOTER ACTIONS -->
     <div class="sidebar-footer">
-      <button class="btn btn-primary" onclick="exportHTML()">
+      <button class="btn btn-primary" onclick="exportHTML()" style="padding:11px 20px;font-size:0.85rem">
         🚀 Export 3D Portfolio
       </button>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <button class="btn btn-secondary" onclick="saveToDB()">💾 Save Draft</button>
-        <button class="btn btn-secondary" onclick="clearAll()">🗑️ Clear All</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <button class="btn btn-secondary" onclick="saveToDB()" style="flex:1;padding:8px 14px;font-size:0.8rem">
+          💾 Save Draft
+        </button>
+        <button onclick="clearAll()" style="background:none;border:none;color:rgba(255,255,255,0.4);font-size:0.75rem;cursor:pointer;padding:6px 10px;text-decoration:underline">
+          🗑️ Clear Form
+        </button>
       </div>
     </div>
   </aside>
@@ -1593,17 +1615,17 @@ export function renderPublishTab() {
     <div style="background: ${isPublished ? 'rgba(16,185,129,0.06)' : 'rgba(245,158,11,0.06)'}; border: 1px solid ${isPublished ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'}; border-radius: 16px; padding: 18px; margin-bottom: 14px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
         <span style="font-size:0.75rem;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${isPublished ? '#10b981' : '#f59e0b'}">
-          ${isPublished ? '🟢 Live & Published' : '🟡 Unpublished Draft'}
+          ${isPublished ? '🟢 Live' : '🟡 Draft'}
         </span>
-        <span style="font-size:0.7rem;color:rgba(255,255,255,0.4)">
-          ${isPublished ? 'Synced with Supabase' : 'Saved Locally'}
+        <span style="font-size:0.7rem;color:rgba(255,255,255,0.5)">
+          All changes saved
         </span>
       </div>
 
       <div style="font-size:0.8rem;color:rgba(255,255,255,0.7);line-height:1.5;margin-bottom:14px">
         ${isPublished 
-          ? `Your 3D portfolio is live and accessible to employers & visitors worldwide.` 
-          : `Publish your portfolio to generate a public link and enable live 3D web visits.`}
+          ? `Your 3D portfolio is published and accessible to visitors worldwide.` 
+          : `Publish your portfolio to share your live 3D web link with employers.`}
       </div>
 
       <!-- PUBLIC URL DISPLAY -->
@@ -1613,23 +1635,23 @@ export function renderPublishTab() {
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
         <button id="btn-copy-public-url" class="btn btn-secondary" onclick="copyPublicPortfolioUrl()" style="font-size:0.78rem;padding:8px">
-          📋 Copy Public Link
+          📋 Copy Link
         </button>
         <a id="link-open-public-portfolio" href="${isPublished ? publicUrl : '#'}" ${isPublished ? 'target="_blank" rel="noopener noreferrer"' : 'aria-disabled="true" onclick="return false"'} class="btn btn-secondary" style="font-size:0.78rem;padding:8px;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;${isPublished ? '' : 'opacity:.45;cursor:not-allowed'}">
-          🌐 Open Live Site ↗
+          🌐 Open Portfolio ↗
         </a>
       </div>
 
       <!-- PRIMARY PUBLISH ACTION -->
       <button id="btn-publish-portfolio" class="btn btn-primary" onclick="handlePublishPortfolio()" style="width:100%;padding:12px;font-size:0.88rem;font-weight:800;background:linear-gradient(135deg,#7c3aed,#06b6d4)">
-        ${isPublished ? '🚀 Publish Changes (Update Live Site)' : '🚀 Publish Portfolio Live'}
+        ${isPublished ? '🚀 Publish Changes' : '🚀 Publish Portfolio Live'}
       </button>
     </div>
 
     <!-- PUBLIC SLUG SETTINGS -->
     <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:16px;padding:16px;margin-bottom:14px">
       <div style="font-size:0.75rem;font-weight:800;color:rgba(255,255,255,0.8);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
-        🔗 Public Slug / Username
+        🔗 Change Portfolio URL
       </div>
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:rgba(255,255,255,0.4)">/u/</span>
