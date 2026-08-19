@@ -31,8 +31,72 @@
       "destination": "/api/admin?action=health"
     },
     {
+      "source": "/api/deploy",
+      "destination": "/api/portfolio?action=deploy"
+    },
+    {
+      "source": "/api/storage/upload-avatar",
+      "destination": "/api/portfolio?action=upload-avatar"
+    },
+    {
+      "source": "/api/domain/connect",
+      "destination": "/api/portfolio?action=domain-connect"
+    },
+    {
+      "source": "/api/domain/verify",
+      "destination": "/api/portfolio?action=domain-verify"
+    },
+    {
+      "source": "/api/entitlements/check",
+      "destination": "/api/entitlements?action=check"
+    },
+    {
+      "source": "/api/entitlements/cooldown",
+      "destination": "/api/entitlements?action=cooldown"
+    },
+    {
+      "source": "/api/groups/manage",
+      "destination": "/api/entitlements?action=group-manage"
+    },
+    {
+      "source": "/api/promo/validate",
+      "destination": "/api/entitlements?action=promo-validate"
+    },
+    {
+      "source": "/api/audit/log",
+      "destination": "/api/entitlements?action=audit-log"
+    },
+    {
+      "source": "/api/analytics/event",
+      "destination": "/api/analytics?action=event"
+    },
+    {
+      "source": "/api/analytics/dashboard",
+      "destination": "/api/analytics?action=dashboard"
+    },
+    {
+      "source": "/api/billing/checkout",
+      "destination": "/api/billing?action=checkout"
+    },
+    {
+      "source": "/api/billing/portal",
+      "destination": "/api/billing?action=portal"
+    },
+    {
+      "source": "/api/billing/webhook",
+      "destination": "/api/billing?action=webhook"
+    },
+    {
       "source": "/api/public/portfolio",
-      "destination": "/api/public/resume?resource=portfolio"
+      "destination": "/api/public?action=resume&resource=portfolio"
+    },
+    {
+      "source": "/api/public/resume",
+      "destination": "/api/public?action=resume"
+    },
+    {
+      "source": "/api/auth/reset-password",
+      "destination": "/api/public?action=reset-password"
     },
     {
       "source": "/api/(.*)",
