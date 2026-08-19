@@ -26,6 +26,7 @@ async function checkLive() {
     console.log('JS length:', js.body.length);
     console.log('Has billing-modal-overlay:', js.body.includes('billing-modal-overlay'));
     console.log('Has RECOMMENDED:', js.body.includes('RECOMMENDED'));
+    console.log('Has btn-back-to-plans:', js.body.includes('btn-back-to-plans'));
     console.log('Has tier-chip:', js.body.includes('tier-chip'));
   }
 }

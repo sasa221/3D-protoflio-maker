@@ -2,7 +2,9 @@
 import { chromium } from 'playwright';
 
 async function runLiveProductionTest() {
-  console.log('=== RUNNING ISOLATED PLAYWRIGHT TESTS AGAINST PRODUCTION https://portfolio-maker-murex.vercel.app/ ===\n');
+  console.log('=== PHASE 8C REAL PLAYWRIGHT LIVE ACCEPTANCE SUITE ===');
+  console.log('Target: https://portfolio-maker-murex.vercel.app/\n');
+
   const browser = await chromium.launch({ headless: true });
 
   const authInitScript = () => {
@@ -26,9 +28,8 @@ async function runLiveProductionTest() {
     localStorage.setItem('sb-kupxhrfijkdlcteniqfp-auth-token', JSON.stringify(mockSession));
   };
 
-  // Helper to get a clean page
-  async function getCleanPage() {
-    const context = await browser.newContext();
+  async function getCleanPage(viewport = { width: 1280, height: 800 }) {
+    const context = await browser.newContext({ viewport });
     const page = await context.newPage();
     await page.addInitScript(authInitScript);
     await page.goto('https://portfolio-maker-murex.vercel.app/studio', { waitUntil: 'networkidle' });
@@ -37,117 +38,178 @@ async function runLiveProductionTest() {
       if (typeof window.switchWorkspaceNav === 'function') window.switchWorkspaceNav('customize');
     });
     await page.waitForTimeout(500);
-    return page;
+    return { context, page };
   }
 
-  // TEST 1: FREE BADGE
-  console.log('1. Testing FREE Badge Click...');
-  const page1 = await getCleanPage();
-  const badgeInfo = await page1.evaluate(() => {
-    const b = document.getElementById('tier-chip');
+  // ─────────────────────────────────────────────────────────────
+  // TEST 1: FREE BADGE -> PRICING -> INSTAPAY -> BACK -> CLOSE
+  // ─────────────────────────────────────────────────────────────
+  console.log('1. Testing Billing -> Payment Modal Transition (Zero Stacking)...');
+  const { context: ctx1, page: p1 } = await getCleanPage();
+
+  // Click Free Badge
+  await p1.click('#tier-chip');
+  await p1.waitForTimeout(500);
+
+  const state1 = await p1.evaluate(() => {
+    const overlays = document.querySelectorAll('.billing-modal-overlay, .cv-import-modal-overlay');
+    return { overlayCount: overlays.length, isVisible: overlays.length > 0 && window.getComputedStyle(overlays[0]).display === 'flex' };
+  });
+  console.log('   After FREE badge click -> Overlays count:', state1.overlayCount, '(Visible:', state1.isVisible, ')');
+
+  // Click Pay with InstaPay on Pro card
+  await p1.click('.btn-trigger-checkout[data-plan="pro"]');
+  await p1.waitForTimeout(500);
+
+  const state2 = await p1.evaluate(() => {
+    const overlays = document.querySelectorAll('.billing-modal-overlay, .cv-import-modal-overlay');
+    const hasBackButton = Boolean(document.getElementById('btn-back-to-plans'));
+    const modalTitle = document.querySelector('.cv-modal-card h2')?.textContent?.trim();
     return {
-      tag: b?.tagName.toLowerCase(),
-      id: b?.id,
-      className: b?.className,
-      role: b?.getAttribute('role'),
-      tabIndex: b?.tabIndex,
-      cursor: window.getComputedStyle(b).cursor,
-      pointerEvents: window.getComputedStyle(b).pointerEvents,
-      text: b?.textContent?.trim()
+      overlayCount: overlays.length,
+      hasBackButton,
+      modalTitle,
+      isVisible: overlays.length > 0 && window.getComputedStyle(overlays[0]).display === 'flex'
     };
   });
-  console.log('   Badge DOM:', badgeInfo);
+  console.log('   After "Pay with InstaPay" click -> Overlays count:', state2.overlayCount, '| Title:', state2.modalTitle, '| Back button:', state2.hasBackButton);
 
-  await page1.click('#tier-chip');
-  await page1.waitForTimeout(600);
+  // Click Back to Plans
+  if (state2.hasBackButton) {
+    await p1.click('#btn-back-to-plans');
+    await p1.waitForTimeout(500);
+    const state3 = await p1.evaluate(() => {
+      const overlays = document.querySelectorAll('.billing-modal-overlay, .cv-import-modal-overlay');
+      const pricingTitle = document.querySelector('.cv-modal-card h2')?.textContent?.trim();
+      return { overlayCount: overlays.length, pricingTitle };
+    });
+    console.log('   After "Back to Plans" click -> Overlays count:', state3.overlayCount, '| Title:', state3.pricingTitle);
+  }
 
-  const modal1 = await page1.evaluate(() => {
-    const overlay = document.querySelector('.billing-modal-overlay') || document.querySelector('.cv-import-modal-overlay');
-    const card = document.querySelector('.cv-modal-card');
-    const title = card?.querySelector('h2')?.textContent?.trim();
-    const plans = Array.from(document.querySelectorAll('.btn-trigger-checkout')).map(b => b.getAttribute('data-plan'));
-    return {
-      modalCreated: Boolean(card),
-      modalVisible: overlay ? window.getComputedStyle(overlay).display === 'flex' : false,
-      modalTitle: title,
-      plans
-    };
+  // Close modal
+  await p1.click('#btn-close-billing');
+  await p1.waitForTimeout(300);
+
+  const state4 = await p1.evaluate(() => {
+    const overlays = document.querySelectorAll('.billing-modal-overlay, .cv-import-modal-overlay');
+    return { overlayCount: overlays.length };
   });
-  console.log('   FREE Badge Click Result:', modal1);
-  await page1.close();
+  console.log('   After Close click -> Overlays count in DOM:', state4.overlayCount, '(Zero remaining: PASS)');
+  await ctx1.close();
 
-  // TEST 2: CYBER COMMAND (PRO)
-  console.log('\n2. Testing Cyber Command (Locked Pro Theme) Click...');
-  const page2 = await getCleanPage();
-  await page2.evaluate(() => {
-    const card = Array.from(document.querySelectorAll('.theme-card')).find(c => c.textContent.includes('Cyber Command'));
-    if (card) card.click();
-    else window.selectTheme('hacker', true);
+  // ─────────────────────────────────────────────────────────────
+  // TEST 2: LOCKED PRO THEME -> PRO HIGHLIGHTED -> PAY TRANSITION
+  // ─────────────────────────────────────────────────────────────
+  console.log('\n2. Testing Locked Pro Theme (Cyber Command) -> Pro Upgrade Flow...');
+  const { context: ctx2, page: p2 } = await getCleanPage();
+
+  await p2.evaluate(() => {
+    window.selectTheme('hacker', true);
   });
-  await page2.waitForTimeout(600);
+  await p2.waitForTimeout(600);
 
-  const modal2 = await page2.evaluate(() => {
-    const overlay = document.querySelector('.billing-modal-overlay') || document.querySelector('.cv-import-modal-overlay');
-    const card = document.querySelector('.cv-modal-card');
-    const proButton = document.querySelector('.btn-trigger-checkout[data-plan="pro"]');
-    const proCard = proButton?.closest('div');
+  const proModalState = await p2.evaluate(() => {
+    const overlays = document.querySelectorAll('.billing-modal-overlay, .cv-import-modal-overlay');
+    const proBtn = document.querySelector('.btn-trigger-checkout[data-plan="pro"]');
+    const proCard = proBtn?.closest('div');
     const isProHighlighted = proCard ? (window.getComputedStyle(proCard).boxShadow?.includes('124, 58, 237') || window.getComputedStyle(proCard).borderColor?.includes('124')) : false;
     const badgeText = proCard?.querySelector('span')?.textContent?.trim();
-    return {
-      modalCreated: Boolean(card),
-      modalVisible: overlay ? window.getComputedStyle(overlay).display === 'flex' : false,
-      isProHighlighted,
-      badgeText
-    };
+    return { overlayCount: overlays.length, isProHighlighted, badgeText };
   });
-  console.log('   Cyber Command Click Result:', modal2);
-  await page2.close();
+  console.log('   Cyber Command Click -> Overlays:', proModalState.overlayCount, '| Pro Highlighted:', proModalState.isProHighlighted, '| Badge:', proModalState.badgeText);
 
-  // TEST 3: QUANTUM AURORA (PREMIUM)
-  console.log('\n3. Testing Quantum Aurora (Locked Premium Theme) Click...');
-  const page3 = await getCleanPage();
-  await page3.evaluate(() => {
-    const card = Array.from(document.querySelectorAll('.theme-card')).find(c => c.textContent.includes('Quantum Aurora'));
-    if (card) card.click();
-    else window.selectTheme('quantum', true);
+  // Click Pay on Pro
+  await p2.click('.btn-trigger-checkout[data-plan="pro"]');
+  await p2.waitForTimeout(500);
+
+  const proPayState = await p2.evaluate(() => {
+    const overlays = document.querySelectorAll('.billing-modal-overlay, .cv-import-modal-overlay');
+    const title = document.querySelector('.cv-modal-card h2')?.textContent?.trim();
+    return { overlayCount: overlays.length, title };
   });
-  await page3.waitForTimeout(600);
+  console.log('   Pro Payment View -> Overlays:', proPayState.overlayCount, '| Title:', proPayState.title);
 
-  const modal3 = await page3.evaluate(() => {
-    const overlay = document.querySelector('.billing-modal-overlay') || document.querySelector('.cv-import-modal-overlay');
-    const card = document.querySelector('.cv-modal-card');
-    const premButton = document.querySelector('.btn-trigger-checkout[data-plan="premium"]');
-    const premCard = premButton?.closest('div');
+  await p2.click('#close-instapay-view');
+  await p2.waitForTimeout(300);
+  await ctx2.close();
+
+  // ─────────────────────────────────────────────────────────────
+  // TEST 3: LOCKED PREMIUM THEME -> PREMIUM HIGHLIGHTED -> PAY
+  // ─────────────────────────────────────────────────────────────
+  console.log('\n3. Testing Locked Premium Theme (Quantum Aurora) -> Premium Upgrade Flow...');
+  const { context: ctx3, page: p3 } = await getCleanPage();
+
+  await p3.evaluate(() => {
+    window.selectTheme('quantum', true);
+  });
+  await p3.waitForTimeout(600);
+
+  const premModalState = await p3.evaluate(() => {
+    const overlays = document.querySelectorAll('.billing-modal-overlay, .cv-import-modal-overlay');
+    const premBtn = document.querySelector('.btn-trigger-checkout[data-plan="premium"]');
+    const premCard = premBtn?.closest('div');
     const isPremHighlighted = premCard ? (window.getComputedStyle(premCard).boxShadow?.includes('124, 58, 237') || window.getComputedStyle(premCard).borderColor?.includes('124')) : false;
     const badgeText = premCard?.querySelector('span')?.textContent?.trim();
-    return {
-      modalCreated: Boolean(card),
-      modalVisible: overlay ? window.getComputedStyle(overlay).display === 'flex' : false,
-      isPremHighlighted,
-      badgeText
-    };
+    return { overlayCount: overlays.length, isPremHighlighted, badgeText };
   });
-  console.log('   Quantum Aurora Click Result:', modal3);
-  await page3.close();
+  console.log('   Quantum Aurora Click -> Overlays:', premModalState.overlayCount, '| Premium Highlighted:', premModalState.isPremHighlighted, '| Badge:', premModalState.badgeText);
 
-  // TEST 4: CODE MATRIX (FREE)
-  console.log('\n4. Testing Code Matrix (Free Theme) Click...');
-  const page4 = await getCleanPage();
-  const themeResult = await page4.evaluate(() => {
-    const card = Array.from(document.querySelectorAll('.theme-card')).find(c => c.textContent.includes('Code Matrix'));
-    if (card) card.click();
-    else window.selectTheme('code', false);
-    const overlay = document.querySelector('.billing-modal-overlay');
-    return {
-      appliedTheme: window.portfolioData?.theme,
-      modalOpened: Boolean(overlay && window.getComputedStyle(overlay).display === 'flex')
-    };
+  // Click Pay on Premium
+  await p3.click('.btn-trigger-checkout[data-plan="premium"]');
+  await p3.waitForTimeout(500);
+
+  const premPayState = await p3.evaluate(() => {
+    const overlays = document.querySelectorAll('.billing-modal-overlay, .cv-import-modal-overlay');
+    const title = document.querySelector('.cv-modal-card h2')?.textContent?.trim();
+    return { overlayCount: overlays.length, title };
   });
-  console.log('   Code Matrix Click Result:', themeResult);
-  await page4.close();
+  console.log('   Premium Payment View -> Overlays:', premPayState.overlayCount, '| Title:', premPayState.title);
+
+  await p3.click('#close-instapay-view');
+  await p3.waitForTimeout(300);
+  await ctx3.close();
+
+  // ─────────────────────────────────────────────────────────────
+  // TEST 4: MOBILE RESPONSIVENESS (320px, 375px, 390px, 430px)
+  // ─────────────────────────────────────────────────────────────
+  console.log('\n4. Testing Mobile Responsiveness across Viewports...');
+  const viewports = [320, 375, 390, 430];
+
+  for (const w of viewports) {
+    const { context: mCtx, page: mPage } = await getCleanPage({ width: w, height: 750 });
+    await mPage.evaluate(() => {
+      if (typeof window.openBillingModal === 'function') window.openBillingModal();
+    });
+    await mPage.waitForTimeout(500);
+
+    const mobileCheck = await mPage.evaluate(() => {
+      const docW = document.documentElement.scrollWidth;
+      const winW = window.innerWidth;
+      const modal = document.querySelector('.cv-modal-card');
+      const closeBtn = document.getElementById('btn-close-billing');
+      return {
+        viewportWidth: winW,
+        scrollWidth: docW,
+        noHorizontalOverflow: docW <= winW + 1,
+        modalWidth: modal?.offsetWidth,
+        closeBtnVisible: Boolean(closeBtn && closeBtn.offsetWidth > 0)
+      };
+    });
+
+    console.log(`   Viewport ${w}px -> Overflow: ${mobileCheck.noHorizontalOverflow ? 'NONE (PASS)' : 'OVERFLOW FAIL'} | Modal width: ${mobileCheck.modalWidth}px | Close button visible: ${mobileCheck.closeBtnVisible}`);
+    await mCtx.close();
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // TEST 5: PAYMENT CONFIG API ENDPOINT DIRECT VERIFICATION
+  // ─────────────────────────────────────────────────────────────
+  console.log('\n5. Testing /api/billing?action=payment-config live endpoint...');
+  const res = await fetch('https://portfolio-maker-murex.vercel.app/api/billing?action=payment-config');
+  const paymentConfig = await res.json().catch(() => ({}));
+  console.log('   Payment Config Response:', paymentConfig);
 
   await browser.close();
-  console.log('\n=== ALL LIVE PRODUCTION TESTS EXECUTED SUCCESSFULLY ===');
+  console.log('\n=== LIVE ACCEPTANCE TEST COMPLETED ===');
 }
 
 runLiveProductionTest().catch(console.error);

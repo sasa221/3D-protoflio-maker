@@ -2564,7 +2564,7 @@ function buildThemeGrid() {
     if (requiredTier === 'pro') {
       badgeHTML = '<span class="pro-badge" style="font-size:0.6rem;padding:1px 6px;background:rgba(124,58,237,0.2);color:#c084fc;border:1px solid rgba(124,58,237,0.4);border-radius:6px;font-weight:800">🔒 PRO</span>';
     } else if (requiredTier === 'premium') {
-      badgeHTML = '<span class="pro-badge" style="font-size:0.6rem;padding:1px 6px;background:rgba(6,182,212,0.2);color:#38bdf8;border:1px solid rgba(6,182,212,0.4);border-radius:6px;font-weight:800">💎🔒 PREMIUM</span>';
+      badgeHTML = '<span class="pro-badge" style="font-size:0.6rem;padding:1px 6px;background:rgba(6,182,212,0.2);color:#38bdf8;border:1px solid rgba(6,182,212,0.4);border-radius:6px;font-weight:800">💎 PREMIUM</span>';
     }
 
     return `
