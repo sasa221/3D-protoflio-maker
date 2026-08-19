@@ -1,0 +1,104 @@
+// src/tests/BillingModalAndThemeLiveTest.mjs
+import { PLANS, GROUP_SEAT_PRICING, formatEGP, formatPrice } from '../config/PlanConfig.js';
+import { canAccessTheme, getThemeTier, THEME_TIERS } from '../config/ThemeTierConfig.js';
+import { getAllThemes } from '../three/ProceduralTheme.js';
+
+let passed = 0;
+let failed = 0;
+
+function assert(condition, message) {
+  if (condition) {
+    console.log(`  ✅ ${message}`);
+    passed++;
+  } else {
+    console.error(`  ❌ FAIL: ${message}`);
+    failed++;
+  }
+}
+
+console.log('============================================================');
+console.log('  BILLING MODAL & THEME TIER LIVE REGRESSION TEST');
+console.log('============================================================\n');
+
+// ─── 1. PLAN PRICING VIEW MODEL INTEGRITY ──────────────────────
+console.log('1. Testing Plan pricing normalization & zero undefined .toLocaleString()...');
+
+['free', 'pro', 'premium', 'premium_group'].forEach(planId => {
+  const plan = PLANS[planId];
+  assert(plan !== undefined, `PLANS.${planId} is defined`);
+  assert(typeof plan.priceMonthlyEGP === 'number', `PLANS.${planId}.priceMonthlyEGP is a number (${plan.priceMonthlyEGP})`);
+  assert(Number.isFinite(plan.priceMonthlyEGP), `PLANS.${planId}.priceMonthlyEGP is finite`);
+});
+
+assert(PLANS.free.priceMonthlyEGP === 0, 'Free price is 0 EGP');
+assert(PLANS.pro.priceMonthlyEGP === 600, 'Pro price is 600 EGP');
+assert(PLANS.premium.priceMonthlyEGP === 1000, 'Premium price is 1,000 EGP');
+assert(PLANS.premium_group.priceMonthlyEGP === 1500, 'Premium Group starting price is 1,500 EGP');
+
+// Group seat pricing
+assert(GROUP_SEAT_PRICING[2] === 1500, 'Group 2 seats = 1,500 EGP');
+assert(GROUP_SEAT_PRICING[3] === 1800, 'Group 3 seats = 1,800 EGP');
+assert(GROUP_SEAT_PRICING[4] === 2200, 'Group 4 seats = 2,200 EGP');
+assert(GROUP_SEAT_PRICING[5] === 2800, 'Group 5 seats = 2,800 EGP');
+
+// Safe formatters
+assert(formatEGP(undefined) === '0', 'formatEGP(undefined) does not crash and returns "0"');
+assert(formatEGP(null) === '0', 'formatEGP(null) does not crash and returns "0"');
+assert(formatEGP(0) === '0', 'formatEGP(0) returns "0"');
+assert(formatEGP(600) === '600', 'formatEGP(600) returns "600"');
+assert(formatEGP(1000) === '1,000' || formatEGP(1000) === '1000', 'formatEGP(1000) formats numbers safely');
+
+assert(formatPrice(undefined) === '0 EGP', 'formatPrice(undefined) returns "0 EGP"');
+assert(formatPrice(600) === '600 EGP/month', 'formatPrice(600) returns "600 EGP/month"');
+
+// ─── 2. THEME CATALOG VISIBILITY & LOCK RULES ──────────────────
+console.log('\n2. Testing 15-theme catalog visibility and tiered accessibility...');
+
+const allThemes = getAllThemes();
+assert(allThemes.length === 15, `Full theme catalog contains exactly 15 themes (found ${allThemes.length})`);
+
+// Free tier access
+const freeSelectable = allThemes.filter(t => canAccessTheme('free', t.id));
+const freeLockedPro = allThemes.filter(t => !canAccessTheme('free', t.id) && getThemeTier(t.id) === 'pro');
+const freeLockedPremium = allThemes.filter(t => !canAccessTheme('free', t.id) && getThemeTier(t.id) === 'premium');
+
+assert(freeSelectable.length === 3, `Free user can select exactly 3 themes (found ${freeSelectable.length}: ${freeSelectable.map(t => t.id).join(', ')})`);
+assert(freeLockedPro.length === 7, `Free user sees 7 locked Pro themes (found ${freeLockedPro.length}: ${freeLockedPro.map(t => t.id).join(', ')})`);
+assert(freeLockedPremium.length === 5, `Free user sees 5 locked Premium themes (found ${freeLockedPremium.length}: ${freeLockedPremium.map(t => t.id).join(', ')})`);
+assert(freeSelectable.length + freeLockedPro.length + freeLockedPremium.length === 15, 'Free user sees all 15 themes in workspace');
+
+// Pro tier access
+const proSelectable = allThemes.filter(t => canAccessTheme('pro', t.id));
+const proLockedPremium = allThemes.filter(t => !canAccessTheme('pro', t.id) && getThemeTier(t.id) === 'premium');
+assert(proSelectable.length === 10, `Pro user can select exactly 10 themes (found ${proSelectable.length})`);
+assert(proLockedPremium.length === 5, `Pro user sees 5 locked Premium themes (found ${proLockedPremium.length})`);
+
+// Premium tier access
+const premiumSelectable = allThemes.filter(t => canAccessTheme('premium', t.id));
+assert(premiumSelectable.length === 15, `Premium user can select all 15 themes (found ${premiumSelectable.length})`);
+
+// ─── 3. LOCK BYPASS PREVENTION ─────────────────────────────────
+console.log('\n3. Testing programmatic lock bypass prevention...');
+
+function simulateSelectTheme(userTier, themeId) {
+  const isAllowed = canAccessTheme(userTier, themeId);
+  if (!isAllowed) {
+    return { applied: false, reason: 'DENIED: Tier upgrade required' };
+  }
+  return { applied: true, themeId };
+}
+
+assert(simulateSelectTheme('free', 'code').applied === true, 'Free user selects "code" -> APPLIED');
+assert(simulateSelectTheme('free', 'creative').applied === true, 'Free user selects "creative" -> APPLIED');
+assert(simulateSelectTheme('free', 'minimal').applied === true, 'Free user selects "minimal" -> APPLIED');
+assert(simulateSelectTheme('free', 'hacker').applied === false, 'Free user selects "hacker" (Pro) -> DENIED');
+assert(simulateSelectTheme('free', 'quantum').applied === false, 'Free user selects "quantum" (Premium) -> DENIED');
+assert(simulateSelectTheme('pro', 'hacker').applied === true, 'Pro user selects "hacker" -> APPLIED');
+assert(simulateSelectTheme('pro', 'quantum').applied === false, 'Pro user selects "quantum" -> DENIED');
+assert(simulateSelectTheme('premium', 'quantum').applied === true, 'Premium user selects "quantum" -> APPLIED');
+
+console.log('\n============================================================');
+console.log(`  SUMMARY: ${passed} / ${passed + failed} assertions PASSED (Failures: ${failed})`);
+console.log('============================================================\n');
+
+if (failed > 0) process.exit(1);

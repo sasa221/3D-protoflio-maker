@@ -140,6 +140,8 @@ export const PLANS = {
   premium_group: {
     id: 'premium_group',
     name: 'Premium Group',
+    priceMonthlyEGP: 1500,
+    priceStartingMonthlyEGP: 1500,
     currency: 'EGP',
     hosted: true,
     portfolioPolicy: 'rolling_cooldown',
@@ -198,20 +200,25 @@ export function getPlanConfig(planId) {
   return PLANS[planId] || PLANS.free;
 }
 
-export const INSTAPAY_CONFIG = {
-  accountName: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_INSTAPAY_ACCOUNT_NAME) || (typeof process !== 'undefined' && process.env?.INSTAPAY_ACCOUNT_NAME) || null,
-  instapayId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_INSTAPAY_ID) || (typeof process !== 'undefined' && process.env?.INSTAPAY_ID) || null,
-  phoneNumber: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_INSTAPAY_PHONE) || (typeof process !== 'undefined' && process.env?.INSTAPAY_PHONE) || null,
-  bankName: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_INSTAPAY_BANK) || (typeof process !== 'undefined' && process.env?.INSTAPAY_BANK) || null,
-  isConfigured: false
-};
-
-INSTAPAY_CONFIG.isConfigured = Boolean(INSTAPAY_CONFIG.accountName && INSTAPAY_CONFIG.instapayId);
+/**
+ * Safe currency formatter for Egyptian Pounds.
+ * Validates number input and never crashes on undefined/null.
+ */
+export function formatEGP(amountEGP, period = '') {
+  if (typeof amountEGP !== 'number' || !Number.isFinite(amountEGP)) {
+    return '0';
+  }
+  if (amountEGP === 0) return '0';
+  return amountEGP.toLocaleString('en-EG');
+}
 
 /**
- * Format price for display.
+ * Format price for display with currency and period suffix.
  */
 export function formatPrice(amountEGP, period = '/month') {
+  if (typeof amountEGP !== 'number' || !Number.isFinite(amountEGP)) {
+    return '0 EGP';
+  }
   if (amountEGP === 0) return '0 EGP';
   return `${amountEGP.toLocaleString('en-EG')} EGP${period}`;
 }
@@ -222,4 +229,5 @@ export function formatPrice(amountEGP, period = '/month') {
 export function getGroupPrice(seats) {
   return GROUP_SEAT_PRICING[seats] || null;
 }
+
 

@@ -111,7 +111,7 @@ function renderPlanCard(plan, currentPlan, planId) {
         <p class="pricing-card-desc">${plan.description}</p>
       </div>
       <div class="pricing-card-price">
-        <span class="price-amount">${plan.priceMonthlyEGP === 0 ? '0' : plan.priceMonthlyEGP.toLocaleString('en-EG')}</span>
+        <span class="price-amount">${formatEGP(plan.priceMonthlyEGP)}</span>
         <span class="price-currency">EGP</span>
         ${plan.priceMonthlyEGP > 0 ? '<span class="price-period">/month</span>' : ''}
       </div>

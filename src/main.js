@@ -2556,20 +2556,25 @@ function buildThemeGrid() {
   const themes = getAllThemes();
   const userTier = globalEntitlements.getThemeTier();
   el.innerHTML = themes.map(t => {
-    const themeTierBadge = getThemeBadge(t.id);
-    const isLocked = isFeatureEnabled('THEME_PAYWALL_ENABLED') ? !canAccessTheme(userTier, t.id) : (!isPro() && !['code', 'creative', 'minimal'].includes(t.id));
+    const requiredTier = getThemeTier(t.id);
+    const isLocked = !canAccessTheme(userTier, t.id);
     const meta = THEME_DESCRIPTORS[t.id] || { tag: 'Visual Theme', desc: t.name };
-    const badgeHTML = themeTierBadge
-      ? '<span class="pro-badge" style="font-size:0.6rem;padding:1px 5px">' + themeTierBadge + '</span>'
-      : '';
+    
+    let badgeHTML = '';
+    if (requiredTier === 'pro') {
+      badgeHTML = '<span class="pro-badge" style="font-size:0.6rem;padding:1px 6px;background:rgba(124,58,237,0.2);color:#c084fc;border:1px solid rgba(124,58,237,0.4);border-radius:6px;font-weight:800">🔒 PRO</span>';
+    } else if (requiredTier === 'premium') {
+      badgeHTML = '<span class="pro-badge" style="font-size:0.6rem;padding:1px 6px;background:rgba(6,182,212,0.2);color:#38bdf8;border:1px solid rgba(6,182,212,0.4);border-radius:6px;font-weight:800">💎🔒 PREMIUM</span>';
+    }
+
     return `
-      <div class="theme-card ${currentTheme?.id === t.id ? 'active' : ''}" onclick="selectTheme('${t.id}', ${isLocked})" style="display:flex;flex-direction:column;gap:4px;padding:12px 10px;text-align:left;position:relative">
+      <div class="theme-card ${currentTheme?.id === t.id ? 'active' : ''} ${isLocked ? 'theme-card--locked' : ''}" onclick="selectTheme('${t.id}', ${isLocked})" style="display:flex;flex-direction:column;gap:4px;padding:12px 10px;text-align:left;position:relative;cursor:pointer;">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span class="theme-emoji" style="font-size:1.4rem">${t.emoji}</span>
           <span style="font-size:0.62rem;font-weight:800;color:var(--primary);background:rgba(124,58,237,0.15);padding:2px 6px;border-radius:8px">${meta.tag}</span>
         </div>
-        <div class="theme-name" style="font-size:0.82rem;font-weight:800;color:#fff;margin-top:2px">
-          ${t.name} ${badgeHTML}
+        <div class="theme-name" style="font-size:0.82rem;font-weight:800;color:#fff;margin-top:2px;display:flex;align-items:center;justify-content:space-between;gap:4px;">
+          <span>${t.name}</span> ${badgeHTML}
         </div>
         <div style="font-size:0.68rem;color:rgba(255,255,255,0.5);line-height:1.3">${meta.desc}</div>
       </div>
@@ -2578,15 +2583,19 @@ function buildThemeGrid() {
 }
 
 window.selectTheme = function(id, locked) {
-  if (locked) {
-    const requiredTier = getThemeTier(id);
+  const userTier = globalEntitlements.getThemeTier();
+  const requiredTier = getThemeTier(id);
+  const isAllowed = canAccessTheme(userTier, id);
+
+  if (locked || !isAllowed) {
     const tierLabel = requiredTier === 'premium' ? 'Premium' : 'Pro';
     const themeName = getThemeById(id)?.name || id;
-    showToast('info', '🔒', themeName + ' is available with ' + tierLabel + '.');
-    handleUpgradeClick();
+    showToast('info', '🔒', `${themeName} is available with ${tierLabel}.`);
+    handleUpgradeClick(requiredTier);
     return;
   }
   const theme = getThemeById(id);
+  if (!theme) return;
   currentTheme = theme;
   portfolioData.theme = id;
   engine?.applyTheme(theme);

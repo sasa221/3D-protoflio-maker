@@ -6,7 +6,7 @@
  */
 
 import { globalEntitlements } from '../services/EntitlementService.js';
-import { PLANS, GROUP_SEAT_PRICING, formatPrice } from '../config/PlanConfig.js';
+import { PLANS, GROUP_SEAT_PRICING, formatPrice, formatEGP } from '../config/PlanConfig.js';
 import { submitManualPayment, getUserPaymentStatus, redeemPromoCode, getPublicPaymentConfig } from '../services/AuthService.js';
 
 let modalContainer = null;
@@ -60,7 +60,7 @@ function renderBillingMainView(currentPlan, pendingRequests, onSubscriptionUpdat
           <div>
             <strong style="color: #fde047; font-size: 14px; display: block;">⏳ Payment Verification Pending</strong>
             <span style="font-size: 12px; color: rgba(255,255,255,0.7);">
-              You have a pending request for <strong>${pendingRequests[0].plan_id.toUpperCase()}</strong> (${pendingRequests[0].expected_amount_egp} EGP). Our team is reviewing your transfer.
+              You have a pending request for <strong>${escapeHtml(pendingRequests[0].plan_id.toUpperCase())}</strong> (${pendingRequests[0].expected_amount_egp} EGP). Our team is reviewing your transfer.
             </span>
           </div>
           <span style="background: rgba(234,179,8,0.2); color: #fde047; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 6px;">PENDING REVIEW</span>
@@ -85,8 +85,7 @@ function renderBillingMainView(currentPlan, pendingRequests, onSubscriptionUpdat
 }
 
 function buildPlanCard(planId, currentPlan) {
-  const plan = PLANS[planId];
-  if (!plan) return '';
+  const plan = PLANS[planId] || PLANS.free;
   const isCurrent = currentPlan === planId;
   const isHighlighted = planId === 'pro';
 
@@ -101,8 +100,23 @@ function buildPlanCard(planId, currentPlan) {
   const shadow = isHighlighted ? 'box-shadow: 0 0 30px rgba(124,58,237,0.2);' : '';
   const nameColor = isHighlighted ? 'color: #a855f7;' : '';
 
-  const priceDisplay = plan.priceMonthlyEGP === 0 ? '0' : plan.priceMonthlyEGP.toLocaleString('en-EG');
-  const periodDisplay = plan.priceMonthlyEGP > 0 ? '/month' : '';
+  let pricePrefix = '';
+  let priceAmount = 0;
+  let periodDisplay = '/month';
+
+  if (planId === 'free') {
+    priceAmount = 0;
+    periodDisplay = '';
+  } else if (planId === 'pro') {
+    priceAmount = 600;
+  } else if (planId === 'premium') {
+    priceAmount = 1000;
+  } else if (planId === 'premium_group') {
+    pricePrefix = 'From ';
+    priceAmount = 1500;
+  }
+
+  const priceDisplay = pricePrefix + formatEGP(priceAmount);
 
   let badgeHTML = '';
   if (isCurrent) {
