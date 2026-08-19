@@ -156,6 +156,36 @@ CREATE POLICY "Users can view own creation history"
   ON public.portfolio_creation_history FOR SELECT
   USING (auth.uid() = user_id);
 
+-- Helper functions to prevent recursive RLS evaluation between groups and group_members
+CREATE OR REPLACE FUNCTION public.is_group_member(check_group_id TEXT, check_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.group_members gm
+    WHERE gm.group_id = check_group_id
+    AND gm.user_id = check_user_id
+    AND gm.status = 'active'
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_group_owner(check_group_id TEXT, check_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.groups g
+    WHERE g.id = check_group_id
+    AND g.owner_user_id = check_user_id
+  );
+$$;
+
 -- Groups: owner can manage, members can view
 DROP POLICY IF EXISTS "Group owners can manage own groups" ON public.groups;
 CREATE POLICY "Group owners can manage own groups"
@@ -165,14 +195,7 @@ CREATE POLICY "Group owners can manage own groups"
 DROP POLICY IF EXISTS "Group members can view their group" ON public.groups;
 CREATE POLICY "Group members can view their group"
   ON public.groups FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.group_members
-      WHERE group_members.group_id = groups.id
-      AND group_members.user_id = auth.uid()
-      AND group_members.status = 'active'
-    )
-  );
+  USING (public.is_group_member(id, auth.uid()));
 
 -- Group members: users can view own membership
 DROP POLICY IF EXISTS "Users can view own group membership" ON public.group_members;
@@ -184,13 +207,7 @@ CREATE POLICY "Users can view own group membership"
 DROP POLICY IF EXISTS "Group owners can manage members" ON public.group_members;
 CREATE POLICY "Group owners can manage members"
   ON public.group_members FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.groups
-      WHERE groups.id = group_members.group_id
-      AND groups.owner_user_id = auth.uid()
-    )
-  );
+  USING (public.is_group_owner(group_id, auth.uid()));
 
 -- Keep live: users can view own
 DROP POLICY IF EXISTS "Users can view own keep live entitlements" ON public.keep_live_entitlements;
