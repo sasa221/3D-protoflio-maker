@@ -1167,8 +1167,8 @@ function initEngine() {
     openBillingModal(authUser.id, () => renderAll());
   };
 
-  // Only run test suites in development environment or explicit debug query flag
-  if (import.meta.env.DEV || window.location.search.includes('run_tests=true')) {
+  // Only run test suites in browser if explicit debug query flag ?run_tests=true is set
+  if (typeof window !== 'undefined' && window.location.search.includes('run_tests=true')) {
     (async () => {
       try {
       const [
