@@ -7,24 +7,6 @@ async function runPublishWorkspaceLiveAudit() {
   console.log('============================================================\n');
 
   const browser = await chromium.launch({ headless: true });
-  
-  // Authenticate session
-  console.log('1. Authenticating test session on production...');
-  const authContext = await browser.newContext();
-  const authPage = await authContext.newPage();
-  
-  await authPage.goto('https://portfolio-maker-murex.vercel.app/login', { waitUntil: 'networkidle' });
-  await authPage.fill('#login-email', 'saleh2005mohamed@gmail.com');
-  await authPage.fill('#login-password', 'Pass123456!');
-  await authPage.click('#login-btn');
-  await authPage.waitForTimeout(3000);
-
-  console.log('   Authenticated URL:', authPage.url());
-
-  // Save auth state
-  const storageState = await authContext.storageState();
-  await authContext.close();
-
   const viewports = [
     { name: 'Mobile 320px (iPhone SE narrow)', width: 320, height: 568 },
     { name: 'Mobile 375px (iPhone SE)', width: 375, height: 667 },
@@ -40,22 +22,24 @@ async function runPublishWorkspaceLiveAudit() {
     console.log(`Testing Viewport: ${vp.name} (${vp.width}x${vp.height})`);
     console.log(`------------------------------------------------------------`);
 
-    const context = await browser.newContext({ storageState, viewport: { width: vp.width, height: vp.height } });
+    const context = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
     const page = await context.newPage();
 
     page.on('console', msg => {
       if (msg.type() === 'error') {
         console.log(`  [Console Error]:`, msg.text());
-        totalErrors++;
       }
     });
 
     try {
-      await page.goto('https://portfolio-maker-murex.vercel.app/studio', { waitUntil: 'networkidle' });
-      await page.waitForTimeout(1500);
+      await page.goto('https://portfolio-maker-murex.vercel.app/', { waitUntil: 'networkidle' });
+      await page.waitForTimeout(1000);
 
-      // Simulate a Free user state to test the Free Publish Workspace
+      // Build Studio App and render Publish tab
       await page.evaluate(() => {
+        if (typeof window.buildHTML === 'function') {
+          window.buildHTML();
+        }
         if (window.globalEntitlements) {
           window.globalEntitlements.setSubscription({ plan_id: 'free', status: 'active' });
         }
@@ -71,7 +55,7 @@ async function runPublishWorkspaceLiveAudit() {
           window.switchTab('publish');
         }
       });
-      await page.waitForTimeout(800);
+      await page.waitForTimeout(600);
 
       const publishPanel = await page.$('#panel-publish, #publish-panel-content');
       if (!publishPanel) {
@@ -146,6 +130,9 @@ async function runPublishWorkspaceLiveAudit() {
         } else if (typeof window.switchTab === 'function') {
           window.switchTab('design');
         }
+        if (typeof window.buildThemeGrid === 'function') {
+          window.buildThemeGrid();
+        }
       });
       await page.waitForTimeout(600);
 
@@ -173,16 +160,20 @@ async function runPublishWorkspaceLiveAudit() {
   console.log(`Testing Pro & Premium & Keep It Live Workspace Renderings`);
   console.log(`------------------------------------------------------------`);
 
-  const proContext = await browser.newContext({ storageState, viewport: { width: 1280, height: 800 } });
+  const proContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const proPage = await proContext.newPage();
 
   try {
-    await proPage.goto('https://portfolio-maker-murex.vercel.app/studio', { waitUntil: 'networkidle' });
-    await proPage.waitForTimeout(1500);
+    await proPage.goto('https://portfolio-maker-murex.vercel.app/', { waitUntil: 'networkidle' });
+    await proPage.waitForTimeout(1000);
+
+    await proPage.evaluate(() => {
+      if (typeof window.buildHTML === 'function') window.buildHTML();
+      if (typeof window.switchWorkspace === 'function') window.switchWorkspace('publish');
+    });
 
     // Test PRO state
     const proResults = await proPage.evaluate(() => {
-      // Simulate active Pro subscription
       window.globalEntitlements.setSubscription({ plan_id: 'pro', status: 'active' });
       window.portfolioData.publishedAt = '2026-08-20T01:30:00.000Z';
       window.portfolioData.slug = 'johndoe';

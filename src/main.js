@@ -539,6 +539,7 @@ async function initStudio() {
   renderWorkspaceHeader();
   renderFirstRunChecklist(document.body, portfolioData);
   installEntitlementRefresh();
+  window.initStudio = initStudio;
   showToast('info', '⚡', 'Studio Ready! Synced with Supabase Postgres.');
 }
 
@@ -972,8 +973,9 @@ function buildHTML() {
     </div>
   </div>
 </div>
-`;
+};
 }
+window.buildHTML = buildHTML;
 
 // ─── VIRTUAL PREVIEW VIEWPORT STATE & SCALING ──────
 let currentPreviewMode = 'desktop';
