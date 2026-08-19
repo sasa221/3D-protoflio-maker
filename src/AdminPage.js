@@ -116,19 +116,33 @@ async function loadAllData() {
   const container = document.getElementById('admin-tab-content');
   if (status) {
     status.style.display = 'block';
+    status.style.background = 'rgba(255,255,255,0.05)';
+    status.style.border = '1px solid rgba(255,255,255,0.1)';
+    status.style.color = '#fff';
     status.textContent = 'Refreshing platform telemetry & database records…';
   }
 
+  const errors = [];
+  const safeCall = async (fn, label, fallback) => {
+    try {
+      return await fn();
+    } catch (e) {
+      console.error(`[Admin Data] ${label} failed:`, e);
+      errors.push(`${label}: ${e.message}`);
+      return fallback;
+    }
+  };
+
   try {
     const [overviewData, usersData, portfoliosData, groupsData, promosData, paymentsData, auditData, systemData] = await Promise.all([
-      adminGetOverview().catch(() => ({ stats: {}, featureFlags: {} })),
-      adminGetUsers().catch(() => ({ users: [] })),
-      adminGetPortfolios().catch(() => ({ portfolios: [] })),
-      adminGetGroups().catch(() => ({ groups: [] })),
-      adminGetPromos().catch(() => ({ promos: [] })),
-      adminGetPaymentRequests('all').catch(() => ({ requests: [] })),
-      adminGetAuditLog(150).catch(() => ({ logs: [] })),
-      adminGetSystemInfo().catch(() => ({ featureFlags: {}, pricingReference: {} }))
+      safeCall(adminGetOverview, 'Overview', { stats: null, error: true }),
+      safeCall(adminGetUsers, 'Users', { users: [] }),
+      safeCall(adminGetPortfolios, 'Portfolios', { portfolios: [] }),
+      safeCall(adminGetGroups, 'Groups', { groups: [] }),
+      safeCall(adminGetPromos, 'Promos', { promos: [] }),
+      safeCall(() => adminGetPaymentRequests('all'), 'Payment Requests', { requests: [] }),
+      safeCall(() => adminGetAuditLog(150), 'Audit Log', { logs: [] }),
+      safeCall(adminGetSystemInfo, 'System Info', { featureFlags: {}, pricingReference: {} })
     ]);
 
     cachedData = {
@@ -142,11 +156,25 @@ async function loadAllData() {
       system: systemData
     };
 
-    if (status) status.style.display = 'none';
+    if (errors.length > 0) {
+      if (status) {
+        status.style.display = 'block';
+        status.style.background = 'rgba(239,68,68,0.15)';
+        status.style.border = '1px solid rgba(239,68,68,0.3)';
+        status.style.color = '#fca5a5';
+        status.innerHTML = `<strong>⚠️ Partial telemetry loading error:</strong><br>${errors.map(e => escapeHtml(e)).join('<br>')}`;
+      }
+    } else {
+      if (status) status.style.display = 'none';
+    }
+
     renderCurrentTab();
   } catch (err) {
     if (status) {
       status.style.display = 'block';
+      status.style.background = 'rgba(239,68,68,0.15)';
+      status.style.border = '1px solid rgba(239,68,68,0.3)';
+      status.style.color = '#fca5a5';
       status.textContent = `Failed to load admin data: ${err.message}`;
     }
   }
@@ -197,7 +225,16 @@ function renderCurrentTab() {
 
 // ─── 1. OVERVIEW TAB ─────────────────────────────────────────────
 function renderOverviewTab(data) {
-  const stats = data?.stats || {};
+  if (!data || data.error || !data.stats) {
+    return `
+      <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:12px;padding:24px;text-align:center;color:#fca5a5;margin-bottom:24px;">
+        <span style="font-size:32px;display:block;margin-bottom:8px">⚠️</span>
+        <h3 style="margin:0 0 6px;color:#fff;font-size:16px;">Unable to load platform overview metrics</h3>
+        <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.7);">The server telemetry query encountered an issue. Check server logs or click ↻ Refresh Data above.</p>
+      </div>
+    `;
+  }
+  const stats = data.stats;
   return `
     <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:12px;padding:14px 18px;margin-bottom:24px;display:flex;align-items:center;gap:12px">
       <span style="font-size:22px">💳</span>
@@ -208,18 +245,18 @@ function renderOverviewTab(data) {
     </div>
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:14px;margin-bottom:28px">
-      ${renderStatCard('Total Users', stats.totalUsers || 0, '#8b5cf6')}
-      ${renderStatCard('Free Users', stats.freeUsers || 0, '#06b6d4')}
-      ${renderStatCard('Pro Users', stats.proUsers || 0, '#fbbf24')}
-      ${renderStatCard('Premium Users', stats.premiumUsers || 0, '#ec4899')}
-      ${renderStatCard('Group Members', stats.groupMembers || 0, '#10b981')}
-      ${renderStatCard('Total Portfolios', stats.totalPortfolios || 0, '#3b82f6')}
-      ${renderStatCard('Published (Live)', stats.publishedPortfolios || 0, '#22c55e')}
-      ${renderStatCard('Draft Portfolios', stats.draftPortfolios || 0, '#94a3b8')}
-      ${renderStatCard('Finalized Free', stats.finalizedFreePortfolios || 0, '#a855f7')}
-      ${renderStatCard('Keep It Live', stats.keepLivePortfolios || 0, '#f97316')}
-      ${renderStatCard('Active Groups', stats.activeGroups || 0, '#14b8a6')}
-      ${renderStatCard('Active Promos', stats.promoCodesCount || 0, '#eab308')}
+      ${renderStatCard('Total Users', stats.totalUsers ?? 0, '#8b5cf6')}
+      ${renderStatCard('Free Users', stats.freeUsers ?? 0, '#06b6d4')}
+      ${renderStatCard('Pro Users', stats.proUsers ?? 0, '#fbbf24')}
+      ${renderStatCard('Premium Users', stats.premiumUsers ?? 0, '#ec4899')}
+      ${renderStatCard('Group Members', stats.groupMembers ?? 0, '#10b981')}
+      ${renderStatCard('Total Portfolios', stats.totalPortfolios ?? 0, '#3b82f6')}
+      ${renderStatCard('Published (Live)', stats.publishedPortfolios ?? 0, '#22c55e')}
+      ${renderStatCard('Draft Portfolios', stats.draftPortfolios ?? 0, '#94a3b8')}
+      ${renderStatCard('Finalized Free', stats.finalizedFreePortfolios ?? 0, '#a855f7')}
+      ${renderStatCard('Keep It Live', stats.keepLivePortfolios ?? 0, '#f97316')}
+      ${renderStatCard('Active Groups', stats.activeGroups ?? 0, '#14b8a6')}
+      ${renderStatCard('Active Promos', stats.promoCodesCount ?? 0, '#eab308')}
       ${renderStatCard('Pending Payments', stats.pendingPaymentsCount ?? 0, '#fde047')}
       ${renderStatCard('Approved Payments', stats.approvedPaymentsCount ?? 0, '#22c55e')}
       ${renderStatCard('Rejected Payments', stats.rejectedPaymentsCount ?? 0, '#ef4444')}
@@ -296,32 +333,45 @@ function renderUserRows(users) {
   if (!users.length) {
     return `<tr><td colspan="7" style="padding:32px;text-align:center;color:rgba(255,255,255,0.4)">No matching user accounts found.</td></tr>`;
   }
-  return users.map(u => `
-    <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-      <td style="padding:14px 16px">
-        <strong style="color:#fff;display:block">${escapeHtml(u.name)}</strong>
-        <small style="color:rgba(255,255,255,0.5);font-size:11px">${escapeHtml(u.email)}</small>
-        ${u.isAdmin ? '<span style="font-size:9px;background:rgba(245,158,11,0.2);color:#fbbf24;padding:1px 5px;border-radius:4px;font-weight:800;margin-top:2px;display:inline-block">ADMIN</span>' : ''}
-      </td>
-      <td style="padding:14px">
-        <span class="plan plan-${escapeHtml(u.plan)}" style="font-weight:800;font-size:11px;padding:3px 8px;border-radius:6px">${escapeHtml(u.plan.toUpperCase())}</span>
-      </td>
-      <td style="padding:14px">
-        <span style="font-size:11px;color:${u.status === 'active' ? '#4ade80' : '#f87171'}">● ${escapeHtml(u.status)}</span>
-      </td>
-      <td style="padding:14px">
-        <strong>${u.portfolioCount}</strong> <small style="color:rgba(255,255,255,0.5)">(${u.hostedCount} live)</small>
-      </td>
-      <td style="padding:14px">
-        ${u.isLegacy ? '<span style="color:#38bdf8;font-size:11px;font-weight:700">YES</span>' : '<span style="color:rgba(255,255,255,0.3);font-size:11px">NO</span>'}
-      </td>
-      <td style="padding:14px;color:rgba(255,255,255,0.6);font-size:12px">
-        ${new Date(u.createdAt).toLocaleDateString()}
-      </td>
-      <td style="padding:14px 16px;text-align:right">
-        <button class="manage-user-btn" data-user-id="${escapeHtml(u.id)}" style="background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.4);color:#c084fc;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⚙️ Manage User</button>
-      </td>
-    </tr>`).join('');
+  return users.map(u => {
+    const name = u.name || u.display_name || u.email?.split('@')[0] || 'User';
+    const email = u.email || 'No email';
+    const plan = (u.plan || 'free').toLowerCase();
+    const status = u.status || 'active';
+    const portfolioCount = u.portfolioCount ?? u.portfolios_count ?? 0;
+    const hostedCount = u.hostedCount ?? u.hosted_count ?? 0;
+    const isLegacy = Boolean(u.isLegacy ?? u.is_legacy);
+    const createdAt = u.createdAt || u.created_at;
+    const dateStr = createdAt ? new Date(createdAt).toLocaleDateString() : '—';
+    const isAdmin = Boolean(u.isAdmin ?? u.is_admin);
+
+    return `
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
+        <td style="padding:14px 16px">
+          <strong style="color:#fff;display:block">${escapeHtml(name)}</strong>
+          <small style="color:rgba(255,255,255,0.5);font-size:11px">${escapeHtml(email)}</small>
+          ${isAdmin ? '<span style="font-size:9px;background:rgba(245,158,11,0.2);color:#fbbf24;padding:1px 5px;border-radius:4px;font-weight:800;margin-top:2px;display:inline-block">ADMIN</span>' : ''}
+        </td>
+        <td style="padding:14px">
+          <span class="plan plan-${escapeHtml(plan)}" style="font-weight:800;font-size:11px;padding:3px 8px;border-radius:6px">${escapeHtml(plan.toUpperCase())}</span>
+        </td>
+        <td style="padding:14px">
+          <span style="font-size:11px;color:${status === 'active' ? '#4ade80' : '#f87171'}">● ${escapeHtml(status)}</span>
+        </td>
+        <td style="padding:14px">
+          <strong>${portfolioCount}</strong> <small style="color:rgba(255,255,255,0.5)">(${hostedCount} live)</small>
+        </td>
+        <td style="padding:14px">
+          ${isLegacy ? '<span style="color:#38bdf8;font-size:11px;font-weight:700">YES</span>' : '<span style="color:rgba(255,255,255,0.3);font-size:11px">NO</span>'}
+        </td>
+        <td style="padding:14px;color:rgba(255,255,255,0.6);font-size:12px">
+          ${escapeHtml(dateStr)}
+        </td>
+        <td style="padding:14px 16px;text-align:right">
+          <button class="manage-user-btn" data-user-id="${escapeHtml(u.id)}" style="background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.4);color:#c084fc;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⚙️ Manage User</button>
+        </td>
+      </tr>`;
+  }).join('');
 }
 
 function installUsersTabHandlers() {
@@ -335,17 +385,20 @@ function installUsersTabHandlers() {
     const sort = sortSelect?.value || 'newest';
 
     let filtered = cachedData.users.filter(u => {
-      const matchesQuery = u.name.toLowerCase().includes(query) || u.email.toLowerCase().includes(query) || u.id.toLowerCase().includes(query);
+      const uName = (u.name || u.display_name || '').toLowerCase();
+      const uEmail = (u.email || '').toLowerCase();
+      const uId = (u.id || '').toLowerCase();
+      const matchesQuery = uName.includes(query) || uEmail.includes(query) || uId.includes(query);
       if (!matchesQuery) return false;
-      if (plan === 'legacy') return u.isLegacy;
-      if (plan === 'kil') return u.hasKIL;
-      if (plan !== 'all') return u.plan === plan;
+      if (plan === 'legacy') return Boolean(u.isLegacy ?? u.is_legacy);
+      if (plan === 'kil') return Boolean(u.hasKIL ?? u.has_kil);
+      if (plan !== 'all') return (u.plan || '').toLowerCase() === plan;
       return true;
     });
 
-    if (sort === 'oldest') filtered.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-    else if (sort === 'portfolios') filtered.sort((a, b) => b.portfolioCount - a.portfolioCount);
-    else filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    if (sort === 'oldest') filtered.sort((a, b) => new Date(a.createdAt || a.created_at || 0) - new Date(b.createdAt || b.created_at || 0));
+    else if (sort === 'portfolios') filtered.sort((a, b) => (b.portfolioCount || b.portfolios_count || 0) - (a.portfolioCount || a.portfolios_count || 0));
+    else filtered.sort((a, b) => new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0));
 
     const tbody = document.getElementById('users-table-body');
     if (tbody) tbody.innerHTML = renderUserRows(filtered);
@@ -357,6 +410,7 @@ function installUsersTabHandlers() {
   sortSelect?.addEventListener('change', filterAndRender);
   attachManageUserButtons();
 }
+
 
 function attachManageUserButtons() {
   document.querySelectorAll('.manage-user-btn').forEach(btn => {
@@ -494,31 +548,45 @@ function renderPortfoliosTab(portfolios) {
           </tr>
         </thead>
         <tbody>
-          ${portfolios.length ? portfolios.map(p => `
+          ${portfolios.length ? portfolios.map(p => {
+            const name = p.name || 'Untitled Portfolio';
+            const slug = p.slug || '';
+            const ownerId = p.ownerUserId || p.owner_user_id || 'Unknown';
+            const ownerEmail = p.ownerEmail || p.owner_email || '';
+            const theme = p.theme || 'code';
+            const isLive = Boolean(p.isLive ?? p.published_at);
+            const isFinalized = Boolean(p.isFinalized ?? p.is_finalized);
+
+            return `
             <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
               <td style="padding:14px 16px">
-                <strong style="color:#fff;display:block">${escapeHtml(p.name)}</strong>
-                <small style="color:#38bdf8;font-family:monospace;font-size:11px">/${escapeHtml(p.slug)}</small>
+                <strong style="color:#fff;display:block">${escapeHtml(name)}</strong>
+                <small style="color:#38bdf8;font-family:monospace;font-size:11px">/${escapeHtml(slug)}</small>
               </td>
-              <td style="padding:14px;font-family:monospace;color:rgba(255,255,255,0.6);font-size:12px">${escapeHtml(p.ownerUserId)}</td>
-              <td style="padding:14px"><span style="font-weight:700;color:#c084fc">${escapeHtml(p.theme)}</span></td>
+              <td style="padding:14px;font-family:monospace;color:rgba(255,255,255,0.6);font-size:12px">
+                ${ownerEmail ? `<span style="color:#fff;display:block;font-size:11px">${escapeHtml(ownerEmail)}</span>` : ''}
+                <span style="font-size:10px;color:rgba(255,255,255,0.4)">${escapeHtml(ownerId)}</span>
+              </td>
+              <td style="padding:14px"><span style="font-weight:700;color:#c084fc">${escapeHtml(theme)}</span></td>
               <td style="padding:14px">
-                <span style="font-size:11px;color:${p.isLive ? '#4ade80' : '#94a3b8'}">● ${p.isLive ? 'HOSTED & LIVE' : 'DRAFT'}</span>
+                <span style="font-size:11px;color:${isLive ? '#4ade80' : '#94a3b8'}">● ${isLive ? 'HOSTED & LIVE' : 'DRAFT'}</span>
               </td>
               <td style="padding:14px">
-                ${p.isFinalized ? '<span style="color:#fbbf24;font-size:11px;font-weight:700">🔒 LOCKED</span>' : '<span style="color:rgba(255,255,255,0.4);font-size:11px">EDITABLE</span>'}
+                ${isFinalized ? '<span style="color:#fbbf24;font-size:11px;font-weight:700">🔒 LOCKED</span>' : '<span style="color:rgba(255,255,255,0.4);font-size:11px">EDITABLE</span>'}
               </td>
               <td style="padding:14px 16px;text-align:right">
-                <a href="/u/${escapeHtml(p.slug)}" target="_blank" style="color:#38bdf8;text-decoration:none;font-weight:700;font-size:12px;margin-right:10px">↗ Open Live</a>
-                <button class="portfolio-hosting-btn" data-pf-id="${escapeHtml(p.id)}" data-action="${p.isLive ? 'disable' : 'restore'}" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#fff;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">
-                  ${p.isLive ? 'Disable Hosting' : 'Restore Hosting'}
+                ${slug ? `<a href="/u/${escapeHtml(slug)}" target="_blank" style="color:#38bdf8;text-decoration:none;font-weight:700;font-size:12px;margin-right:10px">↗ Open Live</a>` : ''}
+                <button class="portfolio-hosting-btn" data-pf-id="${escapeHtml(p.id)}" data-action="${isLive ? 'disable' : 'restore'}" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#fff;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">
+                  ${isLive ? 'Disable Hosting' : 'Restore Hosting'}
                 </button>
               </td>
-            </tr>`).join('') : `<tr><td colspan="6" style="padding:32px;text-align:center;color:rgba(255,255,255,0.4)">No portfolios found.</td></tr>`}
+            </tr>`;
+          }).join('') : `<tr><td colspan="6" style="padding:32px;text-align:center;color:rgba(255,255,255,0.4)">No portfolios found.</td></tr>`}
         </tbody>
       </table>
     </div>`;
 }
+
 
 function installPortfoliosTabHandlers() {
   document.querySelectorAll('.portfolio-hosting-btn').forEach(btn => {

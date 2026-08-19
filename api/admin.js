@@ -29,22 +29,40 @@ function isAllowedAdminEmail(email) {
 async function requireAdmin(req, res) {
   const authorization = req.headers.authorization || '';
   if (!authorization.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentication required' });
-  const url = process.env.VITE_SUPABASE_URL || 'https://kupxhrfijkdlcteniqfp.supabase.co';
-  const anonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const token = authorization.replace('Bearer ', '').trim();
+  if (!token) return res.status(401).json({ error: 'Authentication token is empty' });
+
+  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://kupxhrfijkdlcteniqfp.supabase.co';
+  const anonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_gILAHxBLwwDjMoNpfLUbLg_fFKiE0f5';
   const serviceKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !anonKey || !serviceKey) return res.status(503).json({ error: 'Admin service is not configured' });
-  
-  const auth = createClient(url, anonKey, { global: { headers: { Authorization: authorization } } });
-  const { data, error } = await auth.auth.getUser();
-  if (error || !data?.user) return res.status(401).json({ error: 'Invalid or expired session' });
-  
-  const userEmail = (data.user.email || '').trim().toLowerCase();
-  if (!isAllowedAdminEmail(userEmail)) {
-    return res.status(403).json({ error: 'Administrator access required' });
-  }
-  
+  if (!url || !serviceKey) return res.status(503).json({ error: 'Admin database service is not configured' });
+
   const admin = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
-  return { user: data.user, admin };
+
+  let user = null;
+  // 1. Direct validation via admin client with token
+  const { data: adminUserData, error: adminUserErr } = await admin.auth.getUser(token);
+  if (adminUserData?.user && !adminUserErr) {
+    user = adminUserData.user;
+  } else {
+    // 2. Fallback validation via user client
+    const userClient = createClient(url, anonKey, { global: { headers: { Authorization: `Bearer ${token}` } } });
+    const { data: userClientData, error: userClientErr } = await userClient.auth.getUser();
+    if (userClientData?.user && !userClientErr) {
+      user = userClientData.user;
+    }
+  }
+
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid or expired session. Please sign in again.' });
+  }
+
+  const userEmail = (user.email || '').trim().toLowerCase();
+  if (!isAllowedAdminEmail(userEmail)) {
+    return res.status(403).json({ error: `Administrator access required for ${userEmail}` });
+  }
+
+  return { user, admin };
 }
 
 async function writeAuditLog(adminClient, adminUserId, targetUserId, action, prevVal, newVal, reason, metadata = {}) {
@@ -76,8 +94,8 @@ export default async function handler(req, res) {
 
   // Health endpoint for public/monitoring verification
   if (action === 'health' || (req.method === 'GET' && action === 'ping')) {
-    const url = process.env.VITE_SUPABASE_URL || 'https://kupxhrfijkdlcteniqfp.supabase.co';
-    const anonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://kupxhrfijkdlcteniqfp.supabase.co';
+    const anonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_gILAHxBLwwDjMoNpfLUbLg_fFKiE0f5';
     const serviceKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
     const database = (url && serviceKey) ? 'connected' : 'not_connected';
     const storage = (url && anonKey) ? 'connected' : 'not_connected';
@@ -104,33 +122,62 @@ export default async function handler(req, res) {
   // 1. Overview Metrics
   if (req.method === 'GET' && action === 'overview') {
     let usersList = [];
+    let authUsersError = null;
+
     try {
-      const { data: authUsersRes } = await context.admin.auth.admin.listUsers({ perPage: 500 });
-      if (authUsersRes?.users && authUsersRes.users.length > 0) {
+      const { data: authUsersRes, error: authUsersErr } = await context.admin.auth.admin.listUsers({ perPage: 1000 });
+      if (authUsersErr) {
+        console.error('[Admin Overview] auth.admin.listUsers error:', authUsersErr);
+        authUsersError = authUsersErr.message;
+      } else if (authUsersRes?.users) {
         usersList = authUsersRes.users.map(u => ({
           id: u.id,
           email: u.email || '',
+          name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0] || 'User',
           display_name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0] || 'User',
+          createdAt: u.created_at,
           created_at: u.created_at,
+          isAdmin: Boolean(u.user_metadata?.is_admin || u.app_metadata?.is_admin || isAllowedAdminEmail(u.email)),
           is_admin: Boolean(u.user_metadata?.is_admin || u.app_metadata?.is_admin || isAllowedAdminEmail(u.email))
         }));
       }
-    } catch (_) {}
+    } catch (e) {
+      console.error('[Admin Overview] listUsers exception:', e);
+      authUsersError = e.message;
+    }
 
     try {
-      const { data: dbProfiles } = await context.admin.from('profiles').select('id,email,display_name,created_at');
+      const { data: dbProfiles, error: pErr } = await context.admin.from('profiles').select('id,email,display_name,username,is_admin,created_at');
       if (dbProfiles && dbProfiles.length > 0) {
         const existingIds = new Set(usersList.map(u => u.id));
         dbProfiles.forEach(p => {
           if (!existingIds.has(p.id)) {
-            usersList.push(p);
+            usersList.push({
+              id: p.id,
+              email: p.email || '',
+              name: p.display_name || p.username || p.email?.split('@')[0] || 'User',
+              display_name: p.display_name || p.username || p.email?.split('@')[0] || 'User',
+              createdAt: p.created_at,
+              created_at: p.created_at,
+              isAdmin: Boolean(p.is_admin || isAllowedAdminEmail(p.email)),
+              is_admin: Boolean(p.is_admin || isAllowedAdminEmail(p.email))
+            });
           } else {
             const target = usersList.find(u => u.id === p.id);
-            if (target && p.display_name) target.display_name = p.display_name;
+            if (target && p.display_name && (target.display_name === 'User' || !target.display_name)) {
+              target.name = p.display_name;
+              target.display_name = p.display_name;
+            }
           }
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      console.error('[Admin Overview] profiles exception:', e);
+    }
+
+    if (usersList.length === 0 && authUsersError) {
+      return res.status(500).json({ error: `Failed to load users: ${authUsersError}` });
+    }
 
     const [
       subscriptionsRes,
@@ -140,26 +187,54 @@ export default async function handler(req, res) {
       promosRes,
       paymentsRes
     ] = await Promise.all([
-      context.admin.from('subscriptions').select('user_id,plan_id,status,group_id,metadata').catch(() => ({ data: [] })),
-      context.admin.from('portfolios').select('id,owner_user_id,published_at,theme').catch(() => ({ data: [] })),
-      context.admin.from('groups').select('id,status').eq('status', 'active').catch(() => ({ error: true })),
-      context.admin.from('keep_live_entitlements').select('id,status').eq('status', 'active').catch(() => ({ error: true })),
-      context.admin.from('promo_codes').select('id,active').eq('active', true).catch(() => ({ error: true })),
-      context.admin.from('manual_payment_requests').select('id,status').catch(() => ({ error: true }))
+      context.admin.from('subscriptions').select('user_id,plan_id,status,group_id,metadata'),
+      context.admin.from('portfolios').select('id,owner_user_id,name,slug,theme,published_at,is_finalized,created_at'),
+      context.admin.from('groups').select('id,status').eq('status', 'active'),
+      context.admin.from('keep_live_entitlements').select('id,status').eq('status', 'active'),
+      context.admin.from('promo_codes').select('id,active').eq('active', true),
+      context.admin.from('manual_payment_requests').select('id,status')
     ]);
+
+    if (portfoliosRes.error) {
+      console.error('[Admin Overview] portfolios error:', portfoliosRes.error);
+      return res.status(500).json({ error: `Failed to load portfolios: ${portfoliosRes.error.message}` });
+    }
 
     const subsList = subscriptionsRes.data || [];
     const pfsList = portfoliosRes.data || [];
     const paymentsList = paymentsRes.data || [];
 
-    const planCounts = { free: 0, pro: 0, premium: 0, premium_group: 0 };
+    const activePaidUsers = new Set();
+    let proCount = 0;
+    let premiumCount = 0;
+    let groupMemberCount = 0;
+
     subsList.forEach(s => {
-      const p = s.plan_id || 'free';
-      if (planCounts[p] !== undefined) planCounts[p]++;
+      const plan = s.plan_id || 'free';
+      const status = s.status || 'active';
+      if (status === 'active' || status === 'grace' || status === 'canceling') {
+        if (plan === 'pro') {
+          proCount++;
+          activePaidUsers.add(s.user_id);
+        } else if (plan === 'premium') {
+          premiumCount++;
+          activePaidUsers.add(s.user_id);
+        } else if (plan === 'premium_group') {
+          groupMemberCount++;
+          activePaidUsers.add(s.user_id);
+        }
+      }
     });
 
-    const publishedCount = pfsList.filter(p => p.published_at).length;
+    const totalUsersCount = usersList.length;
+    const freeUsersCount = Math.max(0, totalUsersCount - activePaidUsers.size);
+
+    const publishedCount = pfsList.filter(p => Boolean(p.published_at)).length;
     const draftCount = pfsList.filter(p => !p.published_at).length;
+    const finalizedFreeCount = pfsList.filter(p => Boolean(p.is_finalized)).length;
+    const keepLiveCount = (keepLivesRes.data || []).length;
+    const activeGroupsCount = (groupsRes.data || []).length;
+    const activePromosCount = (promosRes.data || []).length;
 
     const pendingPaymentsCount = paymentsRes.error ? 'N/A' : paymentsList.filter(p => p.status === 'PENDING').length;
     const approvedPaymentsCount = paymentsRes.error ? 'N/A' : paymentsList.filter(p => p.status === 'APPROVED').length;
@@ -167,17 +242,22 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       stats: {
-        totalUsers: usersList.length,
-        freeUsers: planCounts.free,
-        proUsers: planCounts.pro,
-        premiumUsers: planCounts.premium,
-        groupMembers: planCounts.premium_group,
+        totalUsers: totalUsersCount,
+        freeUsers: freeUsersCount,
+        proUsers: proCount,
+        premiumUsers: premiumCount,
+        groupMembers: groupMemberCount,
         totalPortfolios: pfsList.length,
         publishedPortfolios: publishedCount,
         draftPortfolios: draftCount,
+        finalizedFreePortfolios: finalizedFreeCount,
+        keepLivePortfolios: keepLiveCount,
+        activeGroups: activeGroupsCount,
+        promoCodesCount: activePromosCount,
         pendingPaymentsCount,
         approvedPaymentsCount,
-        rejectedPaymentsCount
+        rejectedPaymentsCount,
+        enforcementStatus: process.env.FF_ENTITLEMENT_ENFORCEMENT_ENABLED === 'true' ? 'ACTIVE (ENFORCED)' : 'OFF (LEGACY MODE)'
       }
     });
   }
@@ -185,65 +265,96 @@ export default async function handler(req, res) {
   // 2. Users List with complete details
   if (req.method === 'GET' && action === 'users') {
     let usersList = [];
+    let authUsersError = null;
+
     try {
-      const { data: authUsersRes } = await context.admin.auth.admin.listUsers({ perPage: 500 });
-      if (authUsersRes?.users && authUsersRes.users.length > 0) {
+      const { data: authUsersRes, error: authUsersErr } = await context.admin.auth.admin.listUsers({ perPage: 1000 });
+      if (authUsersErr) {
+        console.error('[Admin Users] listUsers error:', authUsersErr);
+        authUsersError = authUsersErr.message;
+      } else if (authUsersRes?.users) {
         usersList = authUsersRes.users.map(u => ({
           id: u.id,
           email: u.email || '',
+          name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0] || 'User',
           display_name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0] || 'User',
+          createdAt: u.created_at,
           created_at: u.created_at,
+          isAdmin: Boolean(u.user_metadata?.is_admin || u.app_metadata?.is_admin || isAllowedAdminEmail(u.email)),
           is_admin: Boolean(u.user_metadata?.is_admin || u.app_metadata?.is_admin || isAllowedAdminEmail(u.email))
         }));
       }
-    } catch (_) {}
+    } catch (e) {
+      console.error('[Admin Users] listUsers exception:', e);
+      authUsersError = e.message;
+    }
 
     try {
-      const { data: dbProfiles } = await context.admin.from('profiles').select('id,email,display_name,created_at');
+      const { data: dbProfiles, error: pErr } = await context.admin.from('profiles').select('id,email,display_name,username,is_admin,created_at');
       if (dbProfiles && dbProfiles.length > 0) {
         const existingIds = new Set(usersList.map(u => u.id));
         dbProfiles.forEach(p => {
           if (!existingIds.has(p.id)) {
-            usersList.push(p);
+            usersList.push({
+              id: p.id,
+              email: p.email || '',
+              name: p.display_name || p.username || p.email?.split('@')[0] || 'User',
+              display_name: p.display_name || p.username || p.email?.split('@')[0] || 'User',
+              createdAt: p.created_at,
+              created_at: p.created_at,
+              isAdmin: Boolean(p.is_admin || isAllowedAdminEmail(p.email)),
+              is_admin: Boolean(p.is_admin || isAllowedAdminEmail(p.email))
+            });
           } else {
             const target = usersList.find(u => u.id === p.id);
-            if (target && p.display_name) target.display_name = p.display_name;
+            if (target && p.display_name && (target.display_name === 'User' || !target.display_name)) {
+              target.name = p.display_name;
+              target.display_name = p.display_name;
+            }
           }
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      console.error('[Admin Users] profiles exception:', e);
+    }
+
+    if (usersList.length === 0 && authUsersError) {
+      return res.status(500).json({ error: `Failed to load users: ${authUsersError}` });
+    }
 
     const [
-      { data: subscriptions },
-      { data: portfolios },
-      { data: groups },
-      { data: keepLives }
+      subscriptionsRes,
+      portfoliosRes,
+      groupsRes,
+      keepLivesRes
     ] = await Promise.all([
-      context.admin.from('subscriptions').select('user_id,plan_id,status,current_period_end,grace_ends_at,metadata,group_id').catch(() => ({ data: [] })),
-      context.admin.from('portfolios').select('id,owner_user_id,name,slug,theme,published_at,created_at').catch(() => ({ data: [] })),
-      context.admin.from('groups').select('id,owner_user_id,seat_limit,status').catch(() => ({ data: [] })),
-      context.admin.from('keep_live_entitlements').select('id,user_id,portfolio_id,status').catch(() => ({ data: [] }))
+      context.admin.from('subscriptions').select('user_id,plan_id,status,current_period_end,grace_ends_at,metadata,group_id'),
+      context.admin.from('portfolios').select('id,owner_user_id,name,slug,theme,published_at,is_finalized,created_at'),
+      context.admin.from('groups').select('id,owner_user_id,seat_limit,status'),
+      context.admin.from('keep_live_entitlements').select('id,user_id,portfolio_id,status')
     ]);
 
-    const subsMap = new Map((subscriptions || []).map(s => [s.user_id, s]));
+    const subsMap = new Map((subscriptionsRes.data || []).map(s => [s.user_id, s]));
     const pfsByUser = new Map();
-    (portfolios || []).forEach(pf => {
+    (portfoliosRes.data || []).forEach(pf => {
       const list = pfsByUser.get(pf.owner_user_id) || [];
       list.push(pf);
       pfsByUser.set(pf.owner_user_id, list);
     });
 
-    const groupsByOwner = new Map((groups || []).map(g => [g.owner_user_id, g]));
-    const kilByUser = new Map((keepLives || []).map(k => [k.user_id, k]));
+    const groupsByOwner = new Map((groupsRes.data || []).map(g => [g.owner_user_id, g]));
+    const kilByUser = new Map((keepLivesRes.data || []).map(k => [k.user_id, k]));
 
     const users = usersList.map(profile => {
       const sub = subsMap.get(profile.id) || { plan_id: 'free', status: 'active' };
       const userPfs = pfsByUser.get(profile.id) || [];
-      const hostedPfs = userPfs.filter(p => p.published_at);
-      const isLegacy = sub.metadata?.legacy_access === true || new Date(profile.created_at) < new Date('2026-08-01T00:00:00Z');
+      const hostedPfs = userPfs.filter(p => Boolean(p.published_at));
+      const isLegacy = sub.metadata?.legacy_access === true || (profile.createdAt ? new Date(profile.createdAt) < new Date('2026-08-01T00:00:00Z') : false);
       
       return {
         ...profile,
+        name: profile.name || profile.display_name || profile.email?.split('@')[0] || 'User',
+        email: profile.email || '',
         plan: sub.plan_id || 'free',
         status: sub.status || 'active',
         portfolioCount: userPfs.length,
@@ -261,13 +372,16 @@ export default async function handler(req, res) {
   if (req.method === 'GET' && action === 'portfolios') {
     const { data: portfolios, error } = await context.admin
       .from('portfolios')
-      .select('id,owner_user_id,name,slug,theme,published_at,created_at,updated_at')
+      .select('id,owner_user_id,name,slug,theme,published_at,is_finalized,created_at,updated_at')
       .order('created_at', { ascending: false })
       .limit(500);
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      console.error('[Admin Portfolios] error:', error);
+      return res.status(500).json({ error: error.message });
+    }
 
-    const ownerIds = [...new Set((portfolios || []).map(p => p.owner_user_id))];
+    const ownerIds = [...new Set((portfolios || []).map(p => p.owner_user_id).filter(Boolean))];
     const { data: profiles } = ownerIds.length
       ? await context.admin.from('profiles').select('id,email,display_name').in('id', ownerIds)
       : { data: [] };
@@ -276,15 +390,20 @@ export default async function handler(req, res) {
 
     const enriched = (portfolios || []).map(p => ({
       ...p,
+      ownerUserId: p.owner_user_id,
       ownerEmail: profileMap.get(p.owner_user_id)?.email || 'Unknown',
       ownerName: profileMap.get(p.owner_user_id)?.display_name || 'User',
       isLive: Boolean(p.published_at),
+      isFinalized: Boolean(p.is_finalized),
+      createdAt: p.created_at,
+      updatedAt: p.updated_at,
       tierRequired: ['cosmic', 'finance', 'legal', 'obsidian', 'quantum'].includes(p.theme) ? 'premium' :
                     ['hacker', 'data', 'blueprint', 'media', 'health', 'marketing', 'education'].includes(p.theme) ? 'pro' : 'free'
     }));
 
     return res.status(200).json({ portfolios: enriched });
   }
+
 
   // 4. Groups List
   if (req.method === 'GET' && action === 'groups') {
