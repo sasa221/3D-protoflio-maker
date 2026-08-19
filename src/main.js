@@ -7,7 +7,6 @@ import { renderAuthPage, renderResetPasswordPage } from './AuthPage.js';
 import { renderAdminPage } from './AdminPage.js';
 import { supabase } from './services/SupabaseClient.js';
 import { isLoggedIn, getCurrentUser, getCurrentAuthUser, isPro, logout, upgradeToPro, isAdmin, redeemPromoCode, subscribeToAuthStateChange, isEmailVerified } from './services/AuthService.js';
-import { openBillingModal } from './ui/BillingModal.js';
 
 window.supabase = supabase;
 window.getCurrentAuthUser = getCurrentAuthUser;
