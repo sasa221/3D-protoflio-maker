@@ -1,7 +1,7 @@
 -- Phase 8A Monetization Migration
--- Non-destructive: ALTER ADD COLUMN and CREATE TABLE only.
--- No DROP statements. All backward-compatible.
--- Run against existing Supabase Postgres.
+-- Non-destructive: ALTER ADD COLUMN IF NOT EXISTS and CREATE TABLE IF NOT EXISTS only.
+-- Idempotent and safely re-runnable across partial executions.
+-- Run against Supabase Postgres in SQL Editor.
 
 -- ============================================
 -- 1. ALTER existing tables
@@ -151,16 +151,19 @@ ALTER TABLE public.promo_redemptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.entitlement_audit_log ENABLE ROW LEVEL SECURITY;
 
 -- Portfolio creation history: users can view own
-CREATE POLICY IF NOT EXISTS "Users can view own creation history"
+DROP POLICY IF EXISTS "Users can view own creation history" ON public.portfolio_creation_history;
+CREATE POLICY "Users can view own creation history"
   ON public.portfolio_creation_history FOR SELECT
   USING (auth.uid() = user_id);
 
 -- Groups: owner can manage, members can view
-CREATE POLICY IF NOT EXISTS "Group owners can manage own groups"
+DROP POLICY IF EXISTS "Group owners can manage own groups" ON public.groups;
+CREATE POLICY "Group owners can manage own groups"
   ON public.groups FOR ALL
   USING (auth.uid() = owner_user_id);
 
-CREATE POLICY IF NOT EXISTS "Group members can view their group"
+DROP POLICY IF EXISTS "Group members can view their group" ON public.groups;
+CREATE POLICY "Group members can view their group"
   ON public.groups FOR SELECT
   USING (
     EXISTS (
@@ -172,12 +175,14 @@ CREATE POLICY IF NOT EXISTS "Group members can view their group"
   );
 
 -- Group members: users can view own membership
-CREATE POLICY IF NOT EXISTS "Users can view own group membership"
+DROP POLICY IF EXISTS "Users can view own group membership" ON public.group_members;
+CREATE POLICY "Users can view own group membership"
   ON public.group_members FOR SELECT
   USING (auth.uid() = user_id);
 
 -- Group members: owners can manage members in their group
-CREATE POLICY IF NOT EXISTS "Group owners can manage members"
+DROP POLICY IF EXISTS "Group owners can manage members" ON public.group_members;
+CREATE POLICY "Group owners can manage members"
   ON public.group_members FOR ALL
   USING (
     EXISTS (
@@ -188,7 +193,8 @@ CREATE POLICY IF NOT EXISTS "Group owners can manage members"
   );
 
 -- Keep live: users can view own
-CREATE POLICY IF NOT EXISTS "Users can view own keep live entitlements"
+DROP POLICY IF EXISTS "Users can view own keep live entitlements" ON public.keep_live_entitlements;
+CREATE POLICY "Users can view own keep live entitlements"
   ON public.keep_live_entitlements FOR SELECT
   USING (auth.uid() = user_id);
 
@@ -196,7 +202,8 @@ CREATE POLICY IF NOT EXISTS "Users can view own keep live entitlements"
 -- No SELECT policy = blocked for anon/authenticated
 
 -- Promo redemptions: users can view own
-CREATE POLICY IF NOT EXISTS "Users can view own promo redemptions"
+DROP POLICY IF EXISTS "Users can view own promo redemptions" ON public.promo_redemptions;
+CREATE POLICY "Users can view own promo redemptions"
   ON public.promo_redemptions FOR SELECT
   USING (auth.uid() = user_id);
 

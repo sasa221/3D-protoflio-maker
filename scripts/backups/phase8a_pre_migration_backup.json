@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-08-19T16:43:16.101Z",
+  "version": "Phase 8A Pre-Migration Snapshot",
+  "liveCommit": "118954a",
+  "liveBundle": "/assets/index-DBXHuADD.js",
+  "counts": {
+    "totalRegisteredUsers": 8,
+    "totalProfiles": 8,
+    "totalPortfolios": 3,
+    "publishedPortfolios": 1,
+    "draftPortfolios": 2
+  },
+  "knownSlugs": [
+    "saleh",
+    "candidate-portfolio",
+    "demo"
+  ],
+  "knownThemesInUse": [
+    "code",
+    "creative",
+    "minimal"
+  ],
+  "featureFlags": {
+    "MONETIZATION_UI_ENABLED": false,
+    "ENTITLEMENT_ENFORCEMENT_ENABLED": false,
+    "FREE_FINALIZATION_LOCK_ENABLED": false,
+    "THEME_PAYWALL_ENABLED": false,
+    "HOSTING_PAYWALL_ENABLED": false,
+    "PRICING_PAGE_ENABLED": false,
+    "GROUP_MANAGEMENT_ENABLED": false
+  }
+}

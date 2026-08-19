@@ -51,7 +51,11 @@ const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
 assert(!/DROP\s+TABLE/i.test(migrationSQL), 'Migration contains ZERO "DROP TABLE" statements');
 assert(!/DROP\s+COLUMN/i.test(migrationSQL), 'Migration contains ZERO "DROP COLUMN" statements');
 assert(!/TRUNCATE/i.test(migrationSQL), 'Migration contains ZERO "TRUNCATE" statements');
+assert(!/DELETE\s+FROM/i.test(migrationSQL), 'Migration contains ZERO "DELETE FROM" statements');
 assert(!/ALTER\s+TABLE[^\n]+DROP/i.test(migrationSQL), 'Migration contains ZERO destructive ALTER DROP statements');
+assert(!/CREATE\s+POLICY\s+IF\s+NOT\s+EXISTS/i.test(migrationSQL), 'Migration contains ZERO invalid "CREATE POLICY IF NOT EXISTS" statements');
+assert((migrationSQL.match(/DROP\s+POLICY\s+IF\s+EXISTS/gi) || []).length === 7, 'Migration contains exactly 7 idempotent "DROP POLICY IF EXISTS" statements');
+assert((migrationSQL.match(/CREATE\s+POLICY\s+"/gi) || []).length === 7, 'Migration contains exactly 7 valid "CREATE POLICY" statements');
 
 // Non-destructive additions
 assert(/ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+is_finalized\s+BOOLEAN\s+DEFAULT\s+FALSE/i.test(migrationSQL), 'portfolios.is_finalized has safe DEFAULT FALSE');
