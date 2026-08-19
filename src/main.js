@@ -38,6 +38,7 @@ import { renderAnalyticsDashboard } from './ui/AnalyticsDashboard.js';
 import { initPublicPortfolioAnalytics } from './services/AnalyticsService.js';
 import { openBillingModal } from './ui/BillingModal.js';
 import { globalEntitlements } from './services/EntitlementService.js';
+window.globalEntitlements = globalEntitlements;
 import { canAccessTheme, getThemeTier, getThemeBadge } from './config/ThemeTierConfig.js';
 import { isFeatureEnabled } from './config/FeatureFlags.js';
 import { PLANS } from './config/PlanConfig.js';
