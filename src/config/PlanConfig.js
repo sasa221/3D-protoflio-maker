@@ -197,12 +197,14 @@ export function getPlanConfig(planId) {
 }
 
 export const INSTAPAY_CONFIG = {
-  accountName: 'Portfolio Maker Billing',
-  instapayId: 'portfoliomaker@instapay',
-  phoneNumber: '+20 100 000 0000',
-  bankName: 'National Bank of Egypt (NBE)',
-  instructions: 'Transfer the exact EGP amount using InstaPay to the account details above, then take a screenshot of the transfer confirmation and upload it below.'
+  accountName: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_INSTAPAY_ACCOUNT_NAME) || (typeof process !== 'undefined' && process.env?.INSTAPAY_ACCOUNT_NAME) || null,
+  instapayId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_INSTAPAY_ID) || (typeof process !== 'undefined' && process.env?.INSTAPAY_ID) || null,
+  phoneNumber: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_INSTAPAY_PHONE) || (typeof process !== 'undefined' && process.env?.INSTAPAY_PHONE) || null,
+  bankName: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_INSTAPAY_BANK) || (typeof process !== 'undefined' && process.env?.INSTAPAY_BANK) || null,
+  isConfigured: false
 };
+
+INSTAPAY_CONFIG.isConfigured = Boolean(INSTAPAY_CONFIG.accountName && INSTAPAY_CONFIG.instapayId);
 
 /**
  * Format price for display.

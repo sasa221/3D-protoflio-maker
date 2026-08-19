@@ -52,6 +52,10 @@ export default async function handler(req, res) {
       const { data: userData, error: userErr } = await userClient.auth.getUser();
       if (userErr || !userData?.user) return res.status(401).json({ error: 'Unauthorized user session' });
 
+      if (!userData.user.email_confirmed_at && !userData.user.confirmed_at && !userData.user.user_metadata?.email_verified) {
+        return res.status(403).json({ error: 'Email verification required before submitting payment requests' });
+      }
+
       const userId = userData.user.id;
       const userEmail = userData.user.email || '';
       const userName = userData.user.user_metadata?.full_name || userData.user.user_metadata?.name || userEmail.split('@')[0];

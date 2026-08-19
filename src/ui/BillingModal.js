@@ -138,6 +138,8 @@ function openInstaPayModal(planId, onSubscriptionUpdated) {
   const wrapper = document.createElement('div');
   wrapper.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10002;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:16px;';
 
+  const isConfigured = Boolean(INSTAPAY_CONFIG.isConfigured);
+
   wrapper.innerHTML = `
     <div style="background:#0e101c;border:1px solid rgba(255,255,255,0.15);border-radius:20px;max-width:540px;width:100%;max-height:92vh;overflow-y:auto;padding:28px;color:#fff;position:relative;">
       <button id="close-instapay-view" style="position:absolute;top:16px;right:16px;background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">✕</button>
@@ -147,29 +149,47 @@ function openInstaPayModal(planId, onSubscriptionUpdated) {
         <h2 style="font-size:1.4rem;font-weight:900;margin:4px 0 0;">Upgrade to ${plan.name}</h2>
       </div>
 
-      <!-- INSTAPAY DETAILS CARD -->
-      <div style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.3);border-radius:14px;padding:18px;margin-bottom:20px;font-size:13px;line-height:1.7;">
-        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-          <span style="color:rgba(255,255,255,0.6);">Account Name:</span>
-          <strong>${INSTAPAY_CONFIG.accountName}</strong>
+      ${isConfigured ? `
+        <!-- INSTAPAY DETAILS CARD -->
+        <div style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.3);border-radius:14px;padding:18px;margin-bottom:20px;font-size:13px;line-height:1.7;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+            <span style="color:rgba(255,255,255,0.6);">Account Name:</span>
+            <strong>${INSTAPAY_CONFIG.accountName || 'N/A'}</strong>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+            <span style="color:rgba(255,255,255,0.6);">InstaPay ID:</span>
+            <strong style="font-family:monospace;color:#38bdf8;">${INSTAPAY_CONFIG.instapayId || 'N/A'}</strong>
+          </div>
+          ${INSTAPAY_CONFIG.phoneNumber ? `
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+              <span style="color:rgba(255,255,255,0.6);">Phone Number:</span>
+              <strong>${INSTAPAY_CONFIG.phoneNumber}</strong>
+            </div>
+          ` : ''}
+          ${INSTAPAY_CONFIG.bankName ? `
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+              <span style="color:rgba(255,255,255,0.6);">Bank:</span>
+              <span>${INSTAPAY_CONFIG.bankName}</span>
+            </div>
+          ` : ''}
+          <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;margin-top:8px;">
+            <span style="color:#fff;font-weight:700;">Exact Amount:</span>
+            <strong id="final-amount-display" style="font-size:16px;color:#4ade80;">${baseAmount} EGP</strong>
+          </div>
         </div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-          <span style="color:rgba(255,255,255,0.6);">InstaPay ID:</span>
-          <strong style="font-family:monospace;color:#38bdf8;">${INSTAPAY_CONFIG.instapayId}</strong>
+      ` : `
+        <!-- UNCONFIGURED STATE BANNER -->
+        <div style="background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.25);border-radius:14px;padding:20px;margin-bottom:20px;text-align:center;">
+          <span style="font-size:24px;display:block;margin-bottom:6px;">⚠️</span>
+          <strong style="color:#fde047;font-size:14px;display:block;margin-bottom:6px;">Payment Details Not Configured Yet</strong>
+          <p style="color:rgba(255,255,255,0.7);font-size:12px;margin:0 0 10px;line-height:1.5;">
+            Official InstaPay transfer destination has not been configured by the platform administrator yet.
+          </p>
+          <div style="font-size:13px;color:#fff;border-top:1px solid rgba(255,255,255,0.08);padding-top:10px;">
+            Plan Price: <strong style="color:#4ade80;">${baseAmount} EGP</strong>
+          </div>
         </div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-          <span style="color:rgba(255,255,255,0.6);">Phone Number:</span>
-          <strong>${INSTAPAY_CONFIG.phoneNumber}</strong>
-        </div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-          <span style="color:rgba(255,255,255,0.6);">Bank:</span>
-          <span>${INSTAPAY_CONFIG.bankName}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;margin-top:8px;">
-          <span style="color:#fff;font-weight:700;">Exact Amount:</span>
-          <strong id="final-amount-display" style="font-size:16px;color:#4ade80;">${baseAmount} EGP</strong>
-        </div>
-      </div>
+      `}
 
       <!-- GROUP SEATS SELECTOR (If Group Plan) -->
       ${planId === 'premium_group' ? `
@@ -209,8 +229,8 @@ function openInstaPayModal(planId, onSubscriptionUpdated) {
 
       <div id="submission-error" style="display:none;font-size:12px;color:#ef4444;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:10px;margin-bottom:16px;"></div>
 
-      <button id="submit-payment-btn" style="width:100%;padding:14px;background:linear-gradient(135deg,#7c3aed,#06b6d4);border:none;border-radius:12px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;">
-        🚀 Submit Payment for Verification
+      <button id="submit-payment-btn" ${!isConfigured ? 'disabled' : ''} style="width:100%;padding:14px;background:${isConfigured ? 'linear-gradient(135deg,#7c3aed,#06b6d4)' : 'rgba(255,255,255,0.1)'};border:none;border-radius:12px;color:#fff;font-size:14px;font-weight:800;cursor:${isConfigured ? 'pointer' : 'not-allowed'};opacity:${isConfigured ? '1' : '0.6'};">
+        ${isConfigured ? '🚀 Submit Payment for Verification' : 'Payment Details Not Configured'}
       </button>
     </div>
   `;

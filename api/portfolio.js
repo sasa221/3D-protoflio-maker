@@ -45,6 +45,10 @@ export default async function handler(req, res) {
       const { data: userData, error: userErr } = await userClient.auth.getUser();
       if (userErr || !userData.user) return res.status(401).json({ error: 'Unauthorized user session' });
 
+      if (!userData.user.email_confirmed_at && !userData.user.confirmed_at && !userData.user.user_metadata?.email_verified) {
+        return res.status(403).json({ error: 'Email verification required before deploying portfolios' });
+      }
+
       const userId = userData.user.id;
       const { action: deployAction, portfolioId, slug, masterProfile } = req.body || {};
       if (!portfolioId || !slug) return res.status(400).json({ error: 'Missing portfolioId or slug' });
@@ -160,6 +164,10 @@ export default async function handler(req, res) {
       const adminClient = createClient(supabaseUrl, supabaseSecretKey, { auth: { autoRefreshToken: false, persistSession: false } });
       const { data: userData, error: userErr } = await adminClient.auth.getUser(token);
       if (userErr || !userData?.user?.id) return res.status(401).json({ error: 'Unauthorized user session' });
+
+      if (!userData.user.email_confirmed_at && !userData.user.confirmed_at && !userData.user.user_metadata?.email_verified) {
+        return res.status(403).json({ error: 'Email verification required before uploading media assets' });
+      }
 
       const userId = userData.user.id;
       const { fileBase64, portfolioId, contentType } = req.body || {};

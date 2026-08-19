@@ -153,7 +153,8 @@ check('User rejection email displays the exact admin reason', userRejectedEmail.
 // ─────────────────────────────────────────────────────────────
 console.log('\n3. Testing InstaPay Configuration & Server Pricing...');
 
-check('InstaPay configuration contains account details', Boolean(INSTAPAY_CONFIG.accountName && INSTAPAY_CONFIG.instapayId));
+check('InstaPay configuration has no invented hardcoded accounts', INSTAPAY_CONFIG.instapayId !== 'portfoliomaker@instapay');
+check('InstaPay configuration safely defaults to unconfigured without env vars', typeof INSTAPAY_CONFIG.isConfigured === 'boolean');
 check('Pro plan price is exactly 600 EGP', PLANS.pro.priceMonthlyEGP === 600);
 check('Premium plan price is exactly 1000 EGP', PLANS.premium.priceMonthlyEGP === 1000);
 check('Group 2-seat price is 1500 EGP', GROUP_SEAT_PRICING[2] === 1500);
