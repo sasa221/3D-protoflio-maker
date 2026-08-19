@@ -263,6 +263,12 @@ check('Migration defines status constraint (PENDING, APPROVED, REJECTED, CANCELL
 check('Migration enables RLS on manual_payment_requests', migrationSql.includes('ALTER TABLE public.manual_payment_requests ENABLE ROW LEVEL SECURITY;'));
 check('Migration provisions private payment_proofs storage bucket', migrationSql.includes("VALUES ('payment_proofs', 'payment_proofs', false)"));
 check('Migration enforces user-isolated folder storage RLS for proofs', migrationSql.includes("auth.uid()::text = (storage.foldername(name))[1]"));
+check('Migration contains ZERO invalid CREATE POLICY IF NOT EXISTS', !migrationSql.includes('CREATE POLICY IF NOT EXISTS'));
+check('Migration contains ZERO DROP TABLE statements', !/DROP\s+TABLE/i.test(migrationSql));
+check('Migration contains ZERO DROP COLUMN statements', !/DROP\s+COLUMN/i.test(migrationSql));
+check('Migration contains ZERO TRUNCATE statements', !/TRUNCATE/i.test(migrationSql));
+check('Migration contains ZERO DELETE statements', !/DELETE\s+FROM/i.test(migrationSql));
+check('Migration contains idempotent DROP POLICY IF EXISTS statements', (migrationSql.match(/DROP\s+POLICY\s+IF\s+EXISTS/gi) || []).length === 5);
 
 // ─────────────────────────────────────────────────────────────
 // 5. Serverless Function Count Audit (Limit <= 10, Target 6)
