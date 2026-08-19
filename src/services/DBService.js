@@ -91,11 +91,11 @@ export async function loadUserPortfoliosFromSupabase(user) {
       currentServerUpdatedAt = pRow.updated_at;
       let masterData = pRow.master_profile_json || {};
 
-      // Merge top-level fields
+      const defaultName = user.user_metadata?.full_name || user.user_metadata?.name || 'Your Portfolio';
       masterData.id = pRow.id;
-      masterData.name = pRow.name || masterData.name || 'Candidate Portfolio';
+      masterData.name = pRow.name || masterData.name || defaultName;
       masterData.slug = pRow.slug || 'portfolio';
-      masterData.profession = pRow.profession || masterData.profession || 'Front-End Developer';
+      masterData.profession = pRow.profession || masterData.profession || '';
       masterData.bio = pRow.bio || masterData.bio || '';
       masterData.theme = pRow.theme || masterData.theme || 'code';
       masterData.owner_user_id = pRow.owner_user_id;

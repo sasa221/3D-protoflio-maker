@@ -7,6 +7,7 @@ import { renderAuthPage, renderResetPasswordPage } from './AuthPage.js';
 import { renderAdminPage } from './AdminPage.js';
 import { supabase } from './services/SupabaseClient.js';
 import { isLoggedIn, getCurrentUser, getCurrentAuthUser, isPro, logout, upgradeToPro, isAdmin, redeemPromoCode, subscribeToAuthStateChange, isEmailVerified } from './services/AuthService.js';
+import { openBillingModal } from './ui/BillingModal.js';
 
 window.supabase = supabase;
 window.getCurrentAuthUser = getCurrentAuthUser;
@@ -484,12 +485,39 @@ async function initStudio() {
   try {
     const authUser = await getCurrentAuthUser();
     if (authUser) {
-      await fetchUserProfileAndEntitlements(authUser);
+      const { profile } = await fetchUserProfileAndEntitlements(authUser);
       const cloudPortfolio = await loadUserPortfoliosFromSupabase(authUser);
+
+      // Deterministic Identity Priority:
+      // 1. current authenticated user's profile.display_name
+      // 2. current authenticated user's auth metadata full_name/name
+      // 3. current user's own portfolio personal.name (sanitized from legacy hardcoded strings)
+      // 4. fallback: "Your Portfolio"
+      const isSalehAccount = (authUser.email || '').toLowerCase().includes('saleh');
+      let canonicalName = profile?.display_name || authUser.user_metadata?.full_name || authUser.user_metadata?.name;
+
+      if (!canonicalName) {
+        if (cloudPortfolio?.name && (isSalehAccount || !cloudPortfolio.name.toUpperCase().includes('SALEH MOHAMED'))) {
+          canonicalName = cloudPortfolio.name;
+        } else {
+          canonicalName = 'Your Portfolio';
+        }
+      }
+
       if (cloudPortfolio) {
-        portfolioData = { ...portfolioData, ...cloudPortfolio };
+        // Scrub legacy hardcoded Saleh properties if this account does not belong to Saleh
+        if (!isSalehAccount && cloudPortfolio.name && cloudPortfolio.name.toUpperCase().includes('SALEH MOHAMED')) {
+          cloudPortfolio.name = canonicalName;
+          cloudPortfolio.profession = '';
+          cloudPortfolio.bio = '';
+          cloudPortfolio.education = [];
+          cloudPortfolio.experience = [];
+          cloudPortfolio.projects = [];
+          cloudPortfolio.skills = [];
+        }
+        portfolioData = { ...portfolioData, ...cloudPortfolio, name: canonicalName };
       } else {
-        portfolioData.name = authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'Your Portfolio';
+        portfolioData.name = canonicalName;
         portfolioData.social.email = authUser.email || '';
       }
     }
@@ -2778,133 +2806,15 @@ window.handleLogout = function() {
   }
 };
 
-window.handleUpgradeClick = function() {
-  if (isPro()) return;
-  const user = getCurrentUser();
-  const phone = '201270024222';
-  
-  let currentPrice = 200;
-  let appliedCode = '';
-  let discountPercent = 0;
-
-  const buildWhatsappUrl = () => {
-    let msgText = `أهلاً، حابب أشترك في خطة Pro (InstaPay).\nاسم الحساب: ${user?.name || ''}\nالإيميل: ${user?.email || ''}`;
-    if (appliedCode) {
-      msgText += `\n🏷️ كود الخصم المطبق: ${appliedCode} (${discountPercent}% OFF)\n💰 المبلغ المطلوب تحويله: ${currentPrice} جنيه مصري`;
-    } else {
-      msgText += `\n💰 المبلغ: 200 جنيه مصري`;
-    }
-    return `https://wa.me/${phone}?text=${encodeURIComponent(msgText)}`;
-  };
-
-  const modal = document.createElement('div');
-  modal.id = 'pro-upgrade-modal';
-  modal.style.cssText = `
-    position:fixed;inset:0;z-index:99999;
-    background:rgba(5,5,12,0.85);backdrop-filter:blur(20px);
-    display:flex;align-items:center;justify-content:center;padding:20px;
-    font-family:'Inter',sans-serif;
-  `;
-  modal.innerHTML = `
-    <div style="
-      background:rgba(15,15,30,0.95);border:1px solid rgba(124,58,237,0.3);
-      border-radius:24px;padding:32px 28px;max-width:420px;width:100%;
-      text-align:center;box-shadow:0 30px 60px rgba(0,0,0,0.8);position:relative;
-    ">
-      <button onclick="document.getElementById('pro-upgrade-modal').remove()" style="
-        position:absolute;top:16px;right:16px;background:none;border:none;
-        color:rgba(255,255,255,0.4);font-size:18px;cursor:pointer;
-      ">✕</button>
-      
-      <div style="font-size:3rem;margin-bottom:12px">💎</div>
-      <h3 style="font-size:1.3rem;font-weight:800;margin-bottom:6px;background:linear-gradient(135deg,#7c3aed,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent">
-        الترقية لخطة Pro
-      </h3>
-      <div id="modal-price-display" style="font-size:1.6rem;font-weight:900;color:#10b981;margin-bottom:16px;font-family:'JetBrains Mono',monospace">
-        200 جنيه مصري <span style="font-size:0.8rem;color:rgba(255,255,255,0.4);font-weight:normal">/ مدى الحياة</span>
-      </div>
-
-      <div style="text-align:left;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:16px;margin-bottom:20px;font-size:0.82rem;color:rgba(255,255,255,0.7);line-height:1.8">
-        <div>⚡ <strong>الرفع التلقائي:</strong> موقعك يترفع أوتوماتيك ورابط حي مباشر</div>
-        <div>🎨 <strong>كل الثيمات الـ 3D:</strong> فتح جميع العوالم الـ 11 </div>
-        <div>♾️ <strong>مواقع غير محدودة:</strong> عمل أكثر من بروتوفوليو</div>
-        <div>🚫 <strong>بدون علامة مائية:</strong> مظهر احترافي 100%</div>
-      </div>
-
-      <!-- PROMO CODE INPUT SECTION -->
-      <div style="margin-bottom:16px;display:flex;gap:8px">
-        <input id="input-modal-promo" type="text" placeholder="عندك كود خصم؟" style="
-          flex:1;padding:10px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);
-          border-radius:10px;color:#fff;font-size:0.8rem;outline:none;font-family:'JetBrains Mono',monospace;
-          text-transform:uppercase;
-        "/>
-        <button onclick="handleRedeemPromo()" style="
-          padding:10px 16px;background:rgba(124,58,237,0.2);border:1px solid rgba(124,58,237,0.4);
-          border-radius:10px;color:#fff;font-size:0.8rem;font-weight:700;cursor:pointer;
-        ">تطبيق</button>
-      </div>
-      <div id="modal-promo-msg" style="display:none;font-size:0.75rem;margin-bottom:12px"></div>
-
-      <div style="font-size:0.8rem;color:rgba(255,255,255,0.5);margin-bottom:12px">
-        الدفع عن طريق <strong>InstaPay</strong> عبر تواصل سريع واتساب:
-      </div>
-
-      <a id="modal-wa-link" href="${buildWhatsappUrl()}" target="_blank" onclick="document.getElementById('pro-upgrade-modal').remove()" style="
-        display:flex;align-items:center;justify-content:center;gap:10px;
-        width:100%;padding:14px;background:#25D366;border-radius:12px;
-        color:#fff;font-weight:700;font-size:0.95rem;text-decoration:none;
-        box-shadow:0 10px 25px rgba(37,211,102,0.3);transition:all 0.3s;
-      " onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
-        <span>💬 تواصل واتساب للتفعيل (InstaPay)</span>
-      </a>
-      
-      <div style="font-size:0.7rem;color:rgba(255,255,255,0.25);margin-top:12px">
-        رقم الواتساب: 01270024222
-      </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
-
-  window.handleRedeemPromo = function() {
-    const code = document.getElementById('input-modal-promo')?.value;
-    const msgEl = document.getElementById('modal-promo-msg');
-    const priceDisplay = document.getElementById('modal-price-display');
-    const waLink = document.getElementById('modal-wa-link');
-    if (!code || !msgEl) return;
-
-    const res = redeemPromoCode(code);
-    msgEl.style.display = 'block';
-
-    if (res.success) {
-      msgEl.style.color = '#10b981';
-      msgEl.textContent = res.message;
-      appliedCode = code.trim().toUpperCase();
-      discountPercent = res.discount;
-      currentPrice = res.newPrice || 0;
-
-      if (priceDisplay && res.discount < 100) {
-        priceDisplay.innerHTML = `<span style="text-decoration:line-through;color:rgba(255,255,255,0.3);font-size:1.1rem;margin-right:8px">200 ج.م</span> ${currentPrice} جنيه مصري <span style="font-size:0.8rem;color:rgba(255,255,255,0.4);font-weight:normal">(${discountPercent}% الخصم)</span>`;
-      }
-
-      if (waLink) {
-        waLink.href = buildWhatsappUrl();
-      }
-
-      if (res.discount === 100) {
-        setTimeout(() => {
-          document.getElementById('pro-upgrade-modal')?.remove();
-          document.getElementById('tier-chip').textContent = '💎 PRO';
-          document.getElementById('tier-chip').className = 'tier-chip tier-pro';
-          buildThemeGrid();
-          renderPublishTab();
-          showToast('success', '💎', 'تم تفعيل حسابك كـ Pro بنجاح!');
-        }, 1200);
-      }
-    } else {
-      msgEl.style.color = '#ef4444';
-      msgEl.textContent = res.error;
-    }
-  };
+window.handleUpgradeClick = async function(targetPlanId = null) {
+  const user = await getCurrentAuthUser().catch(() => null);
+  if (!user) {
+    window.location.href = '/login?next=/studio';
+    return;
+  }
+  openBillingModal(user.id, () => {
+    refreshStudioEntitlements({ notify: true });
+  });
 };
 
 // ─── ADMIN DASHBOARD ─────────────────────────

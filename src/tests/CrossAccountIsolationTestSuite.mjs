@@ -202,12 +202,64 @@ check('Step 6 (User A Re-login): User A data restored accurately', currentStudio
 check('Step 6 (User A Re-login): Zero User B contamination', !currentStudioMemory.projects.some(p => p.name === 'Project B1'));
 
 // ─────────────────────────────────────────────────────────────
-// 5. Authoritative Query & IDOR Guard Check
+// 5. Deterministic Identity Resolution Hierarchy
 // ─────────────────────────────────────────────────────────────
-console.log('\n5. Testing DB Query Ownership Guard...');
+console.log('\n5. Testing Deterministic Identity Priority Hierarchy...');
+
+function resolveCanonicalName(authUser, profile, cloudPortfolio) {
+  const isSaleh = (authUser?.email || '').toLowerCase().includes('saleh');
+  let name = profile?.display_name || authUser?.user_metadata?.full_name || authUser?.user_metadata?.name;
+  if (!name) {
+    if (cloudPortfolio?.name && (isSaleh || !cloudPortfolio.name.toUpperCase().includes('SALEH MOHAMED'))) {
+      name = cloudPortfolio.name;
+    } else {
+      name = 'Your Portfolio';
+    }
+  }
+  return name;
+}
+
+// Priority 1: profile.display_name takes top priority
+check('Priority 1: profile.display_name takes top precedence', resolveCanonicalName(
+  { email: 'test@example.com', user_metadata: { full_name: 'Meta Name' } },
+  { display_name: 'Profile Display Name' },
+  { name: 'Portfolio Name' }
+) === 'Profile Display Name');
+
+// Priority 2: authUser user_metadata takes 2nd priority
+check('Priority 2: user_metadata used when profile display_name missing', resolveCanonicalName(
+  { email: 'test@example.com', user_metadata: { full_name: 'Meta Full Name' } },
+  null,
+  { name: 'Portfolio Name' }
+) === 'Meta Full Name');
+
+// Priority 3: cloudPortfolio.name used when auth names missing
+check('Priority 3: portfolio.name used when auth/profile names missing', resolveCanonicalName(
+  { email: 'test@example.com', user_metadata: {} },
+  null,
+  { name: 'My Custom Portfolio' }
+) === 'My Custom Portfolio');
+
+// Priority 4: fallback to "Your Portfolio"
+check('Priority 4: Fallback to "Your Portfolio" when all missing', resolveCanonicalName(
+  { email: 'test@example.com', user_metadata: {} },
+  null,
+  null
+) === 'Your Portfolio');
+
+// Legacy sanitization: legacy Saleh string stripped for non-Saleh user
+check('Legacy Sanitization: Legacy Saleh name stripped for new non-Saleh user', resolveCanonicalName(
+  { email: 'newuser@example.com', user_metadata: {} },
+  null,
+  { name: 'SALEH MOHAMED ABOREHAB Portfolio' }
+) === 'Your Portfolio');
+
+// ─────────────────────────────────────────────────────────────
+// 6. Authoritative Query & IDOR Guard Check
+// ─────────────────────────────────────────────────────────────
+console.log('\n6. Testing DB Query Ownership Guard...');
 
 function mockAuthorizeQuery(requestingUserId, targetPortfolioOwnerId) {
-  // Authoritative RLS check: requesting user must match owner
   return requestingUserId === targetPortfolioOwnerId;
 }
 

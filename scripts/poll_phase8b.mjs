@@ -5,7 +5,7 @@ async function check() {
       const m = html.match(/src="(\/assets\/index-[^"]+\.js)"/);
       const asset = m ? m[1] : 'not found';
       console.log(`[Attempt ${i}/25] Live Asset: ${asset}`);
-      if (asset !== '/assets/index-BILdPQ1W.js' && asset !== '/assets/index-CxJj5vkH.js' && asset !== '/assets/index-DNPaSDcz.js' && asset !== '/assets/index-GCSbVwzy.js' && asset !== '/assets/index-Bo7lm4pa.js') {
+      if (asset !== '/assets/index-BILdPQ1W.js' && asset !== '/assets/index-CxJj5vkH.js' && asset !== '/assets/index-DNPaSDcz.js' && asset !== '/assets/index-GCSbVwzy.js' && asset !== '/assets/index-Bo7lm4pa.js' && asset !== '/assets/index-P70ujDH-.js') {
         console.log(`\n======================================================`);
         console.log(`✅ NEW 8-DIGIT OTP BUNDLE DEPLOYED: ${asset}`);
         console.log(`======================================================\n`);

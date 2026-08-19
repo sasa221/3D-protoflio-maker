@@ -182,7 +182,7 @@ async function openInstaPayModal(planId, onSubscriptionUpdated) {
         <!-- UNCONFIGURED STATE BANNER -->
         <div style="background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.25);border-radius:14px;padding:20px;margin-bottom:20px;text-align:center;">
           <span style="font-size:24px;display:block;margin-bottom:6px;">⚠️</span>
-          <strong style="color:#fde047;font-size:14px;display:block;margin-bottom:6px;">Payment Details Not Configured Yet</strong>
+          <strong style="color:#fde047;font-size:14px;display:block;margin-bottom:6px;">Payment setup is temporarily unavailable.</strong>
           <p style="color:rgba(255,255,255,0.7);font-size:12px;margin:0 0 10px;line-height:1.5;">
             Official InstaPay transfer destination has not been configured by the platform administrator yet.
           </p>
@@ -231,7 +231,7 @@ async function openInstaPayModal(planId, onSubscriptionUpdated) {
       <div id="submission-error" style="display:none;font-size:12px;color:#ef4444;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:10px;margin-bottom:16px;"></div>
 
       <button id="submit-payment-btn" ${!isConfigured ? 'disabled' : ''} style="width:100%;padding:14px;background:${isConfigured ? 'linear-gradient(135deg,#7c3aed,#06b6d4)' : 'rgba(255,255,255,0.1)'};border:none;border-radius:12px;color:#fff;font-size:14px;font-weight:800;cursor:${isConfigured ? 'pointer' : 'not-allowed'};opacity:${isConfigured ? '1' : '0.6'};">
-        ${isConfigured ? '🚀 Submit Payment for Verification' : 'Payment Details Not Configured'}
+        ${isConfigured ? '🚀 Submit Payment for Verification' : 'Payment setup is temporarily unavailable.'}
       </button>
     </div>
   `;
