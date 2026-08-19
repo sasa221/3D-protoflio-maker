@@ -53,11 +53,11 @@ export function generateOtpEmail({ firstName = 'there', otpCode }) {
   const content = `
     <h2 style="margin:0 0 12px;font-size:18px;font-weight:700;color:#ffffff;">Verify your email</h2>
     <p style="margin:0 0 24px;font-size:14px;color:#9ca3af;line-height:1.5;">
-      Hi ${firstName}, use this 6-digit verification code to complete your Portfolio Maker account registration:
+      Hi ${firstName}, enter this verification code to complete your Portfolio Maker account registration:
     </p>
     
     <div style="background-color:#131522;border:1px solid #7c3aed;border-radius:14px;padding:20px;text-align:center;margin-bottom:24px;">
-      <span style="font-family:'Courier New',Courier,monospace;font-size:36px;font-weight:900;letter-spacing:10px;color:#c084fc;">${otpCode}</span>
+      <span style="font-family:'Courier New',Courier,monospace;font-size:32px;font-weight:900;letter-spacing:6px;color:#c084fc;">${otpCode}</span>
     </div>
 
     <p style="margin:0 0 8px;font-size:13px;color:#9ca3af;">

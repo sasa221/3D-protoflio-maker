@@ -78,6 +78,8 @@ console.log('\n============================================================');
 console.log('  PHASE 8B — AUTH, EMAIL & MANUAL BILLING TEST SUITE');
 console.log('============================================================\n');
 
+import { EMAIL_OTP_LENGTH } from '../config/PlanConfig.js';
+
 // ─────────────────────────────────────────────────────────────
 // 1. Central Auth Error Mapper & Email Verification Helper
 // ─────────────────────────────────────────────────────────────
@@ -90,10 +92,10 @@ const errUnconfirmed = mapAuthError(new Error('Email not confirmed'));
 check('Maps unconfirmed email to unverified trigger', errUnconfirmed.type === 'unverified' && errUnconfirmed.userFacing === 'Verify your email to continue.');
 
 const errOtpExpired = mapAuthError(new Error('Token has expired or is invalid'));
-check('Maps expired OTP code cleanly', errOtpExpired.type === 'otp_expired' && errOtpExpired.userFacing === 'This code has expired. Request a new one.');
+check('Maps expired OTP code cleanly to expired message', errOtpExpired.type === 'otp_expired' && errOtpExpired.userFacing === 'This code has expired. Request a new one.');
 
 const errInvalidOtp = mapAuthError(new Error('invalid otp'));
-check('Maps incorrect OTP code cleanly', errInvalidOtp.type === 'invalid_otp' && errInvalidOtp.userFacing === 'That code is incorrect.');
+check('Maps incorrect OTP code cleanly to incorrect message', errInvalidOtp.type === 'invalid_otp' && errInvalidOtp.userFacing === 'That verification code is incorrect.');
 
 const errRateLimit = mapAuthError(new Error('over_email_send_rate_limit'));
 check('Maps rate limiting safely', errRateLimit.type === 'rate_limit' && errRateLimit.userFacing === 'Please wait before requesting another code.');
@@ -105,6 +107,45 @@ check('isEmailVerified detects verified user with email_confirmed_at', isEmailVe
 check('isEmailVerified detects verified user with confirmed_at', isEmailVerified({ confirmed_at: '2026-08-19T10:00:00Z' }) === true);
 check('isEmailVerified rejects unverified user without timestamps', isEmailVerified({ id: 'user_123' }) === false);
 check('isEmailVerified handles null user safely', isEmailVerified(null) === false);
+
+// ─────────────────────────────────────────────────────────────
+// 1.5. Configurable OTP Length Validation (6, 8, 10 digits)
+// ─────────────────────────────────────────────────────────────
+console.log('\n1.5. Testing Configurable OTP Architecture & Validation...');
+
+check('Production EMAIL_OTP_LENGTH is configured to 8 digits', EMAIL_OTP_LENGTH === 8);
+
+function validateOtpInput(input, configuredLength) {
+  if (typeof input !== 'string') return false;
+  const digitsOnly = input.replace(/\D/g, '');
+  return digitsOnly.length === configuredLength && input === digitsOnly;
+}
+
+// 6-digit test
+check('Valid 6-digit code passes 6-digit validator', validateOtpInput('482910', 6) === true);
+check('8-digit code rejected by 6-digit validator without truncation', validateOtpInput('48291083', 6) === false);
+
+// 8-digit test (Production default)
+check('Valid 8-digit code passes 8-digit validator', validateOtpInput('48291083', 8) === true);
+check('Partial 7-digit code rejected by 8-digit validator', validateOtpInput('4829108', 8) === false);
+check('Alphabetic input rejected by 8-digit validator', validateOtpInput('4829108A', 8) === false);
+check('Whitespace-padded code rejected before sanitization', validateOtpInput(' 48291083 ', 8) === false);
+
+// 10-digit test
+check('Valid 10-digit code passes 10-digit validator', validateOtpInput('1234567890', 10) === true);
+check('8-digit code rejected by 10-digit validator', validateOtpInput('48291083', 10) === false);
+
+// Paste simulation: Ensure 8-digit pasted string is extracted cleanly
+function simulatePaste(pasteText, targetLength) {
+  const digits = pasteText.replace(/\D/g, '');
+  if (digits.length >= targetLength) {
+    return digits.slice(0, targetLength);
+  }
+  return null;
+}
+check('Simulated paste of 8-digit code preserves all 8 digits', simulatePaste('48291083', 8) === '48291083');
+check('Simulated paste with spaces preserves all 8 digits', simulatePaste(' 4829 1083 ', 8) === '48291083');
+check('Simulated paste of partial input returns null (denied)', simulatePaste('48291', 8) === null);
 
 // ─────────────────────────────────────────────────────────────
 // 2. Email Templates Generation (Brevo Layouts)

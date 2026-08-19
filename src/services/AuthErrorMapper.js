@@ -40,7 +40,12 @@ export function mapAuthError(err) {
   }
 
   // 3. OTP Code Errors
-  if (msgLower.includes('token has expired') || msgLower.includes('otp expired') || code === 'otp_expired') {
+  if (
+    msgLower.includes('token has expired') ||
+    msgLower.includes('otp expired') ||
+    code === 'otp_expired' ||
+    msgLower.includes('token expired')
+  ) {
     return {
       type: 'otp_expired',
       message: 'This code has expired. Request a new one.',
@@ -52,12 +57,14 @@ export function mapAuthError(err) {
     msgLower.includes('invalid token') ||
     msgLower.includes('token is invalid') ||
     msgLower.includes('invalid otp') ||
-    msgLower.includes('token not found')
+    msgLower.includes('token not found') ||
+    msgLower.includes('incorrect') ||
+    msgLower.includes('wrong code')
   ) {
     return {
       type: 'invalid_otp',
-      message: 'That code is incorrect.',
-      userFacing: 'That code is incorrect.'
+      message: 'That verification code is incorrect.',
+      userFacing: 'That verification code is incorrect.'
     };
   }
 

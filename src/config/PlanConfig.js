@@ -4,6 +4,8 @@
  * Phase 8A — No real payment processing. All prices in EGP.
  */
 
+export const EMAIL_OTP_LENGTH = 8;
+
 export const PLAN_IDS = {
   FREE: 'free',
   PRO: 'pro',

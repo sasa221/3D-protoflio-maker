@@ -10,6 +10,7 @@ import {
 } from './services/AuthService.js';
 import { mapAuthError } from './services/AuthErrorMapper.js';
 import { PLAN_CONFIG } from './services/EntitlementService.js';
+import { EMAIL_OTP_LENGTH } from './config/PlanConfig.js';
 
 function maskEmail(email = '') {
   if (!email || !email.includes('@')) return email;
@@ -158,19 +159,16 @@ export function renderAuthPage(onSuccess) {
       <div style="text-align:center;margin-bottom:24px">
         <h2 style="margin:0 0 8px;font-size:1.3rem;font-weight:800;color:#fff">Verify your email</h2>
         <p style="margin:0;font-size:0.85rem;color:rgba(255,255,255,0.6);line-height:1.4">
-          We sent a 6-digit verification code to<br/>
+          We sent a verification code to<br/>
           <strong id="otp-target-email" style="color:#c084fc"></strong>
         </p>
       </div>
 
-      <!-- 6-Digit OTP Box Grid -->
-      <div style="display:flex;gap:8px;justify-content:center;margin-bottom:20px" id="otp-input-container">
-        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" class="otp-digit" data-index="0" style="${otpBoxStyle()}"/>
-        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" class="otp-digit" data-index="1" style="${otpBoxStyle()}"/>
-        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" class="otp-digit" data-index="2" style="${otpBoxStyle()}"/>
-        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" class="otp-digit" data-index="3" style="${otpBoxStyle()}"/>
-        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" class="otp-digit" data-index="4" style="${otpBoxStyle()}"/>
-        <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" class="otp-digit" data-index="5" style="${otpBoxStyle()}"/>
+      <!-- Configurable OTP Box Grid -->
+      <div style="display:flex;gap:6px;justify-content:center;margin-bottom:20px;flex-wrap:nowrap;" id="otp-input-container">
+        ${Array.from({ length: EMAIL_OTP_LENGTH }, (_, i) => `
+          <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" class="otp-digit" data-index="${i}" style="${otpBoxStyle(EMAIL_OTP_LENGTH)}"/>
+        `).join('')}
       </div>
 
       <div id="otp-status-msg" style="display:none;font-size:0.82rem;border-radius:8px;padding:10px 14px;margin-bottom:16px;text-align:center"></div>
@@ -350,9 +348,9 @@ export function renderAuthPage(onSuccess) {
     const statusMsg = document.getElementById('otp-status-msg');
     const verifyBtn = document.getElementById('otp-verify-btn');
 
-    if (digits.length !== 6) {
+    if (digits.length !== EMAIL_OTP_LENGTH || !/^\d+$/.test(digits)) {
       if (statusMsg) {
-        statusMsg.textContent = 'Please enter the complete 6-digit code.';
+        statusMsg.textContent = `Please enter the complete ${EMAIL_OTP_LENGTH}-digit verification code.`;
         statusMsg.style.color = '#ef4444';
         statusMsg.style.background = 'rgba(239,68,68,0.1)';
         statusMsg.style.border = '1px solid rgba(239,68,68,0.2)';
@@ -405,7 +403,7 @@ export function renderAuthPage(onSuccess) {
     try {
       await resendEmailOtp(currentPendingEmail);
       if (statusMsg) {
-        statusMsg.textContent = 'New 6-digit code sent to your email.';
+        statusMsg.textContent = 'New verification code sent to your email.';
         statusMsg.style.color = '#10b981';
         statusMsg.style.background = 'rgba(16,185,129,0.1)';
         statusMsg.style.border = '1px solid rgba(16,185,129,0.25)';
@@ -494,16 +492,18 @@ export function renderAuthPage(onSuccess) {
   };
 }
 
-function otpBoxStyle() {
+function otpBoxStyle(otpLength = EMAIL_OTP_LENGTH) {
+  const isLarge = otpLength > 6;
   return `
-    width:46px;height:54px;
+    width:${isLarge ? '36px' : '46px'};height:${isLarge ? '48px' : '54px'};
     background:rgba(255,255,255,0.06);
     border:1.5px solid rgba(255,255,255,0.15);
-    border-radius:12px;
-    color:#fff;font-size:1.4rem;
+    border-radius:10px;
+    color:#fff;font-size:${isLarge ? '1.2rem' : '1.4rem'};
     font-weight:800;text-align:center;
     outline:none;font-family:'Courier New',Courier,monospace;
     transition:all 0.2s ease;box-sizing:border-box;
+    padding:0;
   `;
 }
 
@@ -520,9 +520,9 @@ function setupOtpInputHandlers(onSuccess) {
         if (idx < inputs.length - 1) {
           inputs[idx + 1].focus();
         } else {
-          // All 6 entered
+          // All entered
           const fullCode = Array.from(inputs).map(i => i.value).join('');
-          if (fullCode.length === 6) {
+          if (fullCode.length === EMAIL_OTP_LENGTH && /^\d+$/.test(fullCode)) {
             window.authDoVerifyOtp();
           }
         }
@@ -539,8 +539,10 @@ function setupOtpInputHandlers(onSuccess) {
       input.addEventListener('paste', (e) => {
         e.preventDefault();
         const pasteData = (e.clipboardData || window.clipboardData).getData('text').trim();
-        if (/^\d{6}$/.test(pasteData)) {
-          pasteData.split('').forEach((char, i) => {
+        const digitsOnly = pasteData.replace(/\D/g, '');
+        if (digitsOnly.length >= EMAIL_OTP_LENGTH) {
+          const targetDigits = digitsOnly.slice(0, EMAIL_OTP_LENGTH);
+          targetDigits.split('').forEach((char, i) => {
             if (inputs[i]) inputs[i].value = char;
           });
           inputs[inputs.length - 1].focus();

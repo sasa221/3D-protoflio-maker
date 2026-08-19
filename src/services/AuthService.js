@@ -96,7 +96,7 @@ export async function requestPasswordReset(email) {
 }
 
 export async function verifyEmailOtp(email, token) {
-  if (!email || !token) throw new Error('Email and 6-digit verification code are required.');
+  if (!email || !token) throw new Error('Email and verification code are required.');
 
   // Try signup type first
   let result = await supabase.auth.verifyOtp({
