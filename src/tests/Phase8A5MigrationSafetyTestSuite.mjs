@@ -90,6 +90,13 @@ assert(/CREATE\s+INDEX\s+IF\s+NOT\s+EXISTS\s+idx_portfolio_creation_history_user
 assert(/CREATE\s+INDEX\s+IF\s+NOT\s+EXISTS\s+idx_groups_owner/i.test(migrationSQL), 'groups owner index present');
 assert(/CREATE\s+INDEX\s+IF\s+NOT\s+EXISTS\s+idx_audit_log_created/i.test(migrationSQL), 'audit log created_at index present');
 
+// Security Definer function hardening
+assert(/SECURITY\s+DEFINER\s+SET\s+search_path\s*=\s*''/i.test(migrationSQL), 'SECURITY DEFINER functions use hardened empty search_path');
+assert(/REVOKE\s+ALL\s+ON\s+FUNCTION\s+public\.is_group_member/i.test(migrationSQL), 'REVOKE ALL from PUBLIC on is_group_member');
+assert(/REVOKE\s+ALL\s+ON\s+FUNCTION\s+public\.is_group_owner/i.test(migrationSQL), 'REVOKE ALL from PUBLIC on is_group_owner');
+assert(/GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.is_group_member[^\n]+TO\s+authenticated,\s*service_role/i.test(migrationSQL), 'Restricted GRANT on is_group_member');
+assert(/GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.is_group_owner[^\n]+TO\s+authenticated,\s*service_role/i.test(migrationSQL), 'Restricted GRANT on is_group_owner');
+
 // ─── 2. LEGACY TRANSITION & THEME GRANDFATHERING ───────────────
 console.log('\n2. Testing legacy transition & theme grandfathering...');
 

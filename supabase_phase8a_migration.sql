@@ -157,11 +157,12 @@ CREATE POLICY "Users can view own creation history"
   USING (auth.uid() = user_id);
 
 -- Helper functions to prevent recursive RLS evaluation between groups and group_members
+-- Hardened: empty search_path, fully-qualified schema tables, restricted EXECUTE grants
 CREATE OR REPLACE FUNCTION public.is_group_member(check_group_id TEXT, check_user_id UUID)
 RETURNS BOOLEAN
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 STABLE
 AS $$
   SELECT EXISTS (
@@ -172,11 +173,14 @@ AS $$
   );
 $$;
 
+REVOKE ALL ON FUNCTION public.is_group_member(TEXT, UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_group_member(TEXT, UUID) TO authenticated, service_role;
+
 CREATE OR REPLACE FUNCTION public.is_group_owner(check_group_id TEXT, check_user_id UUID)
 RETURNS BOOLEAN
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 STABLE
 AS $$
   SELECT EXISTS (
@@ -185,6 +189,9 @@ AS $$
     AND g.owner_user_id = check_user_id
   );
 $$;
+
+REVOKE ALL ON FUNCTION public.is_group_owner(TEXT, UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_group_owner(TEXT, UUID) TO authenticated, service_role;
 
 -- Groups: owner can manage, members can view
 DROP POLICY IF EXISTS "Group owners can manage own groups" ON public.groups;
