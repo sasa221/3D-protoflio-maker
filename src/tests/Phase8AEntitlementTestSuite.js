@@ -58,10 +58,10 @@ assert(PLANS.premium_group.portfolioPolicy === 'rolling_cooldown', 'Premium Grou
 
 section('PLAN CONFIG — Group Pricing');
 
-assert(GROUP_SEAT_PRICING[2] === 1500, 'Group 2 users = 1,500 EGP');
-assert(GROUP_SEAT_PRICING[3] === 1800, 'Group 3 users = 1,800 EGP');
-assert(GROUP_SEAT_PRICING[4] === 2200, 'Group 4 users = 2,200 EGP');
-assert(GROUP_SEAT_PRICING[5] === 2800, 'Group 5 users = 2,800 EGP');
+assert(GROUP_SEAT_PRICING[2] === 1800, 'Group 2 users = 1,800 EGP');
+assert(GROUP_SEAT_PRICING[3] === 2550, 'Group 3 users = 2,550 EGP');
+assert(GROUP_SEAT_PRICING[4] === 3200, 'Group 4 users = 3,200 EGP');
+assert(GROUP_SEAT_PRICING[5] === 3750, 'Group 5 users = 3,750 EGP');
 assert(GROUP_SEAT_MIN === 2, 'Min seats = 2');
 assert(GROUP_SEAT_MAX === 5, 'Max seats = 5');
 

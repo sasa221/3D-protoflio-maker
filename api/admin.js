@@ -326,12 +326,14 @@ export default async function handler(req, res) {
       subscriptionsRes,
       portfoliosRes,
       groupsRes,
-      keepLivesRes
+      keepLivesRes,
+      paymentsRes
     ] = await Promise.all([
-      context.admin.from('subscriptions').select('user_id,plan_id,status,current_period_end,grace_ends_at,metadata,group_id'),
+      context.admin.from('subscriptions').select('user_id,plan_id,status,current_period_start,current_period_end,grace_ends_at,metadata,group_id,created_at,updated_at'),
       context.admin.from('portfolios').select('id,owner_user_id,name,slug,theme,published_at,is_finalized,created_at'),
       context.admin.from('groups').select('id,owner_user_id,seat_limit,status'),
-      context.admin.from('keep_live_entitlements').select('id,user_id,portfolio_id,status')
+      context.admin.from('keep_live_entitlements').select('id,user_id,portfolio_id,status'),
+      context.admin.from('manual_payment_requests').select('id,user_id,plan_id,expected_amount_egp,payment_method,status,reviewed_at,created_at,group_seats').order('created_at', { ascending: false })
     ]);
 
     const subsMap = new Map((subscriptionsRes.data || []).map(s => [s.user_id, s]));
@@ -344,22 +346,80 @@ export default async function handler(req, res) {
 
     const groupsByOwner = new Map((groupsRes.data || []).map(g => [g.owner_user_id, g]));
     const kilByUser = new Map((keepLivesRes.data || []).map(k => [k.user_id, k]));
+    
+    // Map latest payment request per user
+    const paymentsByUser = new Map();
+    (paymentsRes.data || []).forEach(pmt => {
+      if (!paymentsByUser.has(pmt.user_id)) {
+        paymentsByUser.set(pmt.user_id, pmt);
+      }
+    });
+
+    const now = Date.now();
 
     const users = usersList.map(profile => {
       const sub = subsMap.get(profile.id) || { plan_id: 'free', status: 'active' };
       const userPfs = pfsByUser.get(profile.id) || [];
       const hostedPfs = userPfs.filter(p => Boolean(p.published_at));
-      const isLegacy = sub.metadata?.legacy_access === true || (profile.createdAt ? new Date(profile.createdAt) < new Date('2026-08-01T00:00:00Z') : false);
-      
+      const isLegacy = Boolean(sub.metadata?.legacy_access === true || (profile.createdAt ? new Date(profile.createdAt) < new Date('2026-08-01T00:00:00Z') : false));
+      const latestPayment = paymentsByUser.get(profile.id);
+
+      const rawPlan = sub.plan_id || 'free';
+      const periodStart = sub.current_period_start || sub.metadata?.period_start || latestPayment?.reviewed_at || null;
+      const periodEnd = sub.current_period_end || null;
+
+      let daysRemaining = null;
+      let isExpired = false;
+      let isExpiringSoon = false;
+
+      if (rawPlan !== 'free' && periodEnd) {
+        const endMs = new Date(periodEnd).getTime();
+        if (!isNaN(endMs)) {
+          const diffMs = endMs - now;
+          daysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+          if (diffMs <= 0) {
+            isExpired = true;
+          } else if (daysRemaining <= 7) {
+            isExpiringSoon = true;
+          }
+        }
+      }
+
+      const effectivePlan = isExpired ? 'free' : rawPlan;
+      let displayStatus = 'FREE';
+      if (rawPlan !== 'free') {
+        if (isExpired) displayStatus = 'EXPIRED';
+        else if (isExpiringSoon) displayStatus = 'EXPIRING SOON';
+        else displayStatus = (sub.status || 'ACTIVE').toUpperCase();
+      }
+
+      const amountPaid = latestPayment?.expected_amount_egp
+        ? `${latestPayment.expected_amount_egp.toLocaleString()} EGP`
+        : (sub.metadata?.amount_paid || sub.metadata?.amount_egp ? `${Number(sub.metadata.amount_paid || sub.metadata.amount_egp).toLocaleString()} EGP` : '—');
+
       return {
         ...profile,
         name: profile.name || profile.display_name || profile.email?.split('@')[0] || 'User',
         email: profile.email || '',
-        plan: sub.plan_id || 'free',
+        plan: effectivePlan,
+        rawPlan,
         status: sub.status || 'active',
+        displayStatus,
+        periodStart,
+        periodEnd,
+        daysRemaining,
+        isExpired,
+        isExpiringSoon,
+        billingPeriod: sub.plan_id === 'keep_it_live' ? 'Annual' : (rawPlan !== 'free' ? 'Monthly' : '—'),
+        subscriptionSource: sub.metadata?.source ? sub.metadata.source.toUpperCase() : (rawPlan !== 'free' ? 'INSTAPAY' : 'FREE'),
+        amountPaid,
+        autoRenewal: false,
+        lastPaymentDate: latestPayment?.reviewed_at || sub.metadata?.approved_at || null,
+        paymentRequestId: latestPayment?.id || sub.metadata?.payment_request_id || '—',
+        isLegacy,
+        legacyExemption: isLegacy ? 'GRANDFATHERED' : 'NONE',
         portfolioCount: userPfs.length,
         hostedCount: hostedPfs.length,
-        isLegacy,
         hasKIL: Boolean(kilByUser.get(profile.id)),
         groupInfo: groupsByOwner.get(profile.id) || null
       };
@@ -403,7 +463,6 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ portfolios: enriched });
   }
-
 
   // 4. Groups List
   if (req.method === 'GET' && action === 'groups') {
@@ -454,7 +513,7 @@ export default async function handler(req, res) {
         free: '0 EGP',
         pro: '600 EGP/month',
         premium: '1,000 EGP/month',
-        group: { 2: '1,500 EGP', 3: '1,800 EGP', 4: '2,200 EGP', 5: '2,800 EGP' },
+        group: { 2: '1,800 EGP', 3: '2,550 EGP', 4: '3,200 EGP', 5: '3,750 EGP' },
         keepItLive: '500 EGP/year/portfolio'
       },
       readOnlyNotice: 'READ ONLY: Feature flags and pricing are server/deployment authoritative.'
@@ -463,14 +522,29 @@ export default async function handler(req, res) {
 
   // ─── AUDITED WRITE ACTIONS ────────────────────────────────────────
 
-  // 8. Manual Plan Override (Audited)
+  // 8. Manual Plan Override (Audited with Duration)
   if (req.method === 'POST' && action === 'user-plan-override') {
-    const { userId, targetPlanId, status, expiryDate, reason } = req.body || {};
+    const { userId, targetPlanId, status, durationDays, startDate, endDate, groupSeats, reason } = req.body || {};
     if (!userId || !VALID_PLANS.includes(targetPlanId)) {
       return res.status(400).json({ error: `Valid userId and targetPlanId required. Allowed plans: ${VALID_PLANS.join(', ')}` });
     }
     if (!reason || String(reason).trim().length < 3) {
       return res.status(400).json({ error: 'A mandatory audit reason (minimum 3 characters) is required for plan overrides.' });
+    }
+
+    const now = new Date();
+    let calculatedStart = null;
+    let calculatedEnd = null;
+
+    if (targetPlanId !== 'free') {
+      if (startDate && endDate) {
+        calculatedStart = new Date(startDate).toISOString();
+        calculatedEnd = new Date(endDate).toISOString();
+      } else {
+        const days = Number(durationDays) || 30;
+        calculatedStart = now.toISOString();
+        calculatedEnd = new Date(now.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+      }
     }
 
     const { data: existingSub } = await context.admin.from('subscriptions').select('*').eq('user_id', userId).maybeSingle();
@@ -481,20 +555,33 @@ export default async function handler(req, res) {
       user_id: userId,
       plan_id: targetPlanId,
       status: VALID_STATUSES.includes(status) ? status : 'active',
-      current_period_end: expiryDate || existingSub?.current_period_end || null,
+      current_period_start: calculatedStart,
+      current_period_end: calculatedEnd,
       metadata: {
         ...(existingSub?.metadata || {}),
         source: 'admin_override',
+        duration_days: durationDays || (calculatedStart && calculatedEnd ? Math.round((new Date(calculatedEnd) - new Date(calculatedStart)) / 86400000) : null),
         overridden_by: context.user.id,
         overridden_by_email: context.user.email,
         override_reason: reason.trim(),
-        overridden_at: new Date().toISOString()
+        overridden_at: now.toISOString()
       },
-      updated_at: new Date().toISOString()
+      updated_at: now.toISOString()
     };
 
     const { error } = await context.admin.from('subscriptions').upsert(updateData, { onConflict: 'user_id' });
     if (error) return res.status(500).json({ error: error.message });
+
+    if (targetPlanId === 'premium_group') {
+      const seats = Number(groupSeats) || 2;
+      await context.admin.from('groups').upsert([{
+        owner_user_id: userId,
+        seat_limit: seats,
+        plan_type: 'premium_group',
+        status: 'active',
+        updated_at: now.toISOString()
+      }], { onConflict: 'owner_user_id' });
+    }
 
     await writeAuditLog(
       context.admin,
@@ -502,12 +589,19 @@ export default async function handler(req, res) {
       userId,
       'PLAN_OVERRIDE',
       { plan: prevPlan, status: prevStatus },
-      { plan: targetPlanId, status: updateData.status, expiryDate },
+      { plan: targetPlanId, status: updateData.status, periodStart: calculatedStart, periodEnd: calculatedEnd },
       reason,
-      { source: 'admin_control_center' }
+      { source: 'admin_control_center', durationDays, startDate: calculatedStart, endDate: calculatedEnd }
     );
 
-    return res.status(200).json({ success: true, userId, planId: targetPlanId, status: updateData.status });
+    return res.status(200).json({
+      success: true,
+      userId,
+      planId: targetPlanId,
+      status: updateData.status,
+      periodStart: calculatedStart,
+      periodEnd: calculatedEnd
+    });
   }
 
   // 9. Portfolio Hosting Override (Audited)
@@ -734,45 +828,70 @@ export default async function handler(req, res) {
     const { data: profile } = await context.admin.from('profiles').select('email,display_name').eq('id', request.user_id).maybeSingle();
     const userEmail = profile?.email;
     const userName = profile?.display_name || userEmail?.split('@')[0] || 'Member';
-    const now = new Date().toISOString();
+    const now = new Date();
+    const nowISO = now.toISOString();
 
     if (decision === 'APPROVED') {
       // 1. Mark request APPROVED
       await context.admin.from('manual_payment_requests').update({
         status: 'APPROVED',
         reviewed_by: context.user.id,
-        reviewed_at: now,
-        updated_at: now
+        reviewed_at: nowISO,
+        updated_at: nowISO
       }).eq('id', requestId);
 
-      // 2. Activate Subscription
+      // 2. Fetch existing subscription for authoritative renewal calculation (Task 6)
+      const { data: existingSub } = await context.admin.from('subscriptions').select('*').eq('user_id', request.user_id).maybeSingle();
       const periodDays = request.plan_id === 'keep_it_live' ? 365 : 30;
-      const periodEnd = new Date(Date.now() + periodDays * 24 * 60 * 60 * 1000).toISOString();
+
+      let newPeriodStart;
+      let newPeriodEnd;
+
+      const existingEnd = existingSub?.current_period_end ? new Date(existingSub.current_period_end) : null;
+
+      // If existing subscription is ACTIVE/GRACE and period_end > NOW (still has remaining days)
+      if (existingSub && (existingSub.status === 'active' || existingSub.status === 'grace') && existingEnd && existingEnd.getTime() > now.getTime()) {
+        // Renewal before expiry: keep original start, extend from existing expiry date
+        newPeriodStart = existingSub.current_period_start || existingSub.created_at || nowISO;
+        newPeriodEnd = new Date(existingEnd.getTime() + periodDays * 24 * 60 * 60 * 1000).toISOString();
+      } else {
+        // Renewal after expiry or brand new subscription: starts from current server time
+        newPeriodStart = nowISO;
+        newPeriodEnd = new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000).toISOString();
+      }
+
+      const seats = request.plan_id === 'premium_group' ? (Number(request.group_seats) || 2) : null;
 
       await context.admin.from('subscriptions').upsert([{
         user_id: request.user_id,
         plan_id: request.plan_id === 'keep_it_live' ? 'free' : request.plan_id,
         status: 'active',
-        current_period_end: periodEnd,
+        current_period_start: newPeriodStart,
+        current_period_end: newPeriodEnd,
         metadata: {
           source: 'manual_instapay',
+          subscription_source: 'INSTAPAY',
+          payment_method: 'INSTAPAY',
           payment_request_id: requestId,
-          approved_by: context.user.id,
+          amount_paid: request.expected_amount_egp,
           amount_egp: request.expected_amount_egp,
-          approved_at: now
+          auto_renew: false,
+          autoRenewal: false,
+          seat_count: seats,
+          approved_by: context.user.id,
+          approved_at: nowISO
         },
-        updated_at: now
+        updated_at: nowISO
       }], { onConflict: 'user_id' });
 
       // Handle Group
       if (request.plan_id === 'premium_group') {
-        const seats = Number(request.group_seats) || 2;
         await context.admin.from('groups').upsert([{
           owner_user_id: request.user_id,
-          seat_limit: seats,
+          seat_limit: seats || 2,
           plan_type: 'premium_group',
           status: 'active',
-          updated_at: now
+          updated_at: nowISO
         }], { onConflict: 'owner_user_id' });
       }
 
@@ -782,9 +901,9 @@ export default async function handler(req, res) {
           portfolio_id: request.portfolio_id,
           user_id: request.user_id,
           status: 'active',
-          starts_at: now,
-          expires_at: periodEnd,
-          updated_at: now
+          starts_at: newPeriodStart,
+          expires_at: newPeriodEnd,
+          updated_at: nowISO
         }], { onConflict: 'portfolio_id' });
       }
 

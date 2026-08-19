@@ -258,10 +258,10 @@ export function adminGetSystemInfo() {
   return adminRequest('/api/admin?action=system');
 }
 
-export function adminOverrideUserPlan({ userId, targetPlanId, status = 'active', expiryDate = null, reason }) {
+export function adminOverrideUserPlan({ userId, targetPlanId, status = 'active', durationDays = 30, startDate = null, endDate = null, groupSeats = 2, expiryDate = null, reason }) {
   return adminRequest('/api/admin?action=user-plan-override', {
     method: 'POST',
-    body: JSON.stringify({ userId, targetPlanId, status, expiryDate, reason })
+    body: JSON.stringify({ userId, targetPlanId, status, durationDays, startDate, endDate, groupSeats, expiryDate, reason })
   });
 }
 

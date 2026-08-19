@@ -208,11 +208,19 @@ function runTestSuite(mode = 'OFF') {
   assert(memberACooldown.allowed === false, 'Group Member A on cooldown is DENIED');
   assert(memberBCooldown.allowed === true, 'Group Member B without recent creation is ALLOWED (Independent cooldown)');
 
-  // Seat Pricing check
-  assert(GROUP_SEAT_PRICING[2] === 1500, 'Group seat price for 2 = 1,500 EGP');
-  assert(GROUP_SEAT_PRICING[3] === 1800, 'Group seat price for 3 = 1,800 EGP');
-  assert(GROUP_SEAT_PRICING[4] === 2200, 'Group seat price for 4 = 2,200 EGP');
-  assert(GROUP_SEAT_PRICING[5] === 2800, 'Group seat price for 5 = 2,800 EGP');
+  // Group seat pricing table
+  assert(GROUP_SEAT_PRICING[2] === 1800, 'Group seat price for 2 = 1,800 EGP');
+  assert(GROUP_SEAT_PRICING[3] === 2550, 'Group seat price for 3 = 2,550 EGP');
+  assert(GROUP_SEAT_PRICING[4] === 3200, 'Group seat price for 4 = 3,200 EGP');
+  assert(GROUP_SEAT_PRICING[5] === 3750, 'Group seat price for 5 = 3,750 EGP');
+  assert(GROUP_SEAT_MIN === 2, 'GROUP_SEAT_MIN === 2');
+  assert(GROUP_SEAT_MAX === 5, 'GROUP_SEAT_MAX === 5');
+  assert(getGroupPrice(2) === 1800, 'getGroupPrice(2) === 1800');
+  assert(getGroupPrice(3) === 2550, 'getGroupPrice(3) === 2550');
+  assert(getGroupPrice(4) === 3200, 'getGroupPrice(4) === 3200');
+  assert(getGroupPrice(5) === 3750, 'getGroupPrice(5) === 3750');
+  assert(getGroupPrice(1) === null, 'getGroupPrice(1) === null (invalid seat count)');
+  assert(getGroupPrice(6) === null, 'getGroupPrice(6) === null (invalid seat count)');
 
   // 5. KEEP IT LIVE TESTS
   const kilUser = new EntitlementService();

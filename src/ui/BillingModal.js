@@ -230,9 +230,9 @@ function buildPlanCard(planId, currentPlan, targetPlan = null, selectedGroupSeat
 
   const benefits = benefitsMap[planId] || [];
 
-  // Price Calculation
+  // Price Calculation & Display
   let priceNumberHTML = '0';
-  let periodHTML = '';
+  let periodHTML = '<span style="font-size: 0.8rem; font-weight: 500; color: rgba(255,255,255,0.6);"> /month</span>';
   let seatSelectorHTML = '';
 
   if (isFree) {
@@ -245,7 +245,7 @@ function buildPlanCard(planId, currentPlan, targetPlan = null, selectedGroupSeat
     priceNumberHTML = '1,000';
     periodHTML = '<span style="font-size: 0.8rem; font-weight: 500; color: rgba(255,255,255,0.6);"> /month</span>';
   } else if (isGroup) {
-    const activePrice = GROUP_SEAT_PRICING[selectedGroupSeats] || 1500;
+    const activePrice = GROUP_SEAT_PRICING[selectedGroupSeats] || 1800;
     priceNumberHTML = `<span id="group-card-price-val">${formatEGP(activePrice)}</span>`;
     periodHTML = '<span style="font-size: 0.8rem; font-weight: 500; color: rgba(255,255,255,0.6);"> /month</span>';
 
@@ -253,10 +253,10 @@ function buildPlanCard(planId, currentPlan, targetPlan = null, selectedGroupSeat
       <div style="margin: 12px 0 6px 0;">
         <label style="font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.6); display: block; margin-bottom: 4px;">Select Team Seats:</label>
         <select id="card-group-seats-select" style="width: 100%; background: #121320; border: 1px solid rgba(255,255,255,0.2); padding: 7px 10px; border-radius: 8px; color: #fff; font-size: 12px; font-weight: 600; outline: none; cursor: pointer;">
-          <option value="2" ${selectedGroupSeats === 2 ? 'selected' : ''}>2 Users — 1,500 EGP/mo</option>
-          <option value="3" ${selectedGroupSeats === 3 ? 'selected' : ''}>3 Users — 1,800 EGP/mo</option>
-          <option value="4" ${selectedGroupSeats === 4 ? 'selected' : ''}>4 Users — 2,200 EGP/mo</option>
-          <option value="5" ${selectedGroupSeats === 5 ? 'selected' : ''}>5 Users — 2,800 EGP/mo</option>
+          <option value="2" ${selectedGroupSeats === 2 ? 'selected' : ''}>2 Users — 1,800 EGP/mo</option>
+          <option value="3" ${selectedGroupSeats === 3 ? 'selected' : ''}>3 Users — 2,550 EGP/mo</option>
+          <option value="4" ${selectedGroupSeats === 4 ? 'selected' : ''}>4 Users — 3,200 EGP/mo</option>
+          <option value="5" ${selectedGroupSeats === 5 ? 'selected' : ''}>5 Users — 3,750 EGP/mo</option>
         </select>
       </div>
     `;
@@ -354,7 +354,7 @@ async function renderInstaPayView(planId, onSubscriptionUpdated, previousPlan, p
   let baseAmount = plan.priceMonthlyEGP || 600;
   let groupSeats = groupSeatsCount || 2;
   if (planId === 'premium_group') {
-    baseAmount = GROUP_SEAT_PRICING[groupSeats] || 1500;
+    baseAmount = GROUP_SEAT_PRICING[groupSeats] || 1800;
   }
 
   const paymentConfig = await getPublicPaymentConfig().catch(() => ({ configured: false }));
@@ -444,10 +444,10 @@ async function renderInstaPayView(planId, onSubscriptionUpdated, previousPlan, p
         <div style="margin-bottom:16px;">
           <label style="font-size:12px;color:rgba(255,255,255,0.7);display:block;margin-bottom:6px;">Select Group Seats (2–5 members):</label>
           <select id="group-seats-select" style="width:100%;background:#141624;border:1px solid rgba(255,255,255,0.2);padding:10px;border-radius:10px;color:#fff;font-size:13px;outline:none;">
-            <option value="2" ${groupSeats === 2 ? 'selected' : ''}>2 Seats — 1,500 EGP/month</option>
-            <option value="3" ${groupSeats === 3 ? 'selected' : ''}>3 Seats — 1,800 EGP/month</option>
-            <option value="4" ${groupSeats === 4 ? 'selected' : ''}>4 Seats — 2,200 EGP/month</option>
-            <option value="5" ${groupSeats === 5 ? 'selected' : ''}>5 Seats — 2,800 EGP/month</option>
+            <option value="2" ${groupSeats === 2 ? 'selected' : ''}>2 Seats — 1,800 EGP/month</option>
+            <option value="3" ${groupSeats === 3 ? 'selected' : ''}>3 Seats — 2,550 EGP/month</option>
+            <option value="4" ${groupSeats === 4 ? 'selected' : ''}>4 Seats — 3,200 EGP/month</option>
+            <option value="5" ${groupSeats === 5 ? 'selected' : ''}>5 Seats — 3,750 EGP/month</option>
           </select>
         </div>
       ` : ''}
@@ -578,7 +578,7 @@ async function renderInstaPayView(planId, onSubscriptionUpdated, previousPlan, p
   const seatsSelect = modalContainer.querySelector('#group-seats-select');
   seatsSelect?.addEventListener('change', () => {
     groupSeats = Number(seatsSelect.value);
-    baseAmount = GROUP_SEAT_PRICING[groupSeats] || 1500;
+    baseAmount = GROUP_SEAT_PRICING[groupSeats] || 1800;
     updatePriceDisplay();
   });
 

@@ -47,9 +47,15 @@ export default async function handler(req, res) {
       const { data: sub } = await adminClient.from('subscriptions').select('*').eq('user_id', userId).maybeSingle();
       const plan = sub?.plan_id || 'free';
       const status = sub?.status || 'active';
+      const periodEnd = sub?.current_period_end ? new Date(sub.current_period_end) : null;
+      const now = new Date();
 
       let effectivePlan = plan;
-      if (status !== 'active' && status !== 'grace' && status !== 'canceling') effectivePlan = 'free';
+      if (status !== 'active' && status !== 'grace' && status !== 'canceling') {
+        effectivePlan = 'free';
+      } else if (plan !== 'free' && periodEnd && !isNaN(periodEnd.getTime()) && periodEnd.getTime() <= now.getTime()) {
+        effectivePlan = 'free';
+      }
 
       // Check group membership
       if (effectivePlan === 'free') {

@@ -33,13 +33,13 @@ console.log('1. Testing Plan pricing normalization & zero undefined .toLocaleStr
 assert(PLANS.free.priceMonthlyEGP === 0, 'Free price is 0 EGP');
 assert(PLANS.pro.priceMonthlyEGP === 600, 'Pro price is 600 EGP');
 assert(PLANS.premium.priceMonthlyEGP === 1000, 'Premium price is 1,000 EGP');
-assert(PLANS.premium_group.priceMonthlyEGP === 1500, 'Premium Group starting price is 1,500 EGP');
+assert(PLANS.premium_group.priceMonthlyEGP === 1800, 'Premium Group starting price is 1,800 EGP');
 
 // Group seat pricing
-assert(GROUP_SEAT_PRICING[2] === 1500, 'Group 2 seats = 1,500 EGP');
-assert(GROUP_SEAT_PRICING[3] === 1800, 'Group 3 seats = 1,800 EGP');
-assert(GROUP_SEAT_PRICING[4] === 2200, 'Group 4 seats = 2,200 EGP');
-assert(GROUP_SEAT_PRICING[5] === 2800, 'Group 5 seats = 2,800 EGP');
+assert(GROUP_SEAT_PRICING[2] === 1800, 'Group 2 seats = 1,800 EGP');
+assert(GROUP_SEAT_PRICING[3] === 2550, 'Group 3 seats = 2,550 EGP');
+assert(GROUP_SEAT_PRICING[4] === 3200, 'Group 4 seats = 3,200 EGP');
+assert(GROUP_SEAT_PRICING[5] === 3750, 'Group 5 seats = 3,750 EGP');
 
 // Safe formatters
 assert(formatEGP(undefined) === '0', 'formatEGP(undefined) does not crash and returns "0"');
@@ -154,10 +154,10 @@ assert(CTAS.premium_group === 'Choose Group', 'Group CTA is "Choose Group"');
 
 // Group seat dynamic calculation
 [
-  { seats: 2, price: 1500 },
-  { seats: 3, price: 1800 },
-  { seats: 4, price: 2200 },
-  { seats: 5, price: 2800 }
+  { seats: 2, price: 1800 },
+  { seats: 3, price: 2550 },
+  { seats: 4, price: 3200 },
+  { seats: 5, price: 3750 }
 ].forEach(({ seats, price }) => {
   assert(GROUP_SEAT_PRICING[seats] === price, `Group ${seats} seats price = ${price} EGP`);
 });

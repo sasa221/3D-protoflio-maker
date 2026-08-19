@@ -314,10 +314,13 @@ function renderUsersTab(users) {
         <thead>
           <tr style="border-bottom:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);font-size:11px;text-transform:uppercase;letter-spacing:1px">
             <th style="padding:14px 16px">User / Identity</th>
-            <th style="padding:14px">Effective Plan</th>
+            <th style="padding:14px">Plan</th>
             <th style="padding:14px">Status</th>
+            <th style="padding:14px">Started</th>
+            <th style="padding:14px">Expires</th>
+            <th style="padding:14px">Days Left</th>
             <th style="padding:14px">Portfolios</th>
-            <th style="padding:14px">Legacy Access</th>
+            <th style="padding:14px">Legacy Exemption</th>
             <th style="padding:14px">Joined</th>
             <th style="padding:14px 16px;text-align:right">Action</th>
           </tr>
@@ -331,18 +334,37 @@ function renderUsersTab(users) {
 
 function renderUserRows(users) {
   if (!users.length) {
-    return `<tr><td colspan="7" style="padding:32px;text-align:center;color:rgba(255,255,255,0.4)">No matching user accounts found.</td></tr>`;
+    return `<tr><td colspan="10" style="padding:32px;text-align:center;color:rgba(255,255,255,0.4)">No matching user accounts found.</td></tr>`;
   }
   return users.map(u => {
     const name = u.name || u.display_name || u.email?.split('@')[0] || 'User';
     const email = u.email || 'No email';
-    const plan = (u.plan || 'free').toLowerCase();
-    const status = u.status || 'active';
+    const rawPlan = (u.rawPlan || u.plan || 'free').toLowerCase();
+    const effectivePlan = (u.plan || 'free').toLowerCase();
+
+    // Status Badge Logic
+    const displayStatus = u.displayStatus || (effectivePlan === 'free' ? 'FREE' : (u.status || 'active').toUpperCase());
+    let statusBadgeColor = 'background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(255,255,255,0.1)';
+    if (displayStatus === 'ACTIVE') {
+      statusBadgeColor = 'background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3)';
+    } else if (displayStatus === 'EXPIRING SOON') {
+      statusBadgeColor = 'background:rgba(245,158,11,0.2);color:#fbbf24;border:1px solid rgba(245,158,11,0.4)';
+    } else if (displayStatus === 'EXPIRED') {
+      statusBadgeColor = 'background:rgba(239,68,68,0.2);color:#f87171;border:1px solid rgba(239,68,68,0.4)';
+    }
+
     const portfolioCount = u.portfolioCount ?? u.portfolios_count ?? 0;
     const hostedCount = u.hostedCount ?? u.hosted_count ?? 0;
     const isLegacy = Boolean(u.isLegacy ?? u.is_legacy);
+    const legacyExemptionText = isLegacy ? 'GRANDFATHERED' : 'NONE';
+    const legacyColor = isLegacy ? '#38bdf8' : 'rgba(255,255,255,0.3)';
+
+    const startedStr = u.periodStart ? new Date(u.periodStart).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+    const expiresStr = u.periodEnd ? new Date(u.periodEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+    const daysLeftStr = u.daysRemaining !== null && u.daysRemaining !== undefined ? `${u.daysRemaining}` : '—';
+
     const createdAt = u.createdAt || u.created_at;
-    const dateStr = createdAt ? new Date(createdAt).toLocaleDateString() : '—';
+    const joinedStr = createdAt ? new Date(createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
     const isAdmin = Boolean(u.isAdmin ?? u.is_admin);
 
     return `
@@ -353,19 +375,28 @@ function renderUserRows(users) {
           ${isAdmin ? '<span style="font-size:9px;background:rgba(245,158,11,0.2);color:#fbbf24;padding:1px 5px;border-radius:4px;font-weight:800;margin-top:2px;display:inline-block">ADMIN</span>' : ''}
         </td>
         <td style="padding:14px">
-          <span class="plan plan-${escapeHtml(plan)}" style="font-weight:800;font-size:11px;padding:3px 8px;border-radius:6px">${escapeHtml(plan.toUpperCase())}</span>
+          <span class="plan plan-${escapeHtml(effectivePlan)}" style="font-weight:800;font-size:11px;padding:3px 8px;border-radius:6px">${escapeHtml(effectivePlan.toUpperCase())}</span>
         </td>
         <td style="padding:14px">
-          <span style="font-size:11px;color:${status === 'active' ? '#4ade80' : '#f87171'}">● ${escapeHtml(status)}</span>
+          <span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;display:inline-block;${statusBadgeColor}">${escapeHtml(displayStatus)}</span>
+        </td>
+        <td style="padding:14px;color:rgba(255,255,255,0.7);font-size:12px">
+          ${escapeHtml(startedStr)}
+        </td>
+        <td style="padding:14px;color:rgba(255,255,255,0.7);font-size:12px">
+          ${escapeHtml(expiresStr)}
+        </td>
+        <td style="padding:14px;font-weight:700;font-size:12px;color:${u.isExpiringSoon ? '#fbbf24' : u.isExpired ? '#f87171' : 'rgba(255,255,255,0.8)'}">
+          ${escapeHtml(daysLeftStr)}
         </td>
         <td style="padding:14px">
           <strong>${portfolioCount}</strong> <small style="color:rgba(255,255,255,0.5)">(${hostedCount} live)</small>
         </td>
         <td style="padding:14px">
-          ${isLegacy ? '<span style="color:#38bdf8;font-size:11px;font-weight:700">YES</span>' : '<span style="color:rgba(255,255,255,0.3);font-size:11px">NO</span>'}
+          <span style="font-size:11px;font-weight:800;color:${legacyColor}">${escapeHtml(legacyExemptionText)}</span>
         </td>
         <td style="padding:14px;color:rgba(255,255,255,0.6);font-size:12px">
-          ${escapeHtml(dateStr)}
+          ${escapeHtml(joinedStr)}
         </td>
         <td style="padding:14px 16px;text-align:right">
           <button class="manage-user-btn" data-user-id="${escapeHtml(u.id)}" style="background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.4);color:#c084fc;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">⚙️ Manage User</button>
@@ -392,7 +423,7 @@ function installUsersTabHandlers() {
       if (!matchesQuery) return false;
       if (plan === 'legacy') return Boolean(u.isLegacy ?? u.is_legacy);
       if (plan === 'kil') return Boolean(u.hasKIL ?? u.has_kil);
-      if (plan !== 'all') return (u.plan || '').toLowerCase() === plan;
+      if (plan !== 'all') return (u.plan || '').toLowerCase() === plan || (u.rawPlan || '').toLowerCase() === plan;
       return true;
     });
 
@@ -411,7 +442,6 @@ function installUsersTabHandlers() {
   attachManageUserButtons();
 }
 
-
 function attachManageUserButtons() {
   document.querySelectorAll('.manage-user-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -427,6 +457,22 @@ function openUserManagementModal(user) {
   const body = document.getElementById('admin-modal-body');
   if (!modal || !body) return;
 
+  const rawPlan = (user.rawPlan || user.plan || 'free').toUpperCase();
+  const displayStatus = user.displayStatus || (user.plan === 'free' ? 'FREE' : (user.status || 'active').toUpperCase());
+  const startedFormatted = user.periodStart ? new Date(user.periodStart).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  const expiresFormatted = user.periodEnd ? new Date(user.periodEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  const daysRemainingStr = user.daysRemaining !== null && user.daysRemaining !== undefined ? String(user.daysRemaining) : '—';
+  const billingPeriodStr = user.billingPeriod || (user.plan !== 'free' ? 'Monthly' : '—');
+  const sourceStr = user.subscriptionSource || (user.plan !== 'free' ? 'INSTAPAY' : 'FREE');
+  const amountPaidStr = user.amountPaid || '—';
+  const autoRenewalStr = 'NO';
+  const lastPaymentStr = user.lastPaymentDate ? new Date(user.lastPaymentDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  const paymentReqStr = user.paymentRequestId || '—';
+  const legacyExemptionStr = user.legacyExemption || (user.isLegacy ? 'GRANDFATHERED' : 'NONE');
+
+  const todayIso = new Date().toISOString().split('T')[0];
+  const in30DaysIso = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+
   body.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:14px">
       <div>
@@ -437,28 +483,74 @@ function openUserManagementModal(user) {
       <button id="close-user-modal" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer">✕</button>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
-      <div style="background:rgba(255,255,255,0.03);padding:12px;border-radius:8px">
-        <span style="font-size:11px;color:rgba(255,255,255,0.5)">Current Commercial Plan</span>
-        <div style="font-size:16px;font-weight:800;color:#c084fc;margin-top:2px">${escapeHtml(user.plan.toUpperCase())} (${escapeHtml(user.status)})</div>
-      </div>
-      <div style="background:rgba(255,255,255,0.03);padding:12px;border-radius:8px">
-        <span style="font-size:11px;color:rgba(255,255,255,0.5)">Legacy Access Mode</span>
-        <div style="font-size:16px;font-weight:800;color:${user.isLegacy ? '#38bdf8' : '#94a3b8'};margin-top:2px">${user.isLegacy ? 'GRANDFATHERED (ALL THEMES)' : 'STANDARD COMMERCIAL'}</div>
+    <!-- 1. Subscription Details Section -->
+    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px;margin-bottom:20px">
+      <h3 style="margin:0 0 14px;font-size:14px;color:#fff;font-weight:800;display:flex;align-items:center;gap:6px">
+        <span>📋</span> Subscription Details
+      </h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));gap:12px;font-size:12px">
+        <div style="background:rgba(255,255,255,0.03);padding:10px;border-radius:8px">
+          <span style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;display:block">Plan</span>
+          <strong style="color:#c084fc;font-size:13px">${escapeHtml(rawPlan)}</strong>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);padding:10px;border-radius:8px">
+          <span style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;display:block">Status</span>
+          <strong style="color:#4ade80;font-size:13px">${escapeHtml(displayStatus)}</strong>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);padding:10px;border-radius:8px">
+          <span style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;display:block">Started At</span>
+          <span style="color:#fff;font-weight:600">${escapeHtml(startedFormatted)}</span>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);padding:10px;border-radius:8px">
+          <span style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;display:block">Expires At</span>
+          <span style="color:#fff;font-weight:600">${escapeHtml(expiresFormatted)}</span>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);padding:10px;border-radius:8px">
+          <span style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;display:block">Days Remaining</span>
+          <strong style="color:${user.isExpiringSoon ? '#fbbf24' : user.isExpired ? '#f87171' : '#fff'};font-size:13px">${escapeHtml(daysRemainingStr)}</strong>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);padding:10px;border-radius:8px">
+          <span style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;display:block">Billing Period</span>
+          <span style="color:#fff;font-weight:600">${escapeHtml(billingPeriodStr)}</span>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);padding:10px;border-radius:8px">
+          <span style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;display:block">Subscription Source</span>
+          <span style="color:#38bdf8;font-weight:700">${escapeHtml(sourceStr)}</span>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);padding:10px;border-radius:8px">
+          <span style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;display:block">Amount Paid</span>
+          <span style="color:#fff;font-weight:700">${escapeHtml(amountPaidStr)}</span>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);padding:10px;border-radius:8px">
+          <span style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;display:block">Auto Renewal</span>
+          <span style="color:#94a3b8;font-weight:600">${escapeHtml(autoRenewalStr)}</span>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);padding:10px;border-radius:8px">
+          <span style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;display:block">Last Payment</span>
+          <span style="color:#fff;font-weight:600">${escapeHtml(lastPaymentStr)}</span>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);padding:10px;border-radius:8px">
+          <span style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;display:block">Payment Request</span>
+          <span style="color:rgba(255,255,255,0.7);font-family:monospace;font-size:11px">${escapeHtml(paymentReqStr)}</span>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);padding:10px;border-radius:8px">
+          <span style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;display:block">Legacy Access</span>
+          <strong style="color:${user.isLegacy ? '#38bdf8' : 'rgba(255,255,255,0.4)'}">${escapeHtml(legacyExemptionStr)}</strong>
+        </div>
       </div>
     </div>
 
-    <!-- Override Plan Section -->
+    <!-- 2. Override Plan Section with Duration -->
     <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px;margin-bottom:16px">
       <h3 style="margin:0 0 10px;font-size:14px;color:#fff;font-weight:800">Plan & Subscription Override (Audited)</h3>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
         <div>
           <label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">Target Plan Tier</label>
           <select id="modal-override-plan" style="width:100%;background:#141624;border:1px solid rgba(255,255,255,0.2);padding:8px;border-radius:6px;color:#fff;font-size:12px">
-            <option value="free" ${user.plan === 'free' ? 'selected' : ''}>Free Tier</option>
-            <option value="pro" ${user.plan === 'pro' ? 'selected' : ''}>Pro Plan</option>
-            <option value="premium" ${user.plan === 'premium' ? 'selected' : ''}>Premium Plan</option>
-            <option value="premium_group" ${user.plan === 'premium_group' ? 'selected' : ''}>Premium Group</option>
+            <option value="free" ${(user.rawPlan || user.plan) === 'free' ? 'selected' : ''}>Free Tier</option>
+            <option value="pro" ${(user.rawPlan || user.plan) === 'pro' ? 'selected' : ''}>Pro Plan</option>
+            <option value="premium" ${(user.rawPlan || user.plan) === 'premium' ? 'selected' : ''}>Premium Plan</option>
+            <option value="premium_group" ${(user.rawPlan || user.plan) === 'premium_group' ? 'selected' : ''}>Premium Group</option>
           </select>
         </div>
         <div>
@@ -472,17 +564,59 @@ function openUserManagementModal(user) {
           </select>
         </div>
       </div>
-      <div style="margin-bottom:10px">
-        <label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">Mandatory Audit Reason (Required for security trail)</label>
-        <input type="text" id="modal-override-reason" placeholder="e.g. VIP Customer upgrade / Manual test account setup" style="width:100%;background:#141624;border:1px solid rgba(255,255,255,0.2);padding:8px;border-radius:6px;color:#fff;font-size:12px;outline:none;box-sizing:border-box"/>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">Subscription Duration</label>
+          <select id="modal-override-duration" style="width:100%;background:#141624;border:1px solid rgba(255,255,255,0.2);padding:8px;border-radius:6px;color:#fff;font-size:12px">
+            <option value="30" selected>30 Days</option>
+            <option value="90">90 Days</option>
+            <option value="365">365 Days (1 Year)</option>
+            <option value="custom">Custom Date Range…</option>
+          </select>
+        </div>
+        <div id="modal-group-seats-container" style="display:${(user.rawPlan || user.plan) === 'premium_group' ? 'block' : 'none'}">
+          <label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">Group Seat Count</label>
+          <select id="modal-override-seats" style="width:100%;background:#141624;border:1px solid rgba(255,255,255,0.2);padding:8px;border-radius:6px;color:#fff;font-size:12px">
+            <option value="2">2 Seats — 1,800 EGP/mo</option>
+            <option value="3">3 Seats — 2,550 EGP/mo</option>
+            <option value="4">4 Seats — 3,200 EGP/mo</option>
+            <option value="5">5 Seats — 3,750 EGP/mo</option>
+          </select>
+        </div>
       </div>
-      <button id="modal-btn-save-plan" style="background:#7c3aed;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer">Apply Plan Override</button>
+
+      <!-- Custom Date Inputs (only shown when duration = custom) -->
+      <div id="modal-custom-dates-container" style="display:none;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">Start Date</label>
+          <input type="date" id="modal-custom-start" value="${todayIso}" style="width:100%;background:#141624;border:1px solid rgba(255,255,255,0.2);padding:8px;border-radius:6px;color:#fff;font-size:12px;box-sizing:border-box"/>
+        </div>
+        <div>
+          <label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">End Date</label>
+          <input type="date" id="modal-custom-end" value="${in30DaysIso}" style="width:100%;background:#141624;border:1px solid rgba(255,255,255,0.2);padding:8px;border-radius:6px;color:#fff;font-size:12px;box-sizing:border-box"/>
+        </div>
+      </div>
+
+      <!-- Calculated Date Preview Box -->
+      <div id="modal-duration-preview-box" style="background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.3);border-radius:8px;padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;font-size:12px">
+        <div>
+          <span style="color:rgba(255,255,255,0.6);font-size:11px">Calculated Schedule:</span>
+          <strong id="modal-preview-text" style="color:#c084fc;display:block">Start: ${todayIso} | End: ${in30DaysIso} (30 days)</strong>
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">Mandatory Audit Reason (Required for security trail)</label>
+        <input type="text" id="modal-override-reason" placeholder="e.g. Approved InstaPay manual override / VIP Customer setup" style="width:100%;background:#141624;border:1px solid rgba(255,255,255,0.2);padding:8px;border-radius:6px;color:#fff;font-size:12px;outline:none;box-sizing:border-box"/>
+      </div>
+      <button id="modal-btn-save-plan" style="background:#7c3aed;color:#fff;border:none;padding:9px 18px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer">Apply Subscription Override</button>
     </div>
 
-    <!-- Legacy Access Toggle Section -->
+    <!-- 3. Legacy Access Toggle Section -->
     <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px">
-      <h3 style="margin:0 0 10px;font-size:14px;color:#fff;font-weight:800">Legacy Grandfathering Exemption</h3>
-      <p style="margin:0 0 10px;font-size:12px;color:rgba(255,255,255,0.6)">Grandfathered accounts retain access to all themes without commercial lockouts.</p>
+      <h3 style="margin:0 0 10px;font-size:14px;color:#fff;font-weight:800">Legacy Access Exemption</h3>
+      <p style="margin:0 0 10px;font-size:12px;color:rgba(255,255,255,0.6)">Current: <strong style="color:${user.isLegacy ? '#38bdf8' : 'rgba(255,255,255,0.4)'}">${user.isLegacy ? 'GRANDFATHERED (ALL THEMES)' : 'NONE'}</strong>. Grandfathered accounts retain access to all themes without commercial lockouts.</p>
       <div style="display:flex;gap:10px;align-items:center">
         <input type="text" id="modal-legacy-reason" placeholder="Reason for legacy exemption change…" style="flex:1;background:#141624;border:1px solid rgba(255,255,255,0.2);padding:8px;border-radius:6px;color:#fff;font-size:12px;outline:none"/>
         <button id="modal-btn-toggle-legacy" style="background:rgba(56,189,248,0.2);border:1px solid rgba(56,189,248,0.4);color:#38bdf8;padding:8px 14px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer">
@@ -494,9 +628,56 @@ function openUserManagementModal(user) {
   modal.style.display = 'flex';
   document.getElementById('close-user-modal').addEventListener('click', () => { modal.style.display = 'none'; });
 
+  const planSelect = document.getElementById('modal-override-plan');
+  const durationSelect = document.getElementById('modal-override-duration');
+  const customContainer = document.getElementById('modal-custom-dates-container');
+  const customStart = document.getElementById('modal-custom-start');
+  const customEnd = document.getElementById('modal-custom-end');
+  const groupSeatsContainer = document.getElementById('modal-group-seats-container');
+  const previewText = document.getElementById('modal-preview-text');
+
+  const updatePreview = () => {
+    const targetPlan = planSelect.value;
+    const duration = durationSelect.value;
+
+    groupSeatsContainer.style.display = targetPlan === 'premium_group' ? 'block' : 'none';
+
+    if (targetPlan === 'free') {
+      customContainer.style.display = 'none';
+      previewText.textContent = 'Free Tier (No active paid duration)';
+      return;
+    }
+
+    if (duration === 'custom') {
+      customContainer.style.display = 'grid';
+      const s = new Date(customStart.value || todayIso);
+      const e = new Date(customEnd.value || in30DaysIso);
+      const days = Math.max(0, Math.round((e - s) / 86400000));
+      const sStr = isNaN(s.getTime()) ? '—' : s.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      const eStr = isNaN(e.getTime()) ? '—' : e.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      previewText.textContent = `Start: ${sStr} | End: ${eStr} (${days} days)`;
+    } else {
+      customContainer.style.display = 'none';
+      const days = Number(duration) || 30;
+      const s = new Date();
+      const e = new Date(Date.now() + days * 86400000);
+      const sStr = s.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      const eStr = e.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      previewText.textContent = `Start: ${sStr} | End: ${eStr} (${days} days)`;
+    }
+  };
+
+  planSelect?.addEventListener('change', updatePreview);
+  durationSelect?.addEventListener('change', updatePreview);
+  customStart?.addEventListener('input', updatePreview);
+  customEnd?.addEventListener('input', updatePreview);
+  updatePreview();
+
   document.getElementById('modal-btn-save-plan').addEventListener('click', async () => {
-    const targetPlanId = document.getElementById('modal-override-plan').value;
+    const targetPlanId = planSelect.value;
     const status = document.getElementById('modal-override-status').value;
+    const duration = durationSelect.value;
+    const groupSeats = Number(document.getElementById('modal-override-seats')?.value) || 2;
     const reason = document.getElementById('modal-override-reason').value;
 
     if (!reason || reason.trim().length < 3) {
@@ -504,9 +685,31 @@ function openUserManagementModal(user) {
       return;
     }
 
+    let startDate = null;
+    let endDate = null;
+    let durationDays = Number(duration) || 30;
+
+    if (duration === 'custom') {
+      startDate = customStart.value ? new Date(customStart.value).toISOString() : null;
+      endDate = customEnd.value ? new Date(customEnd.value).toISOString() : null;
+      if (!startDate || !endDate || new Date(endDate) <= new Date(startDate)) {
+        alert('Please enter valid start and end dates (end date must be after start date).');
+        return;
+      }
+    }
+
     try {
-      await adminOverrideUserPlan({ userId: user.id, targetPlanId, status, reason: reason.trim() });
-      alert('User plan updated successfully.');
+      await adminOverrideUserPlan({
+        userId: user.id,
+        targetPlanId,
+        status,
+        durationDays,
+        startDate,
+        endDate,
+        groupSeats,
+        reason: reason.trim()
+      });
+      alert('User subscription override applied successfully.');
       modal.style.display = 'none';
       await loadAllData();
     } catch (err) {
@@ -1098,7 +1301,7 @@ function renderSystemTab(system) {
             <span>Premium Plan</span><strong>1,000 EGP/month</strong>
           </div>
           <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
-            <span>Premium Group (2–5 seats)</span><strong>1,500 – 2,800 EGP/month</strong>
+            <span>Premium Group (2–5 seats)</span><strong>1,800 – 3,750 EGP/month</strong>
           </div>
           <div style="display:flex;justify-content:space-between;padding:8px 0">
             <span>Keep It Live (Retention)</span><strong>500 EGP/year/portfolio</strong>

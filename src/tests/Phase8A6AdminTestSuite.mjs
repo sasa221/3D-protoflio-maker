@@ -228,9 +228,10 @@ assert(catalog.length === 15, 'Admin theme catalog shows exactly 15 themes');
 assert(Object.keys(THEME_TIERS).length === 15, 'ThemeTierConfig covers all 15 themes');
 assert(PLANS.free.priceMonthlyEGP === 0, 'Pricing: Free = 0 EGP');
 assert(PLANS.pro.priceMonthlyEGP === 600, 'Pricing: Pro = 600 EGP');
-assert(PLANS.premium.priceMonthlyEGP === 1000, 'Pricing: Premium = 1000 EGP');
-assert(GROUP_SEAT_PRICING[2] === 1500, 'Pricing: Group 2 = 1500 EGP');
-assert(GROUP_SEAT_PRICING[5] === 2800, 'Pricing: Group 5 = 2800 EGP');
+assert(GROUP_SEAT_PRICING[2] === 1800, 'Pricing: Group 2 = 1800 EGP');
+assert(GROUP_SEAT_PRICING[3] === 2550, 'Pricing: Group 3 = 2550 EGP');
+assert(GROUP_SEAT_PRICING[4] === 3200, 'Pricing: Group 4 = 3200 EGP');
+assert(GROUP_SEAT_PRICING[5] === 3750, 'Pricing: Group 5 = 3750 EGP');
 assert(KEEP_IT_LIVE.priceAnnualPerPortfolioEGP === 500, 'Pricing: Keep It Live = 500 EGP/year');
 
 console.log('\n============================================================');

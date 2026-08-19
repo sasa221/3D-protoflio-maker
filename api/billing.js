@@ -14,15 +14,15 @@ const PLAN_PRICES = {
   free: 0,
   pro: 600,
   premium: 1000,
-  premium_group: 1500, // base 2-seat price
+  premium_group: 1800, // base 2-seat price
   keep_it_live: 500
 };
 
 const GROUP_SEAT_PRICING = {
-  2: 1500,
-  3: 1800,
-  4: 2200,
-  5: 2800
+  2: 1800,
+  3: 2550,
+  4: 3200,
+  5: 3750
 };
 
 export default async function handler(req, res) {
@@ -116,7 +116,7 @@ export default async function handler(req, res) {
       if (targetPlanId === 'premium_group') {
         validSeats = Number(groupSeats) || 2;
         if (validSeats < 2 || validSeats > 5) return res.status(400).json({ error: 'Group seats must be between 2 and 5' });
-        baseAmount = GROUP_SEAT_PRICING[validSeats] || 1500;
+        baseAmount = GROUP_SEAT_PRICING[validSeats] || 1800;
       }
 
       // Validate promo code on server

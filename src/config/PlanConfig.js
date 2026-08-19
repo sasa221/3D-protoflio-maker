@@ -140,8 +140,8 @@ export const PLANS = {
   premium_group: {
     id: 'premium_group',
     name: 'Premium Group',
-    priceMonthlyEGP: 1500,
-    priceStartingMonthlyEGP: 1500,
+    priceMonthlyEGP: 1800,
+    priceStartingMonthlyEGP: 1800,
     currency: 'EGP',
     hosted: true,
     portfolioPolicy: 'rolling_cooldown',
@@ -160,10 +160,10 @@ PLANS.premium_group.capabilities = [...PLANS.premium.capabilities];
 PLANS.premium_group.limits = { ...PLANS.premium.limits };
 
 export const GROUP_SEAT_PRICING = {
-  2: 1500,
-  3: 1800,
-  4: 2200,
-  5: 2800
+  2: 1800,
+  3: 2550,
+  4: 3200,
+  5: 3750
 };
 
 export const GROUP_SEAT_MIN = 2;
@@ -230,4 +230,9 @@ export function getGroupPrice(seats) {
   return GROUP_SEAT_PRICING[seats] || null;
 }
 
-
+export const INSTAPAY_CONFIG = {
+  displayName: (typeof process !== 'undefined' && process.env?.INSTAPAY_ACCOUNT_NAME) || 'SALEH MOHAMED SALEH',
+  instapayAddress: (typeof process !== 'undefined' && process.env?.INSTAPAY_ADDRESS) || 'saleh2005mohamed@instapay',
+  phoneNumber: (typeof process !== 'undefined' && process.env?.INSTAPAY_PHONE_NUMBER) || '01270024222',
+  isConfigured: true
+};

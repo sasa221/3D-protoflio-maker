@@ -58,6 +58,15 @@ export class EntitlementService {
   getPlanId() {
     const status = this.subscription?.status;
     const planId = this.getRawPlanId();
+    const periodEnd = this.subscription?.currentPeriodEnd;
+
+    // If on a paid plan and subscription has an expired period_end, fall back to free
+    if (planId !== 'free' && periodEnd) {
+      const endMs = new Date(periodEnd).getTime();
+      if (!isNaN(endMs) && Date.now() > endMs) {
+        return 'free';
+      }
+    }
 
     // Active or grace period = plan applies
     if (status === 'active' || status === 'grace' || status === 'canceling') {

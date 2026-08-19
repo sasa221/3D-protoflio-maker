@@ -178,15 +178,15 @@ const userApprovedEmail = generatePaymentApprovedEmail({
   activeUntil: '2026-09-19T00:00:00Z',
   groupSeats: 4
 });
-check('User approval email contains active status banner', userApprovedEmail.includes('Payment Verified &amp; Subscription Activated') || userApprovedEmail.includes('Payment Verified & Subscription Activated'));
-check('User approval email contains group seat details', userApprovedEmail.includes('4 group members'));
+check('User approval email contains active status banner', userApprovedEmail.includes('PAYMENT VERIFIED'));
+check('User approval email contains group seat details', userApprovedEmail.includes('4 member seats'));
 
 const userRejectedEmail = generatePaymentRejectedEmail({
   firstName: 'Saleh',
   planName: 'pro',
   reason: 'Transfer amount was 500 EGP instead of 600 EGP.'
 });
-check('User rejection email contains respectful notice and reason', userRejectedEmail.includes('We couldn&#39;t verify your payment') || userRejectedEmail.includes("We couldn't verify your payment"));
+check('User rejection email contains respectful notice and reason', userRejectedEmail.includes("We couldn't verify this payment submission"));
 check('User rejection email displays the exact admin reason', userRejectedEmail.includes('Transfer amount was 500 EGP instead of 600 EGP.'));
 
 // ─────────────────────────────────────────────────────────────
@@ -198,10 +198,10 @@ check('InstaPay configuration has no invented hardcoded accounts', INSTAPAY_CONF
 check('InstaPay configuration safely defaults to unconfigured without env vars', typeof INSTAPAY_CONFIG.isConfigured === 'boolean');
 check('Pro plan price is exactly 600 EGP', PLANS.pro.priceMonthlyEGP === 600);
 check('Premium plan price is exactly 1000 EGP', PLANS.premium.priceMonthlyEGP === 1000);
-check('Group 2-seat price is 1500 EGP', GROUP_SEAT_PRICING[2] === 1500);
-check('Group 3-seat price is 1800 EGP', GROUP_SEAT_PRICING[3] === 1800);
-check('Group 4-seat price is 2200 EGP', GROUP_SEAT_PRICING[4] === 2200);
-check('Group 5-seat price is 2800 EGP', GROUP_SEAT_PRICING[5] === 2800);
+check('Group 2-seat price is 1800 EGP', GROUP_SEAT_PRICING[2] === 1800);
+check('Group 3-seat price is 2550 EGP', GROUP_SEAT_PRICING[3] === 2550);
+check('Group 4-seat price is 3200 EGP', GROUP_SEAT_PRICING[4] === 3200);
+check('Group 5-seat price is 3750 EGP', GROUP_SEAT_PRICING[5] === 3750);
 
 // ─────────────────────────────────────────────────────────────
 // 4. API Router Security & Manual Payment Handlers
