@@ -40,9 +40,16 @@ console.log('============================================================\n');
 // ─── 1. ADMIN AUTHORIZATION GATING ──────────────────────────────
 console.log('1. Testing admin authorization gating...');
 
-function simulateAdminAuth(userRole, userEmail, allowedAdminEmails = ['admin@example.com']) {
+const CANONICAL_ADMIN_EMAIL = 'saleh2005mohamed@gmail.com';
+
+function simulateAdminAuth(userRole, userEmail, allowedAdminEmails = [CANONICAL_ADMIN_EMAIL]) {
   if (userRole === 'admin') return { authorized: true };
-  if (userEmail && allowedAdminEmails.includes(userEmail.toLowerCase())) return { authorized: true };
+  if (userEmail) {
+    const normalized = userEmail.trim().toLowerCase();
+    if (allowedAdminEmails.map(e => e.trim().toLowerCase()).includes(normalized)) {
+      return { authorized: true };
+    }
+  }
   return { authorized: false, status: 403, error: 'Administrator access required' };
 }
 
@@ -50,8 +57,9 @@ assert(simulateAdminAuth('user', 'user@example.com').authorized === false, 'Norm
 assert(simulateAdminAuth('pro', 'pro@example.com').authorized === false, 'Pro subscriber accessing admin -> DENIED (403)');
 assert(simulateAdminAuth('premium', 'vip@example.com').authorized === false, 'Premium subscriber accessing admin -> DENIED (403)');
 assert(simulateAdminAuth('group_owner', 'founder@corp.com').authorized === false, 'Group owner accessing admin -> DENIED (403)');
-assert(simulateAdminAuth('admin', 'admin@example.com').authorized === true, 'Admin user accessing admin -> ALLOWED (200)');
-assert(simulateAdminAuth('member', 'admin@example.com').authorized === true, 'Admin by allowlisted email -> ALLOWED (200)');
+assert(simulateAdminAuth('user', 'Saleh2005mohamed@gmail.com').authorized === true, 'Saleh2005mohamed@gmail.com -> ALLOWED (200)');
+assert(simulateAdminAuth('user', ' SALEH2005MOHAMED@GMAIL.COM ').authorized === true, 'Trimmed & normalized Saleh2005mohamed@gmail.com -> ALLOWED (200)');
+assert(simulateAdminAuth('member', 'otheruser@example.com').authorized === false, 'Non-admin email -> DENIED (403)');
 
 // ─── 2. ROLE ESCALATION & SELF-PROMOTION PREVENTION ─────────────
 console.log('\n2. Testing role escalation prevention...');

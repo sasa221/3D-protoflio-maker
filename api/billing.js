@@ -167,7 +167,7 @@ export default async function handler(req, res) {
       if (insertErr) return res.status(500).json({ error: `Failed to record payment request: ${insertErr.message}` });
 
       // Dispatch Brevo notification email to admin
-      const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || process.env.ADMIN_EMAILS?.split(',')[0]?.trim() || process.env.BREVO_SENDER_EMAIL;
+      const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || process.env.ADMIN_EMAILS?.split(',')[0]?.trim() || 'saleh2005mohamed@gmail.com';
       if (adminEmail) {
         const html = generateAdminNewPaymentEmail({
           userName,

@@ -11,6 +11,18 @@ import {
 const VALID_PLANS = ['free', 'pro', 'premium', 'premium_group'];
 const VALID_STATUSES = ['active', 'canceling', 'expired', 'grace', 'keep_it_live'];
 
+const CANONICAL_ADMIN_EMAIL = 'saleh2005mohamed@gmail.com';
+
+function isAllowedAdminEmail(email) {
+  if (!email || typeof email !== 'string') return false;
+  const normalized = email.trim().toLowerCase();
+  const configured = (process.env.ADMIN_EMAILS || CANONICAL_ADMIN_EMAIL)
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean);
+  return configured.includes(normalized);
+}
+
 async function requireAdmin(req, res) {
   const authorization = req.headers.authorization || '';
   if (!authorization.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentication required' });
@@ -25,12 +37,12 @@ async function requireAdmin(req, res) {
   
   const admin = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
   const { data: profile } = await admin.from('profiles').select('is_admin').eq('id', data.user.id).maybeSingle();
-  const allowedEmails = new Set((process.env.ADMIN_EMAILS || '').split(',').map((email) => email.trim().toLowerCase()).filter(Boolean));
   
-  if (!profile?.is_admin && !allowedEmails.has((data.user.email || '').toLowerCase())) {
+  const userEmail = (data.user.email || '').trim().toLowerCase();
+  if (!profile?.is_admin && !isAllowedAdminEmail(userEmail)) {
     return res.status(403).json({ error: 'Administrator access required' });
   }
-  return { user: data.user, admin, allowedEmails };
+  return { user: data.user, admin };
 }
 
 async function writeAuditLog(adminClient, adminUserId, targetUserId, action, prevVal, newVal, reason, metadata = {}) {
@@ -98,7 +110,7 @@ export default async function handler(req, res) {
           email: u.email || '',
           display_name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0] || 'User',
           created_at: u.created_at,
-          is_admin: Boolean(u.user_metadata?.is_admin || u.app_metadata?.is_admin || (u.email && u.email.toLowerCase() === (process.env.ADMIN_EMAIL || 'salehaborehab221@gmail.com').toLowerCase()))
+          is_admin: Boolean(u.user_metadata?.is_admin || u.app_metadata?.is_admin || isAllowedAdminEmail(u.email))
         }));
       }
     } catch (_) {}
@@ -179,7 +191,7 @@ export default async function handler(req, res) {
           email: u.email || '',
           display_name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0] || 'User',
           created_at: u.created_at,
-          is_admin: Boolean(u.user_metadata?.is_admin || u.app_metadata?.is_admin || (u.email && u.email.toLowerCase() === (process.env.ADMIN_EMAIL || 'salehaborehab221@gmail.com').toLowerCase()))
+          is_admin: Boolean(u.user_metadata?.is_admin || u.app_metadata?.is_admin || isAllowedAdminEmail(u.email))
         }));
       }
     } catch (_) {}

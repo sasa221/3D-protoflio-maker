@@ -244,8 +244,9 @@ export default async function handler(req, res) {
 
       const adminClient = createClient(supabaseUrl, supabaseServiceKey);
       const { data: profile } = await adminClient.from('profiles').select('is_admin').eq('id', userData.user.id).maybeSingle();
-      const allowedEmails = new Set((process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean));
-      if (!profile?.is_admin && !allowedEmails.has((userData.user.email || '').toLowerCase())) {
+      const allowedEmails = new Set((process.env.ADMIN_EMAILS || 'saleh2005mohamed@gmail.com').split(',').map(e => e.trim().toLowerCase()).filter(Boolean));
+      const userEmail = (userData.user.email || '').trim().toLowerCase();
+      if (!profile?.is_admin && !allowedEmails.has(userEmail)) {
         return res.status(403).json({ error: 'Administrator access required' });
       }
 
