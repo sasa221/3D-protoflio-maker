@@ -150,6 +150,16 @@ export function showActiveWorkspacePanels() {
       window.renderAnalyticsDashboardGlobal();
     }
   }
+
+  // Hide redundant global footer actions specifically when in Publish workspace
+  const sidebarFooter = document.querySelector('.sidebar-footer');
+  if (sidebarFooter) {
+    if (currentWorkspace === WORKSPACES.PUBLISH) {
+      sidebarFooter.style.display = 'none';
+    } else {
+      sidebarFooter.style.display = '';
+    }
+  }
 }
 
 window.switchWorkspace = function(wsName, subSection) {

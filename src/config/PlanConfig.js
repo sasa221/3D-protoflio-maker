@@ -57,7 +57,7 @@ export const PLANS = {
       customDomains: 0,
       analyticsDays: 0,
       jobMatchLifetimeQuota: 1, // 1 lifetime analysis per account
-      exportsPerMonth: -1  // unlimited HTML exports for free
+      exportsPerMonth: 1  // 1 standalone HTML export per month for free
     },
     description: 'Build and download your portfolio.',
     cta: 'Start Free'

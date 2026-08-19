@@ -186,11 +186,11 @@ export class EntitlementService {
    * Check if user can publish a hosted portfolio.
    */
   canPublishHosted() {
-    if (!isFeatureEnabled('HOSTING_PAYWALL_ENABLED')) {
-      return true; // Hosting paywall not active yet
-    }
     if (this.isKeepItLive()) {
       return false; // KIL is read-only, no new publishes
+    }
+    if (!isFeatureEnabled('HOSTING_PAYWALL_ENABLED')) {
+      return true; // Hosting paywall not active yet
     }
     return this.can(CAPABILITIES.PUBLISH_HOSTED);
   }

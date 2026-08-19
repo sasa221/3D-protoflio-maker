@@ -923,11 +923,11 @@ function buildHTML() {
 <div class="modal-overlay" id="avatar-crop-modal" style="display:none;z-index:99999">
   <div class="modal-box" style="max-width:420px;text-align:center">
     <div class="modal-header">
-      <span class="modal-title">✂️ تعديل وضبط صورة البروفايل</span>
+      <span class="modal-title">✂️ Adjust Profile Photo</span>
       <button class="modal-close" onclick="closeAvatarCropper()">✕</button>
     </div>
     <div class="modal-body" style="display:flex;flex-direction:column;align-items:center;padding:24px">
-      <div style="font-size:0.8rem;color:rgba(255,255,255,0.6);margin-bottom:16px">حرك وسجل الصورة وتأكد من ضبط وجهك في منتصف الدائرة الـ 3D:</div>
+      <div style="font-size:0.8rem;color:rgba(255,255,255,0.6);margin-bottom:16px">Center your face within the 3D circle preview:</div>
       
       <!-- CROP PREVIEW CONTAINER CIRCLE (PERFECT 1:1 CIRCLE) -->
       <div style="
@@ -944,20 +944,20 @@ function buildHTML() {
 
       <!-- ZOOM & POSITION CONTROLS -->
       <div style="width:100%;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:16px;margin-bottom:20px">
-        <div style="font-size:0.75rem;font-weight:700;color:var(--primary);margin-bottom:10px">🔍 تكبير وتصغير (Zoom)</div>
+        <div style="font-size:0.75rem;font-weight:700;color:var(--primary);margin-bottom:10px">🔍 Zoom</div>
         <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px">
           <button onclick="adjustCropZoom(-0.15)" class="btn btn-secondary" style="padding:6px 16px;font-size:1rem;font-weight:bold">➖</button>
           <span id="crop-zoom-label" style="font-size:0.9rem;font-weight:900;color:#fff;min-width:60px">100%</span>
           <button onclick="adjustCropZoom(0.15)" class="btn btn-secondary" style="padding:6px 16px;font-size:1rem;font-weight:bold">➕</button>
         </div>
 
-        <div style="font-size:0.75rem;font-weight:700;color:var(--primary);margin-bottom:10px">🎯 ضبط موقع الوجه (Position)</div>
+        <div style="font-size:0.75rem;font-weight:700;color:var(--primary);margin-bottom:10px">🎯 Position (Align Face)</div>
         <div style="display:grid;grid-template-columns:repeat(3, 45px);gap:8px;justify-content:center">
           <div></div>
           <button onclick="adjustCropPos(0, -10)" class="btn btn-secondary" style="padding:8px">⬆️</button>
           <div></div>
           <button onclick="adjustCropPos(-10, 0)" class="btn btn-secondary" style="padding:8px">⬅️</button>
-          <button onclick="resetCropPos()" class="btn btn-secondary" style="padding:6px;font-size:0.7rem" title="إعادة التمركز">🎯</button>
+          <button onclick="resetCropPos()" class="btn btn-secondary" style="padding:6px;font-size:0.7rem" title="Recenter">🎯</button>
           <button onclick="adjustCropPos(10, 0)" class="btn btn-secondary" style="padding:8px">➡️</button>
           <div></div>
           <button onclick="adjustCropPos(0, 10)" class="btn btn-secondary" style="padding:8px">⬇️</button>
@@ -966,7 +966,7 @@ function buildHTML() {
       </div>
 
       <button class="btn btn-primary" onclick="saveAvatarCrop()" style="width:100%;padding:12px;font-size:0.95rem;font-weight:800">
-        ✅ اعتماد وتطبيق على الـ 3D Portfolio
+        ✅ Apply to 3D Portfolio
       </button>
     </div>
   </div>
@@ -1473,7 +1473,14 @@ window.switchTab = function(id) {
   const targetSec = secMap[id] || 'hero';
   flyToSection(targetSec);
   
-  if (id === 'publish') renderPublishTab();
+  if (id === 'publish') {
+    renderPublishTab();
+    const sidebarFooter = document.querySelector('.sidebar-footer');
+    if (sidebarFooter) sidebarFooter.style.display = 'none';
+  } else {
+    const sidebarFooter = document.querySelector('.sidebar-footer');
+    if (sidebarFooter) sidebarFooter.style.display = '';
+  }
 };
 
 window.updateUserAvatar = function(val) {
@@ -1667,127 +1674,295 @@ export function renderPublishTab() {
   const el = document.getElementById('publish-panel-content');
   if (!el) return;
 
+  const effectivePlan = globalEntitlements.getEffectivePlanId();
+  const isGrandfathered = Boolean(portfolioData.isLegacy || portfolioData.is_legacy);
+  const isKeepItLive = globalEntitlements.isKeepItLive() || Boolean(portfolioData.hasKIL || portfolioData.has_kil);
+
+  const hasHostedPublishRights = effectivePlan === 'pro' || effectivePlan === 'premium' || effectivePlan === 'premium_group' || isGrandfathered;
+  const isPremiumOrGroup = effectivePlan === 'premium' || effectivePlan === 'premium_group';
+  const isPublished = Boolean(portfolioData.publishedAt || portfolioData.published_at);
+
   const slug = portfolioData.slug || (portfolioData.name ? portfolioData.name.toLowerCase().replace(/[^a-z0-9]/g, '-') : 'portfolio');
   const publicUrl = `${window.location.origin}/u/${slug}`;
-  const isPublished = Boolean(portfolioData.publishedAt || portfolioData.published_at);
-  const pro = isPro();
+
   const monthKey = new Date().toISOString().slice(0, 7);
   const usage = portfolioData.exportUsage || {};
   const exportsThisMonth = usage.month === monthKey ? Number(usage.count || 0) : 0;
-  const remainingExports = globalUsageLimit.getRemainingExports(exportsThisMonth);
+  const maxFreeExports = 1;
+  const isFreeExportExhausted = exportsThisMonth >= maxFreeExports;
+
+  // Real reset date calculation: 1st of next month
+  const now = new Date();
+  const resetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const resetDateStr = resetDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+  // ──────────────────────────────────────────────
+  // CASE 1: FREE USER (No hosted rights)
+  // ──────────────────────────────────────────────
+  if (!hasHostedPublishRights && !isKeepItLive) {
+    el.innerHTML = `
+      <div style="font-family:'Inter',sans-serif;color:#fff;">
+        
+        <!-- HEADER -->
+        <div style="margin-bottom: 20px;">
+          <h2 style="font-family:'Outfit',sans-serif;font-size:1.25rem;font-weight:800;color:#fff;margin:0 0 6px 0;">Publish & Export</h2>
+          <p style="font-size:0.82rem;color:rgba(255,255,255,0.65);margin:0;line-height:1.5;">
+            Your portfolio is ready. Export it for free, or upgrade when you're ready to publish it online.
+          </p>
+        </div>
+
+        <!-- CARD A: FREE EXPORT -->
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:18px;padding:20px;margin-bottom:16px;box-shadow:0 8px 24px rgba(0,0,0,0.2);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 style="font-size:0.98rem;font-weight:800;color:#fff;margin:0;display:flex;align-items:center;gap:8px;">
+              <span>📦</span> Export Your Portfolio
+            </h3>
+            <span style="font-size:0.68rem;font-weight:800;color:#94a3b8;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:2px 10px;letter-spacing:0.5px;">
+              FREE
+            </span>
+          </div>
+
+          <p style="font-size:0.8rem;color:rgba(255,255,255,0.7);line-height:1.5;margin:0 0 14px 0;">
+            Download a standalone version of your portfolio that you can keep, share, or host yourself.
+          </p>
+
+          <div style="background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:0.78rem;color:rgba(255,255,255,0.8);line-height:1.8;">
+            <div>• Standalone HTML Export</div>
+            <div>• 1 export per month</div>
+            <div>• Platform branding included</div>
+          </div>
+
+          <!-- CTA BUTTON -->
+          <button id="btn-free-download-portfolio" class="btn btn-secondary" onclick="exportHTML()" ${isFreeExportExhausted ? 'disabled aria-disabled="true"' : ''} style="width:100%;padding:12px;font-size:0.85rem;font-weight:700;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:10px;cursor:${isFreeExportExhausted ? 'not-allowed' : 'pointer'};display:flex;align-items:center;justify-content:center;gap:8px;">
+            <span>📥</span> Download Portfolio (.html)
+          </button>
+
+          <!-- USAGE METER -->
+          <div style="margin-top:10px;text-align:center;font-size:0.75rem;color:rgba(255,255,255,0.55);">
+            ${isFreeExportExhausted ? '1 of 1 exports used this month' : '0 of 1 exports used this month'}
+          </div>
+          ${isFreeExportExhausted ? `
+            <div style="margin-top:6px;text-align:center;font-size:0.72rem;color:#fde047;font-weight:600;">
+              Your free export allowance resets on ${resetDateStr}
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- CARD B: ONLINE PUBLISHING (UPGRADE TO PRO) -->
+        <div style="background:linear-gradient(135deg,rgba(124,58,237,0.14),rgba(6,182,212,0.08));border:1px solid rgba(124,58,237,0.35);border-radius:18px;padding:22px;box-shadow:0 12px 30px rgba(124,58,237,0.15);position:relative;overflow:hidden;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 style="font-size:1.02rem;font-weight:800;color:#fff;margin:0;display:flex;align-items:center;gap:8px;">
+              <span>🌐</span> Publish Your Portfolio Online
+            </h3>
+            <span style="font-size:0.68rem;font-weight:800;color:#c084fc;background:rgba(124,58,237,0.2);border:1px solid rgba(124,58,237,0.4);border-radius:12px;padding:2px 10px;letter-spacing:0.5px;">
+              PRO
+            </span>
+          </div>
+
+          <p style="font-size:0.8rem;color:rgba(255,255,255,0.75);line-height:1.5;margin:0 0 16px 0;">
+            Get your own live portfolio link, keep it updated, and share it anywhere.
+          </p>
+
+          <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:18px;font-size:0.78rem;color:rgba(255,255,255,0.85);">
+            <div style="display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;font-weight:900;">✓</span> Your live /u/username link</div>
+            <div style="display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;font-weight:900;">✓</span> Publish instantly</div>
+            <div style="display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;font-weight:900;">✓</span> Update anytime</div>
+            <div style="display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;font-weight:900;">✓</span> Unlimited exports</div>
+            <div style="display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;font-weight:900;">✓</span> 10 professional themes</div>
+            <div style="display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;font-weight:900;">✓</span> Professional portfolio sharing</div>
+          </div>
+
+          <button id="btn-upgrade-pro-publish" class="btn btn-primary" onclick="openBillingModal('pro')" style="width:100%;padding:13px;font-size:0.88rem;font-weight:800;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#fff;border-radius:10px;box-shadow:0 6px 18px rgba(124,58,237,0.35);cursor:pointer;">
+            Upgrade to Pro — 600 EGP/month
+          </button>
+        </div>
+
+      </div>
+    `;
+    return;
+  }
+
+  // ──────────────────────────────────────────────
+  // CASE 2: KEEP IT LIVE STATE
+  // ──────────────────────────────────────────────
+  if (isKeepItLive && !hasHostedPublishRights) {
+    el.innerHTML = `
+      <div style="font-family:'Inter',sans-serif;color:#fff;">
+        <div style="margin-bottom: 20px;">
+          <h2 style="font-family:'Outfit',sans-serif;font-size:1.25rem;font-weight:800;color:#fff;margin:0 0 6px 0;">Publish & Retention</h2>
+          <p style="font-size:0.82rem;color:rgba(255,255,255,0.65);margin:0;line-height:1.5;">
+            Your portfolio is retained online via Keep It Live.
+          </p>
+        </div>
+
+        <div style="background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.3);border-radius:18px;padding:20px;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <span style="font-size:0.75rem;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#06b6d4;">
+              🟢 Live (Keep It Live)
+            </span>
+          </div>
+
+          <div style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 12px;margin-bottom:12px;">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:#06b6d4;word-break:break-all;">${publicUrl}</span>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+            <button id="btn-copy-public-url" class="btn btn-secondary" onclick="copyPublicPortfolioUrl()" style="font-size:0.78rem;padding:8px;font-weight:700;">
+              📋 Copy Link
+            </button>
+            <a id="link-open-public-portfolio" href="${publicUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="font-size:0.78rem;padding:8px;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;font-weight:700;">
+              🌐 Open Portfolio ↗
+            </a>
+          </div>
+
+          <div style="background:rgba(234,179,8,0.06);border:1px solid rgba(234,179,8,0.2);border-radius:10px;padding:12px;font-size:0.76rem;color:rgba(255,255,255,0.8);line-height:1.5;margin-bottom:16px;">
+            ℹ️ Your hosted portfolio remains online for visitors. Live editing and new theme changes are restricted under the Keep It Live retention policy.
+          </div>
+
+          <button class="btn btn-primary" onclick="openBillingModal('pro')" style="width:100%;padding:11px;font-size:0.84rem;font-weight:800;background:linear-gradient(135deg,#7c3aed,#06b6d4);">
+            Reactivate Full Pro Plan — 600 EGP/month
+          </button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  // ──────────────────────────────────────────────
+  // CASE 3: ACTIVE PRO / PREMIUM / GRANDFATHERED
+  // ──────────────────────────────────────────────
+  const planDisplayName = isGrandfathered ? 'GRANDFATHERED' : (isPremiumOrGroup ? (effectivePlan === 'premium_group' ? 'PREMIUM GROUP' : 'PREMIUM') : 'PRO');
+  const publishedTimestamp = (portfolioData.publishedAt || portfolioData.published_at) ? new Date(portfolioData.publishedAt || portfolioData.published_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
+  const updatedTimestamp = (portfolioData.updatedAt || portfolioData.updated_at) ? new Date(portfolioData.updatedAt || portfolioData.updated_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
 
   el.innerHTML = `
-    <!-- PUBLISH STATUS & PRIMARY CONTROLS -->
-    <div style="background: ${isPublished ? 'rgba(16,185,129,0.06)' : 'rgba(245,158,11,0.06)'}; border: 1px solid ${isPublished ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'}; border-radius: 16px; padding: 18px; margin-bottom: 14px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <span style="font-size:0.75rem;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${isPublished ? '#10b981' : '#f59e0b'}">
-          ${isPublished ? '🟢 Live' : '🟡 Draft'}
-        </span>
-        <span style="font-size:0.7rem;color:rgba(255,255,255,0.5)">
-          All changes saved
-        </span>
+    <div style="font-family:'Inter',sans-serif;color:#fff;">
+
+      <!-- HEADER -->
+      <div style="margin-bottom: 20px;">
+        <h2 style="font-family:'Outfit',sans-serif;font-size:1.25rem;font-weight:800;color:#fff;margin:0 0 6px 0;">Publish & Share</h2>
+        <p style="font-size:0.82rem;color:rgba(255,255,255,0.65);margin:0;line-height:1.5;">
+          Manage your live 3D portfolio, public web link, and export options.
+        </p>
       </div>
 
-      <div style="font-size:0.8rem;color:rgba(255,255,255,0.7);line-height:1.5;margin-bottom:14px">
-        ${isPublished 
-          ? `Your 3D portfolio is published and accessible to visitors worldwide.` 
-          : `Publish your portfolio to share your live 3D web link with employers.`}
-      </div>
-
-      <!-- PUBLIC URL DISPLAY -->
-      <div style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <span id="public-url-text" style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:#06b6d4;word-break:break-all;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${publicUrl}</span>
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-        <button id="btn-copy-public-url" class="btn btn-secondary" onclick="copyPublicPortfolioUrl()" style="font-size:0.78rem;padding:8px">
-          📋 Copy Link
-        </button>
-        <a id="link-open-public-portfolio" href="${isPublished ? publicUrl : '#'}" ${isPublished ? 'target="_blank" rel="noopener noreferrer"' : 'aria-disabled="true" onclick="return false"'} class="btn btn-secondary" style="font-size:0.78rem;padding:8px;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;${isPublished ? '' : 'opacity:.45;cursor:not-allowed'}">
-          🌐 Open Portfolio ↗
-        </a>
-      </div>
-
-      <!-- PRIMARY PUBLISH ACTION -->
-      <button id="btn-publish-portfolio" class="btn btn-primary" onclick="handlePublishPortfolio()" style="width:100%;padding:12px;font-size:0.88rem;font-weight:800;background:linear-gradient(135deg,#7c3aed,#06b6d4)">
-        ${isPublished ? '🚀 Publish Changes' : '🚀 Publish Portfolio Live'}
-      </button>
-    </div>
-
-    <!-- PUBLIC SLUG SETTINGS -->
-    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:16px;padding:16px;margin-bottom:14px">
-      <div style="font-size:0.75rem;font-weight:800;color:rgba(255,255,255,0.8);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
-        🔗 Change Portfolio URL
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:rgba(255,255,255,0.4)">/u/</span>
-        <input id="f-publish-slug" class="field-input" value="${portfolioData.slug || ''}" placeholder="my-portfolio-slug" style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;padding:8px 12px;flex:1" onchange="updatePortfolioSlug(this.value)"/>
-      </div>
-    </div>
-
-    <!-- CUSTOM DOMAIN SECTION -->
-    <div id="custom-domain-slot"></div>
-
-    <!-- BACKUP & OFFLINE EXPORT ACTIONS -->
-    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:16px;padding:16px;margin-bottom:14px">
-      <div style="font-size:0.75rem;font-weight:800;color:rgba(255,255,255,0.8);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">
-        📦 Standalone Export & Backup
-      </div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <div style="font-size:0.74rem;color:rgba(255,255,255,.52);margin-bottom:2px">
-          ${pro ? 'Pro plan: unlimited exports and optional branding.' : `Free plan: ${remainingExports} of 1 HTML export remaining this month. Platform branding stays visible.`}
+      <!-- CARD 1: LIVE PUBLISHING DASHBOARD -->
+      <div style="background:${isPublished ? 'rgba(16,185,129,0.05)' : 'rgba(245,158,11,0.05)'};border:1px solid ${isPublished ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'};border-radius:18px;padding:20px;margin-bottom:16px;box-shadow:0 8px 24px rgba(0,0,0,0.2);">
+        
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <span style="font-size:0.75rem;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${isPublished ? '#10b981' : '#f59e0b'};">
+            ${isPublished ? '🟢 LIVE' : '🟡 DRAFT'}
+          </span>
+          <span style="font-size:0.68rem;font-weight:800;color:#c084fc;background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);border-radius:10px;padding:2px 8px;">
+            ${planDisplayName}
+          </span>
         </div>
-        <button id="btn-export-independent-site" class="btn btn-secondary" onclick="exportHTML()" ${remainingExports === 0 ? 'disabled aria-disabled="true"' : ''} style="width:100%;font-size:0.8rem">
-          📦 Download Independent Website (.html)
+
+        <div style="font-size:0.8rem;color:rgba(255,255,255,0.75);line-height:1.5;margin-bottom:14px;">
+          ${isPublished 
+            ? 'Your 3D portfolio is published and accessible to visitors worldwide.' 
+            : 'Publish your portfolio to get your live personal 3D link to share with recruiters.'}
+        </div>
+
+        ${isPublished ? `
+          <!-- PUBLIC URL DISPLAY -->
+          <div style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <span id="public-url-text" style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:#06b6d4;word-break:break-all;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${publicUrl}</span>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+            <button id="btn-copy-public-url" class="btn btn-secondary" onclick="copyPublicPortfolioUrl()" style="font-size:0.78rem;padding:9px;font-weight:700;">
+              📋 Copy Link
+            </button>
+            <a id="link-open-public-portfolio" href="${publicUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="font-size:0.78rem;padding:9px;text-align:center;text-decoration:none;font-weight:700;display:flex;align-items:center;justify-content:center;">
+              🌐 Open Portfolio ↗
+            </a>
+          </div>
+        ` : ''}
+
+        <!-- PRIMARY PUBLISH / UPDATE ACTION -->
+        <button id="btn-publish-portfolio" class="btn btn-primary" onclick="handlePublishPortfolio()" style="width:100%;padding:12px;font-size:0.88rem;font-weight:800;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#fff;border-radius:10px;cursor:pointer;margin-bottom:14px;">
+          ${isPublished ? '🚀 Update Live Portfolio' : '🚀 Publish Portfolio Live'}
         </button>
-        <div style="font-size:0.7rem;color:rgba(255,255,255,.42);line-height:1.45">A complete standalone website you own and can upload to any web host. Pro exports are unlimited and can remove platform branding.</div>
-        <button class="btn btn-secondary" onclick="copyShareableLink()" style="width:100%;font-size:0.8rem">
-          🔗 Copy Instant Encoded URL (Offline Share)
-        </button>
-        <button class="btn btn-secondary" onclick="saveToDB()" style="width:100%;font-size:0.8rem">
-          💾 Save Draft Snapshot
+
+        <!-- SLUG SETTING -->
+        <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:14px;margin-top:14px;">
+          <label style="font-size:0.72rem;font-weight:800;color:rgba(255,255,255,0.7);letter-spacing:0.8px;text-transform:uppercase;display:block;margin-bottom:6px;">
+            Change Portfolio URL
+          </label>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:0.76rem;color:rgba(255,255,255,0.4);">/u/</span>
+            <input id="f-publish-slug" class="field-input" value="${portfolioData.slug || ''}" placeholder="my-portfolio-slug" style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;padding:8px 10px;flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;outline:none;" onchange="updatePortfolioSlug(this.value)"/>
+          </div>
+        </div>
+
+        <!-- METADATA FOOTER -->
+        ${isPublished ? `
+          <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;margin-top:14px;font-size:0.72rem;color:rgba(255,255,255,0.5);flex-wrap:wrap;gap:8px;">
+            <div>Last Published: <strong style="color:rgba(255,255,255,0.8);">${publishedTimestamp || 'Recently'}</strong></div>
+            ${updatedTimestamp ? `<div>Last Updated: <strong style="color:rgba(255,255,255,0.8);">${updatedTimestamp}</strong></div>` : ''}
+          </div>
+        ` : ''}
+      </div>
+
+      <!-- CARD 2: STANDALONE EXPORT & BACKUP -->
+      <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:20px;margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <h3 style="font-size:0.95rem;font-weight:800;color:#fff;margin:0;display:flex;align-items:center;gap:8px;">
+            <span>📦</span> Standalone Export & Backup
+          </h3>
+          <span style="font-size:0.68rem;font-weight:800;color:#4ade80;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);border-radius:10px;padding:2px 8px;">
+            INCLUDED
+          </span>
+        </div>
+        <p style="font-size:0.78rem;color:rgba(255,255,255,0.65);line-height:1.5;margin:0 0 14px 0;">
+          Download an independent HTML website file for offline use, backup, or self-hosting. Unlimited exports are included with your plan.
+        </p>
+        <button id="btn-export-independent-site" class="btn btn-secondary" onclick="exportHTML()" style="width:100%;padding:10px;font-size:0.82rem;font-weight:700;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.18);color:#fff;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+          <span>📥</span> Download Portfolio (.html)
         </button>
       </div>
+
+      <!-- CARD 3: CUSTOM DOMAIN (PREMIUM ONLY) -->
+      ${isPremiumOrGroup ? `
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:20px;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+            <h3 style="font-size:0.95rem;font-weight:800;color:#fff;margin:0;display:flex;align-items:center;gap:8px;">
+              <span>🌐</span> Custom Domain
+            </h3>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:0.68rem;font-weight:800;color:#c084fc;background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);border-radius:10px;padding:2px 8px;">
+                PREMIUM
+              </span>
+              <span style="font-size:0.68rem;font-weight:800;color:#06b6d4;background:rgba(6,182,212,0.15);border:1px solid rgba(6,182,212,0.3);border-radius:10px;padding:2px 8px;">
+                COMING SOON
+              </span>
+            </div>
+          </div>
+          <p style="font-size:0.78rem;color:rgba(255,255,255,0.65);line-height:1.5;margin:0;">
+            Connect your own personalized domain name (e.g. <code>portfolio.yourname.com</code>) when custom domain publishing becomes available.
+          </p>
+        </div>
+      ` : ''}
+
     </div>
-
-    <!-- PRO BRANDING CONTROLS -->
-    ${pro ? `
-      <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.25);border-radius:16px;padding:16px;margin-bottom:14px">
-        <div style="font-size:0.75rem;font-weight:800;color:#10b981;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px">💎 Pro Branding Options</div>
-        <label style="display:flex;align-items:center;justify-content:space-between;font-size:0.8rem;color:rgba(255,255,255,0.8);cursor:pointer;margin-bottom:10px">
-          <span>🚫 إزالة العلامة المائية (Watermark)</span>
-          <input type="checkbox" id="chk-hide-watermark" ${portfolioData.hideWatermark ? 'checked' : ''} onchange="toggleProBranding('hideWatermark', this.checked)"/>
-        </label>
-        <label style="display:flex;align-items:center;justify-content:space-between;font-size:0.8rem;color:rgba(255,255,255,0.8);cursor:pointer">
-          <span>🎨 إخفاء شارة الثيم الـ 3D (Theme Badge)</span>
-          <input type="checkbox" id="chk-hide-theme" ${portfolioData.hideThemeBadge ? 'checked' : ''} onchange="toggleProBranding('hideThemeBadge', this.checked)"/>
-        </label>
-      </div>
-    ` : `
-      <div style="background:linear-gradient(135deg,rgba(124,58,237,0.18),rgba(6,182,212,0.12));border:1px solid rgba(124,58,237,0.35);border-radius:18px;padding:20px;text-align:center;position:relative;overflow:hidden">
-        <div style="font-size:2rem;margin-bottom:6px">👑</div>
-        <div style="font-size:1rem;font-weight:900;margin-bottom:4px;background:linear-gradient(135deg,#7c3aed,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent">الترقية إلى خطة Pro المميزة</div>
-        <div style="font-size:0.78rem;color:rgba(255,255,255,0.6);margin-bottom:14px">إزالة العلامة المائية وربط دومين مخصص وفتح جميع الميزات.</div>
-        <button class="btn btn-primary" onclick="openBillingModal()" style="width:100%;padding:10px;font-size:0.85rem;font-weight:800">
-          💎 ترقية الحساب
-        </button>
-      </div>
-    `}
   `;
-
-  // Render Custom Domain panel into the slot
-  const cdSlot = document.getElementById('custom-domain-slot');
-  if (cdSlot) {
-    renderCustomDomainPanel(cdSlot, portfolioData, (updatedPf) => {
-      Object.assign(portfolioData, updatedPf);
-      autoSave();
-    });
-  }
 }
 
 window.renderPublishTab = renderPublishTab;
 
 window.handlePublishPortfolio = async function() {
+  const effectivePlan = globalEntitlements.getEffectivePlanId();
+  const isGrandfathered = Boolean(portfolioData.isLegacy || portfolioData.is_legacy);
+  const hasHostedPublishRights = effectivePlan === 'pro' || effectivePlan === 'premium' || effectivePlan === 'premium_group' || isGrandfathered;
+  if (!hasHostedPublishRights) {
+    showToast('error', '🔒', 'Publishing online requires a Pro or Premium plan.');
+    if (typeof window.openBillingModal === 'function') {
+      window.openBillingModal('pro');
+    }
+    return;
+  }
+
   if (!portfolioData.name?.trim()) {
     showToast('error', '!', 'Add your name before publishing your portfolio.');
     switchTab('profile');
@@ -1822,12 +1997,25 @@ window.handlePublishPortfolio = async function() {
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = '🚀 Publish Changes (Update Live Site)';
+      btn.textContent = '🚀 Update Live Portfolio';
     }
   }
 };
 
 window.copyPublicPortfolioUrl = function() {
+  const effectivePlan = globalEntitlements.getEffectivePlanId();
+  const isGrandfathered = Boolean(portfolioData.isLegacy || portfolioData.is_legacy);
+  const isKeepItLive = globalEntitlements.isKeepItLive() || Boolean(portfolioData.hasKIL || portfolioData.has_kil);
+  const hasHostedPublishRights = effectivePlan === 'pro' || effectivePlan === 'premium' || effectivePlan === 'premium_group' || isGrandfathered;
+  
+  if (!hasHostedPublishRights && !isKeepItLive) {
+    showToast('error', '🔒', 'Live portfolio links are available with Pro.');
+    if (typeof window.openBillingModal === 'function') {
+      window.openBillingModal('pro');
+    }
+    return;
+  }
+
   const slug = portfolioData.slug || (portfolioData.name ? portfolioData.name.toLowerCase().replace(/[^a-z0-9]/g, '-') : 'portfolio');
   const url = `${window.location.origin}/u/${slug}`;
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1842,6 +2030,19 @@ window.copyPublicPortfolioUrl = function() {
 };
 
 window.updatePortfolioSlug = function(val) {
+  const effectivePlan = globalEntitlements.getEffectivePlanId();
+  const isGrandfathered = Boolean(portfolioData.isLegacy || portfolioData.is_legacy);
+  const hasHostedPublishRights = effectivePlan === 'pro' || effectivePlan === 'premium' || effectivePlan === 'premium_group' || isGrandfathered;
+  
+  if (!hasHostedPublishRights) {
+    showToast('error', '🔒', 'Custom portfolio URLs are available with Pro.');
+    if (typeof window.openBillingModal === 'function') {
+      window.openBillingModal('pro');
+    }
+    renderPublishTab();
+    return;
+  }
+
   const clean = (val || '')
     .trim()
     .toLowerCase()
@@ -1870,7 +2071,7 @@ window.toggleProBranding = function(prop, val) {
   portfolioData[prop] = val;
   portfolioData.isPro = isPro();
   autoSave();
-  showToast('info', '⚙️', 'تحديث خيارات العلامة المائية بنجاح!');
+  showToast('info', '⚙️', 'Branding options updated successfully!');
 };
 
 // ─── DEPLOY LIVE (PRO) ────────────────────────
