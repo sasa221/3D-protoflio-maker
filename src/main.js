@@ -2917,7 +2917,13 @@ window.upgradeToPro = function() {
 
 // ─── TOAST ──────────────────────────────────
 function showToast(type, icon, message) {
-  const container = document.getElementById('toast-container');
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'toast-container';
+    document.body.appendChild(container);
+  }
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
   toast.innerHTML = `<span class="toast-icon">${icon}</span><span>${message}</span>`;
@@ -2930,6 +2936,9 @@ function showToast(type, icon, message) {
   }, 3500);
 }
 
+window.showToast = showToast;
+window.openBillingModal = openBillingModal;
+
 // ─── ENGINE GLOBAL WRAPPERS (for inline onclick) ────────────
 window.engineBurst = () => engine?.explode();
 window.engineZoomIn = () => engine?.zoomIn();
@@ -2937,3 +2946,4 @@ window.engineZoomOut = () => engine?.zoomOut();
 
 // ─── START ──────────────────────────────────
 init();
+

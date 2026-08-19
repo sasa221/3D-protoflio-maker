@@ -39,8 +39,8 @@ export async function openBillingModal(arg1, arg2, arg3) {
   if (modalContainer) modalContainer.remove();
 
   modalContainer = document.createElement('div');
-  modalContainer.className = 'cv-import-modal-overlay';
-  modalContainer.style.zIndex = '10000';
+  modalContainer.className = 'cv-import-modal-overlay billing-modal-overlay';
+  modalContainer.style.cssText = 'position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 20px;';
 
   const currentPlan = globalEntitlements.getPlanId();
   let pendingRequests = [];
