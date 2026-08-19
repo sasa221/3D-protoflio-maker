@@ -16,11 +16,14 @@ const CANONICAL_ADMIN_EMAIL = 'saleh2005mohamed@gmail.com';
 function isAllowedAdminEmail(email) {
   if (!email || typeof email !== 'string') return false;
   const normalized = email.trim().toLowerCase();
-  const configured = (process.env.ADMIN_EMAILS || CANONICAL_ADMIN_EMAIL)
-    .split(',')
+  if (normalized === CANONICAL_ADMIN_EMAIL) return true;
+  const envList = [
+    ...(process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',') : []),
+    ...(process.env.ADMIN_EMAIL ? [process.env.ADMIN_EMAIL] : [])
+  ]
     .map(e => e.trim().toLowerCase())
     .filter(Boolean);
-  return configured.includes(normalized);
+  return envList.includes(normalized);
 }
 
 async function requireAdmin(req, res) {

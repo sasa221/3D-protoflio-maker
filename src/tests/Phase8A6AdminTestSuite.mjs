@@ -42,24 +42,23 @@ console.log('1. Testing admin authorization gating...');
 
 const CANONICAL_ADMIN_EMAIL = 'saleh2005mohamed@gmail.com';
 
-function simulateAdminAuth(userRole, userEmail, allowedAdminEmails = [CANONICAL_ADMIN_EMAIL]) {
-  if (userRole === 'admin') return { authorized: true };
-  if (userEmail) {
-    const normalized = userEmail.trim().toLowerCase();
-    if (allowedAdminEmails.map(e => e.trim().toLowerCase()).includes(normalized)) {
-      return { authorized: true };
-    }
-  }
+function simulateAdminAuth(userEmail, envAdminEmails = '') {
+  if (!userEmail) return { authorized: false, status: 403, error: 'Administrator access required' };
+  const normalized = userEmail.trim().toLowerCase();
+  if (normalized === CANONICAL_ADMIN_EMAIL) return { authorized: true };
+  const envList = envAdminEmails.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+  if (envList.includes(normalized)) return { authorized: true };
   return { authorized: false, status: 403, error: 'Administrator access required' };
 }
 
-assert(simulateAdminAuth('user', 'user@example.com').authorized === false, 'Normal user accessing admin overview -> DENIED (403)');
-assert(simulateAdminAuth('pro', 'pro@example.com').authorized === false, 'Pro subscriber accessing admin -> DENIED (403)');
-assert(simulateAdminAuth('premium', 'vip@example.com').authorized === false, 'Premium subscriber accessing admin -> DENIED (403)');
-assert(simulateAdminAuth('group_owner', 'founder@corp.com').authorized === false, 'Group owner accessing admin -> DENIED (403)');
-assert(simulateAdminAuth('user', 'Saleh2005mohamed@gmail.com').authorized === true, 'Saleh2005mohamed@gmail.com -> ALLOWED (200)');
-assert(simulateAdminAuth('user', ' SALEH2005MOHAMED@GMAIL.COM ').authorized === true, 'Trimmed & normalized Saleh2005mohamed@gmail.com -> ALLOWED (200)');
-assert(simulateAdminAuth('member', 'otheruser@example.com').authorized === false, 'Non-admin email -> DENIED (403)');
+assert(simulateAdminAuth('user@example.com').authorized === false, 'Normal user accessing admin overview -> DENIED (403)');
+assert(simulateAdminAuth('pro@example.com').authorized === false, 'Pro subscriber accessing admin -> DENIED (403)');
+assert(simulateAdminAuth('vip@example.com').authorized === false, 'Premium subscriber accessing admin -> DENIED (403)');
+assert(simulateAdminAuth('founder@corp.com').authorized === false, 'Group owner accessing admin -> DENIED (403)');
+assert(simulateAdminAuth('Saleh2005mohamed@gmail.com').authorized === true, 'Saleh2005mohamed@gmail.com -> ALLOWED (200)');
+assert(simulateAdminAuth(' SALEH2005MOHAMED@GMAIL.COM ').authorized === true, 'Trimmed & normalized Saleh2005mohamed@gmail.com -> ALLOWED (200)');
+assert(simulateAdminAuth('Saleh2005mohamed@gmail.com', 'some_other_admin@example.com').authorized === true, 'Canonical admin ALLOWED even if ADMIN_EMAILS defines other email');
+assert(simulateAdminAuth('otheruser@example.com').authorized === false, 'Non-admin email -> DENIED (403)');
 
 // ─── 2. ROLE ESCALATION & SELF-PROMOTION PREVENTION ─────────────
 console.log('\n2. Testing role escalation prevention...');

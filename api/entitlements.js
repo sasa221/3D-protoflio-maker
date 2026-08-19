@@ -242,9 +242,13 @@ export default async function handler(req, res) {
       const { data: userData } = await userClient.auth.getUser();
       if (!userData?.user) return res.status(401).json({ error: 'Invalid session' });
 
-      const allowedEmails = new Set((process.env.ADMIN_EMAILS || 'saleh2005mohamed@gmail.com').split(',').map(e => e.trim().toLowerCase()).filter(Boolean));
       const userEmail = (userData.user.email || '').trim().toLowerCase();
-      if (!allowedEmails.has(userEmail)) {
+      const isAllowedAdmin = userEmail === 'saleh2005mohamed@gmail.com' || [
+        ...(process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',') : []),
+        ...(process.env.ADMIN_EMAIL ? [process.env.ADMIN_EMAIL] : [])
+      ].map(e => e.trim().toLowerCase()).filter(Boolean).includes(userEmail);
+
+      if (!isAllowedAdmin) {
         return res.status(403).json({ error: 'Administrator access required' });
       }
 
