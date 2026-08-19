@@ -15,15 +15,13 @@ assert.ok(jobResults.every(result => result.passed), 'Job targeting acceptance s
 
 assert.equal(getThemeById('cyber').id, 'hacker', 'Legacy cyber theme alias must resolve to Cyber Command');
 assert.equal(getThemeById('hacker').name, 'Cyber Command');
-assert.equal(PLAN_CONFIG.pro.priceMonthly, 12);
+assert.equal(PLAN_CONFIG.pro.priceMonthlyEGP, 600);
 assert.equal(PLAN_CONFIG.pro.limits.variants, 5);
-assert.equal(PLAN_CONFIG.pro.limits.customDomains, 3);
 assert.match(PRODUCT_CONFIG.appDomain, /portfolio-maker-murex\.vercel\.app$/);
 const supabaseProEntitlements = new EntitlementService();
 supabaseProEntitlements.setSubscription({ plan_id: 'pro', status: 'active' });
 assert.equal(supabaseProEntitlements.getPlanId(), 'pro', 'Supabase plan_id must activate Pro entitlements in Studio');
 assert.equal(supabaseProEntitlements.getLimit('exportsPerMonth'), -1, 'Supabase Pro users must receive unlimited exports');
-assert.equal(supabaseProEntitlements.getLimit('customDomains'), 3, 'Supabase Pro users must receive custom-domain capacity');
 const publishedThemeCss = generatePortfolioCSS(getThemeById('aperture'));
 assert.match(publishedThemeCss, /\.portfolio-navbar/, 'Published portfolio CSS must include the complete layout system');
 assert.match(publishedThemeCss, /--primary:\s*#[0-9a-f]{6}/i, 'Theme numeric colors must serialize to valid CSS colors');

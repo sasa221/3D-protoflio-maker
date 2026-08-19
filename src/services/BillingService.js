@@ -1,47 +1,83 @@
 /**
  * BillingService.js
- * Production-ready billing provider abstraction & serverless checkout pipeline simulation.
+ * Billing provider abstraction with subscription state machine.
+ * Phase 8A: No real payment processing. Stripe endpoints disabled behind feature flags.
  * Server is the sole source of truth for paid entitlements.
- * Client-side localStorage tamper attempts are strictly blocked server-side.
  */
 
 import { globalEntitlements } from './EntitlementService.js';
 import { supabase } from './SupabaseClient.js';
+import { PLANS, PLAN_IDS, SUBSCRIPTION_STATUSES, GROUP_SEAT_PRICING, KEEP_IT_LIVE, formatPrice, getGroupPrice } from '../config/PlanConfig.js';
+import { isFeatureEnabled } from '../config/FeatureFlags.js';
 
-// Central Database for User Subscriptions
-const SERVER_SUBSCRIPTIONS_DB = new Map([
-  ['user_saleh_123', {
-    userId: 'user_saleh_123',
-    provider: 'stripe',
-    customerId: 'cus_saleh_123',
-    subscriptionId: 'sub_saleh_free',
-    planId: 'free',
-    status: 'active',
-    currentPeriodStart: '2026-08-01T00:00:00Z',
-    currentPeriodEnd: '2026-09-01T00:00:00Z',
-    cancelAtPeriodEnd: false
-  }]
-]);
+/**
+ * Valid subscription state transitions.
+ */
+const VALID_TRANSITIONS = {
+  free:        ['active'],
+  active:      ['canceling', 'expired', 'grace'],
+  canceling:   ['expired', 'active', 'grace'],
+  grace:       ['active', 'expired', 'keep_it_live'],
+  expired:     ['active', 'keep_it_live', 'free'],
+  keep_it_live: ['active', 'expired', 'free']
+};
 
 export class BillingService {
-  async getSubscriptionForUser(userId) {
-    const sub = SERVER_SUBSCRIPTIONS_DB.get(userId) || {
-      userId,
-      provider: 'stripe',
-      planId: 'free',
-      status: 'active'
-    };
-    return sub;
+  /**
+   * Check if a state transition is valid.
+   */
+  isValidTransition(fromStatus, toStatus) {
+    const allowed = VALID_TRANSITIONS[fromStatus];
+    return allowed ? allowed.includes(toStatus) : false;
   }
 
   /**
-   * Server-side Checkout Session Creation (POST /api/billing/checkout)
+   * Get available plan transitions for current plan.
+   */
+  getAvailableUpgrades(currentPlanId) {
+    const upgrades = [];
+    if (currentPlanId === 'free') {
+      upgrades.push('pro', 'premium', 'premium_group');
+    } else if (currentPlanId === 'pro') {
+      upgrades.push('premium', 'premium_group');
+    } else if (currentPlanId === 'premium') {
+      upgrades.push('premium_group');
+    }
+    return upgrades;
+  }
+
+  /**
+   * Get Keep It Live options for a user with expiring/expired subscription.
+   */
+  getKeepItLiveOptions(portfolios = []) {
+    return portfolios.map(p => ({
+      portfolioId: p.id,
+      portfolioName: p.name,
+      priceAnnualEGP: KEEP_IT_LIVE.priceAnnualPerPortfolioEGP,
+      priceDisplay: formatPrice(KEEP_IT_LIVE.priceAnnualPerPortfolioEGP, '/year')
+    }));
+  }
+
+  /**
+   * Create checkout session (placeholder for Phase 8B).
+   * Currently routes to "Coming Soon" unless MONETIZATION_UI_ENABLED.
    */
   async createCheckoutSession(userId, targetPlanId = 'pro', interval = 'monthly') {
     if (!userId) {
       throw new Error('User authentication required for billing checkout.');
     }
 
+    // Phase 8A: No real checkout
+    if (!isFeatureEnabled('MONETIZATION_UI_ENABLED')) {
+      return {
+        checkoutUrl: null,
+        message: 'Checkout is not connected yet. Coming soon!',
+        plan: PLANS[targetPlanId],
+        price: PLANS[targetPlanId]?.priceMonthlyEGP
+      };
+    }
+
+    // Future Phase 8B: Real payment provider integration
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) {
       throw new Error('Please sign in again before upgrading.');
@@ -63,6 +99,9 @@ export class BillingService {
     return { ...payload, checkoutUrl: payload.url };
   }
 
+  /**
+   * Create billing portal session.
+   */
   async createBillingPortalSession(userId) {
     if (!userId) throw new Error('User authentication required for billing.');
     const { data: { session } } = await supabase.auth.getSession();
@@ -84,72 +123,53 @@ export class BillingService {
   }
 
   /**
-   * Verified Billing Webhook Handler (POST /api/billing/webhook)
-   * Handles checkout.completed, customer.subscription.updated, customer.subscription.deleted
+   * Get all plan information for pricing display.
    */
-  async handleWebhookEvent(webhookEvent, signatureHeader) {
-    if (!signatureHeader || signatureHeader !== 'valid_stripe_signature') {
-      return { success: false, status: 400, error: 'Invalid webhook signature.' };
-    }
-
-    const { type, data } = webhookEvent;
-
-    if (type === 'checkout.session.completed' || type === 'customer.subscription.updated') {
-      const { userId, planId, subscriptionId, customerId } = data;
-      const sub = {
-        userId,
-        provider: 'stripe',
-        customerId: customerId || 'cus_stripe_123',
-        subscriptionId: subscriptionId || 'sub_pro_123',
-        planId: planId || 'pro',
-        status: 'active',
-        currentPeriodStart: new Date().toISOString(),
-        currentPeriodEnd: new Date(Date.now() + 30 * 86400000).toISOString(),
-        cancelAtPeriodEnd: false
-      };
-
-      SERVER_SUBSCRIPTIONS_DB.set(userId, sub);
-      globalEntitlements.setSubscription(sub);
-
-      return { success: true, status: 200, subscription: sub };
-    }
-
-    if (type === 'customer.subscription.deleted') {
-      const { userId } = data;
-      const existing = SERVER_SUBSCRIPTIONS_DB.get(userId);
-      if (existing) {
-        existing.planId = 'free';
-        existing.status = 'canceled';
-        SERVER_SUBSCRIPTIONS_DB.set(userId, existing);
-        globalEntitlements.setSubscription(existing);
-      }
-      return { success: true, status: 200 };
-    }
-
-    return { success: true, status: 200, message: 'Event ignored' };
+  getAllPlans() {
+    return {
+      free: PLANS.free,
+      pro: PLANS.pro,
+      premium: PLANS.premium,
+      premiumGroup: PLANS.premium_group,
+      groupPricing: GROUP_SEAT_PRICING,
+      keepItLive: KEEP_IT_LIVE
+    };
   }
 
   /**
-   * Server-Side Entitlement Verification (Prevents localStorage tampering!)
+   * Get the formatted price string for a plan.
    */
-  async verifyServerSideCapability(userId, capability) {
-    // Queries central server database directly, completely ignoring client-side localStorage!
-    const sub = await this.getSubscriptionForUser(userId);
-    const serverEntitlements = sub.planId === 'pro' && sub.status === 'active';
-
-    if (capability === 'pro_feature' && !serverEntitlements) {
-      return { allowed: false, error: 'Pro subscription required. Client-side state rejected.' };
-    }
-    return { allowed: true };
+  getPlanPrice(planId) {
+    const plan = PLANS[planId];
+    if (!plan) return '0 EGP';
+    return formatPrice(plan.priceMonthlyEGP);
   }
 
-  async downgradeUserToFree(userId) {
-    const existing = await this.getSubscriptionForUser(userId);
-    existing.planId = 'free';
-    existing.status = 'active';
-    SERVER_SUBSCRIPTIONS_DB.set(userId, existing);
-    globalEntitlements.setSubscription(existing);
-    return existing;
+  /**
+   * Server-Side Entitlement Verification.
+   * Prevents localStorage tampering.
+   */
+  async verifyServerSideCapability(userId, capability) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        return { allowed: false, error: 'Authentication required.' };
+      }
+
+      const response = await fetch('/api/entitlements/check', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: capability })
+      });
+
+      const result = await response.json().catch(() => ({}));
+      return { allowed: result.allowed === true, reason: result.reason };
+    } catch (e) {
+      return { allowed: false, error: e.message };
+    }
   }
 }
 

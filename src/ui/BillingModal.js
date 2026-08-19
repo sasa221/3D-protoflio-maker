@@ -1,12 +1,60 @@
 /**
  * BillingModal.js
- * Studio UI Modal for SaaS Monetization, Free vs Pro comparison, and checkout triggers.
+ * Studio UI Modal for SaaS Monetization, plan comparison, and checkout triggers.
+ * Phase 8A: All prices from PlanConfig.js. No real checkout connected.
  */
 
-import { globalEntitlements, PLAN_CONFIG } from '../services/EntitlementService.js';
+import { globalEntitlements } from '../services/EntitlementService.js';
 import { globalBilling } from '../services/BillingService.js';
+import { PLANS, formatPrice } from '../config/PlanConfig.js';
+import { isFeatureEnabled } from '../config/FeatureFlags.js';
 
 let modalContainer = null;
+
+function buildPlanCard(planId, currentPlan) {
+  const plan = PLANS[planId];
+  if (!plan) return '';
+  const isCurrent = currentPlan === planId;
+  const isHighlighted = planId === 'pro';
+
+  const bg = isHighlighted
+    ? 'linear-gradient(135deg, rgba(124,58,237,0.15), rgba(6,182,212,0.1))'
+    : 'rgba(255,255,255,0.02)';
+  const border = isHighlighted
+    ? '2px solid rgba(124,58,237,0.6)'
+    : isCurrent
+      ? '1px solid rgba(124,58,237,0.5)'
+      : '1px solid rgba(255,255,255,0.08)';
+  const shadow = isHighlighted ? 'box-shadow: 0 0 30px rgba(124,58,237,0.2);' : '';
+  const nameColor = isHighlighted ? 'color: #a855f7;' : '';
+
+  const priceDisplay = plan.priceMonthlyEGP === 0
+    ? '0'
+    : plan.priceMonthlyEGP.toLocaleString('en-EG');
+  const periodDisplay = plan.priceMonthlyEGP > 0 ? '/month' : '';
+
+  let badgeHTML = '';
+  if (isCurrent) {
+    badgeHTML = '<span style="position: absolute; top: 12px; right: 12px; font-size: 0.6rem; color: #10b981; font-weight: 800; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); border-radius: 12px; padding: 2px 8px;">CURRENT</span>';
+  } else if (plan.badge) {
+    badgeHTML = '<span style="position: absolute; top: 12px; right: 12px; font-size: 0.6rem; color: #f59e0b; font-weight: 800; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3); border-radius: 12px; padding: 2px 8px;">' + plan.badge + '</span>';
+  }
+
+  const ctaHTML = isCurrent
+    ? '<button disabled class="btn btn-secondary" style="width: 100%; opacity: 0.6; padding: 8px; font-size: 0.8rem;">Active Plan</button>'
+    : '<button class="btn btn-primary btn-trigger-checkout" data-plan="' + planId + '" style="width: 100%; font-weight: 900; padding: 8px; font-size: 0.8rem;">' + plan.cta + '</button>';
+
+  return '<div style="background: ' + bg + '; border: ' + border + '; border-radius: 18px; padding: 16px; position: relative; ' + shadow + '">'
+    + badgeHTML
+    + '<h3 style="font-size: 1.1rem; font-weight: 800; margin: 0 0 6px 0; ' + nameColor + '">' + plan.name.toUpperCase() + '</h3>'
+    + '<div style="font-size: 1.5rem; font-weight: 900; color: #fff; margin-bottom: 12px;">'
+    + priceDisplay
+    + ' <span style="font-size: 0.75rem; font-weight: 400; color: rgba(255,255,255,0.5);"> EGP' + periodDisplay + '</span>'
+    + '</div>'
+    + '<p style="font-size: 0.75rem; color: rgba(255,255,255,0.6); min-height: 2.5em; margin-bottom: 12px;">' + plan.description + '</p>'
+    + ctaHTML
+    + '</div>';
+}
 
 export function openBillingModal(currentUserId, onSubscriptionUpdated) {
   if (!currentUserId) {
@@ -20,10 +68,14 @@ export function openBillingModal(currentUserId, onSubscriptionUpdated) {
   modalContainer.style.zIndex = '10000';
 
   const currentPlan = globalEntitlements.getPlanId();
-  const isPro = currentPlan === 'pro';
+  const monetizationEnabled = isFeatureEnabled('MONETIZATION_UI_ENABLED');
+
+  const cardsHTML = ['free', 'pro', 'premium', 'premium_group']
+    .map(id => buildPlanCard(id, currentPlan))
+    .join('');
 
   modalContainer.innerHTML = `
-    <div class="cv-modal-card" style="max-width: 720px; text-align: left; padding: 28px;">
+    <div class="cv-modal-card" style="max-width: 900px; text-align: left; padding: 28px; max-height: 90vh; overflow-y: auto;">
       <button id="btn-close-billing" style="
         position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.06);
         border: 1px solid rgba(255,255,255,0.12); color: #fff; border-radius: 50%; width: 32px; height: 32px;
@@ -31,68 +83,16 @@ export function openBillingModal(currentUserId, onSubscriptionUpdated) {
       ">✕</button>
 
       <div style="margin-bottom: 20px; text-align: center;">
-        <span style="font-size: 0.75rem; font-weight: 800; color: var(--primary, #7c3aed); letter-spacing: 1.5px; text-transform: uppercase;">💎 SaaS MONETIZATION & PRICING</span>
+        <span style="font-size: 0.75rem; font-weight: 800; color: var(--primary, #7c3aed); letter-spacing: 1.5px; text-transform: uppercase;">💎 PLANS &amp; PRICING</span>
         <h2 style="font-size: 1.6rem; font-weight: 900; margin: 6px 0 8px 0;">Upgrade Your 3D Portfolio Experience</h2>
         <p style="font-size: 0.85rem; color: rgba(255,255,255,0.6); max-width: 500px; margin: 0 auto;">
-          Choose the plan that fits your career goals. Upgrade to unlock up to ${PLAN_CONFIG.pro.limits.variants} targeted variants, ${PLAN_CONFIG.pro.limits.customDomains} custom domains, and advanced themes.
+          Choose the plan that fits your career goals.
         </p>
       </div>
 
       <!-- PRICING CARDS -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
-        <!-- FREE PLAN -->
-        <div style="
-          background: rgba(255,255,255,0.02); border: 1px solid ${!isPro ? 'rgba(124,58,237,0.5)' : 'rgba(255,255,255,0.08)'};
-          border-radius: 18px; padding: 20px; position: relative;
-        ">
-          ${!isPro ? '<span style="position: absolute; top: 16px; right: 16px; font-size: 0.68rem; color: #10b981; font-weight: 800; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); border-radius: 12px; padding: 2px 10px;">CURRENT PLAN</span>' : ''}
-          <h3 style="font-size: 1.2rem; font-weight: 800; margin: 0 0 6px 0;">FREE</h3>
-          <div style="font-size: 1.8rem; font-weight: 900; color: #fff; margin-bottom: 12px;">$0 <span style="font-size: 0.8rem; font-weight: 400; color: rgba(255,255,255,0.5);">/forever</span></div>
-
-          <ul style="font-size: 0.78rem; color: rgba(255,255,255,0.8); line-height: 1.8; margin: 0 0 20px 0; padding-left: 18px;">
-            <li>1 Master Portfolio</li>
-            <li>1 Portfolio Variant</li>
-            <li>Basic 3D Themes & Short Intro</li>
-            <li>CV Import Starter Allowance</li>
-            <li>Recruiter Mode Included</li>
-            <li>Platform Subdomain & Branding</li>
-          </ul>
-
-          <button disabled class="btn btn-secondary" style="width: 100%; opacity: 0.6; padding: 10px;">
-            ${!isPro ? 'Active Plan' : 'Basic Plan'}
-          </button>
-        </div>
-
-        <!-- PRO PLAN -->
-        <div style="
-          background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(6,182,212,0.1));
-          border: 2px solid rgba(124,58,237,0.6); border-radius: 18px; padding: 20px; position: relative;
-          box-shadow: 0 0 30px rgba(124,58,237,0.2);
-        ">
-          ${isPro ? '<span style="position: absolute; top: 16px; right: 16px; font-size: 0.68rem; color: #10b981; font-weight: 800; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); border-radius: 12px; padding: 2px 10px;">CURRENT PLAN</span>' : '<span style="position: absolute; top: 16px; right: 16px; font-size: 0.68rem; color: #f59e0b; font-weight: 800; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3); border-radius: 12px; padding: 2px 10px;">RECOMMENDED</span>'}
-          <h3 style="font-size: 1.2rem; font-weight: 800; margin: 0 0 6px 0; color: #a855f7;">PRO</h3>
-          <div style="font-size: 1.8rem; font-weight: 900; color: #fff; margin-bottom: 12px;">$12 <span style="font-size: 0.8rem; font-weight: 400; color: rgba(255,255,255,0.5);">/month</span></div>
-
-          <ul style="font-size: 0.78rem; color: rgba(255,255,255,0.9); line-height: 1.8; margin: 0 0 20px 0; padding-left: 18px;">
-            <li><strong>Up to 5 Targeted Variants</strong></li>
-            <li><strong>Custom Domain Connection</strong></li>
-            <li><strong>Remove Platform Branding</strong></li>
-            <li><strong>Premium 3D Worlds & Epic Intros</strong></li>
-            <li><strong>Job Targeting & AI Optimizer</strong></li>
-            <li><strong>90-Day Advanced Analytics</strong></li>
-            <li><strong>Unlimited HTML Exports</strong></li>
-          </ul>
-
-          ${!isPro ? `
-            <button id="btn-trigger-checkout" class="btn btn-primary" style="width: 100%; font-weight: 900; padding: 12px;">
-              🚀 Upgrade to Pro ($12/mo)
-            </button>
-          ` : `
-            <button id="btn-downgrade-free" class="btn btn-secondary" style="width: 100%; padding: 10px; color: #ef4444;">
-              Downgrade to Free
-            </button>
-          `}
-        </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+        ${cardsHTML}
       </div>
     </div>
   `;
@@ -101,35 +101,54 @@ export function openBillingModal(currentUserId, onSubscriptionUpdated) {
 
   modalContainer.querySelector('#btn-close-billing').addEventListener('click', () => modalContainer.remove());
 
-  const btnCheckout = modalContainer.querySelector('#btn-trigger-checkout');
-  if (btnCheckout) {
-    btnCheckout.addEventListener('click', async () => {
-      btnCheckout.textContent = '⏳ Creating Checkout Session...';
-      btnCheckout.disabled = true;
-      try {
-        const checkout = await globalBilling.createCheckoutSession(currentUserId, 'pro', 'monthly');
-        window.location.assign(checkout.checkoutUrl);
-      } catch (error) {
-        btnCheckout.disabled = false;
-        btnCheckout.textContent = 'Upgrade to Pro ($12/mo)';
-        alert(error.message || 'Checkout is temporarily unavailable.');
-      }
-    });
-  }
+  const btnCheckouts = modalContainer.querySelectorAll('.btn-trigger-checkout');
+  btnCheckouts.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const planId = btn.getAttribute('data-plan');
 
-  const btnDowngrade = modalContainer.querySelector('#btn-downgrade-free');
-  if (btnDowngrade) {
-    btnDowngrade.addEventListener('click', async () => {
-      btnDowngrade.disabled = true;
-      btnDowngrade.textContent = 'Opening secure billing portal...';
+      if (!monetizationEnabled) {
+        showCheckoutPlaceholder(planId);
+        return;
+      }
+
+      const originalText = btn.textContent;
+      btn.textContent = '⏳ Loading...';
+      btn.disabled = true;
       try {
-        const portal = await globalBilling.createBillingPortalSession(currentUserId);
-        window.location.assign(portal.url);
+        const checkout = await globalBilling.createCheckoutSession(currentUserId, planId, 'monthly');
+        if (checkout.checkoutUrl) {
+          window.location.assign(checkout.checkoutUrl);
+        } else {
+          showCheckoutPlaceholder(planId);
+        }
       } catch (error) {
-        btnDowngrade.disabled = false;
-        btnDowngrade.textContent = 'Manage or Downgrade Plan';
-        alert(error.message || 'Billing portal is temporarily unavailable.');
+        btn.disabled = false;
+        btn.textContent = originalText;
+        showCheckoutPlaceholder(planId);
       }
     });
-  }
+  });
+}
+
+function showCheckoutPlaceholder(planId) {
+  const plan = PLANS[planId];
+  const priceText = plan ? plan.priceMonthlyEGP.toLocaleString('en-EG') + ' EGP/month' : '';
+  const placeholder = document.createElement('div');
+  placeholder.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:10001;display:flex;align-items:center;justify-content:center;';
+
+  placeholder.innerHTML = `
+    <div style="background: #1a1a1a; padding: 2rem; border-radius: 12px; border: 1px solid #333; text-align: center; max-width: 400px;">
+      <h2 style="color: #fff; margin-bottom: 8px;">${plan?.name || planId} Plan</h2>
+      <p style="font-size: 1.5rem; font-weight: bold; color: #e0a040; margin-bottom: 1rem;">${priceText}</p>
+      <div style="background: #222; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+        <p style="color: #ccc; margin: 4px 0;">✨ Checkout is not connected yet.</p>
+        <p style="color: #ccc; margin: 4px 0;">Payment integration is coming soon!</p>
+      </div>
+      <button class="btn btn-primary btn-close-placeholder" style="width: 100%;">Got it</button>
+    </div>
+  `;
+
+  document.body.appendChild(placeholder);
+  placeholder.querySelector('.btn-close-placeholder').addEventListener('click', () => placeholder.remove());
+  placeholder.addEventListener('click', (e) => { if (e.target === placeholder) placeholder.remove(); });
 }

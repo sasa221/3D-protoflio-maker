@@ -143,7 +143,36 @@ export function isLoggedIn() {
 }
 
 export function isPro() {
-  return globalEntitlements.getPlanId() === 'pro';
+  return globalEntitlements.getPlanId() === 'pro' || globalEntitlements.getEffectivePlanId() === 'premium' || globalEntitlements.getEffectivePlanId() === 'premium_group';
+}
+
+export function isPaidPlan() {
+  return globalEntitlements.getEffectivePlanId() !== 'free';
+}
+
+export function getCurrentPlanId() {
+  return globalEntitlements.getEffectivePlanId();
+}
+
+export function upgradeToPro() {}
+export async function redeemPromoCode(code) {
+  if (!code) return { success: false, error: 'Promo code is required.' };
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return { success: false, error: 'Please sign in first.' };
+    const response = await fetch('/api/promo/validate', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (result.valid) {
+      return { success: true, discount: result.discount };
+    }
+    return { success: false, error: result.reason || 'Promo code is not valid.' };
+  } catch (e) {
+    return { success: false, error: 'Promo validation failed. Please try again.' };
+  }
 }
 
 async function adminRequest(path, options = {}) {
@@ -175,14 +204,73 @@ export function adminGetOverview() {
   return adminRequest('/api/admin?action=overview');
 }
 
-export function adminSetUserPlan(userId, planId) {
-  return adminRequest('/api/admin?action=user-plan', {
-    method: 'PATCH',
-    body: JSON.stringify({ userId, planId })
+export function adminGetUsers() {
+  return adminRequest('/api/admin?action=users');
+}
+
+export function adminGetPortfolios() {
+  return adminRequest('/api/admin?action=portfolios');
+}
+
+export function adminGetGroups() {
+  return adminRequest('/api/admin?action=groups');
+}
+
+export function adminGetPromos() {
+  return adminRequest('/api/admin?action=promos');
+}
+
+export function adminGetAuditLog(limit = 100) {
+  return adminRequest(`/api/admin?action=audit-log&limit=${limit}`);
+}
+
+export function adminGetSystemInfo() {
+  return adminRequest('/api/admin?action=system');
+}
+
+export function adminOverrideUserPlan({ userId, targetPlanId, status = 'active', expiryDate = null, reason }) {
+  return adminRequest('/api/admin?action=user-plan-override', {
+    method: 'POST',
+    body: JSON.stringify({ userId, targetPlanId, status, expiryDate, reason })
   });
 }
 
-export function upgradeToPro() {}
-export function redeemPromoCode() {
-  return { success: false, error: 'Promo code redemption is not available yet.' };
+export function adminOverridePortfolioHosting({ portfolioId, hostingAction, reason }) {
+  return adminRequest('/api/admin?action=portfolio-hosting-override', {
+    method: 'POST',
+    body: JSON.stringify({ portfolioId, hostingAction, reason })
+  });
+}
+
+export function adminOverrideGroupSeats({ groupId, seatLimit, reason }) {
+  return adminRequest('/api/admin?action=group-seat-override', {
+    method: 'POST',
+    body: JSON.stringify({ groupId, seatLimit, reason })
+  });
+}
+
+export function adminCreatePromo(promoData) {
+  return adminRequest('/api/admin?action=create-promo', {
+    method: 'POST',
+    body: JSON.stringify(promoData)
+  });
+}
+
+export function adminDisablePromo({ promoId, reason }) {
+  return adminRequest('/api/admin?action=disable-promo', {
+    method: 'POST',
+    body: JSON.stringify({ promoId, reason })
+  });
+}
+
+export function adminOverrideUserLegacy({ userId, isLegacy, reason }) {
+  return adminRequest('/api/admin?action=user-legacy-override', {
+    method: 'POST',
+    body: JSON.stringify({ userId, isLegacy, reason })
+  });
+}
+
+// Backward-compat alias for legacy tests
+export function adminSetUserPlan(userId, planId) {
+  return adminOverrideUserPlan({ userId, targetPlanId: planId, reason: 'Legacy direct plan set' });
 }

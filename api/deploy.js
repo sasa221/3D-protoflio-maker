@@ -1,5 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 
+// Plan capabilities inline (serverless can't import from src/)
+const HOSTING_PLANS = new Set(['pro', 'premium', 'premium_group']);
+const PLAN_PORTFOLIO_LIMITS = { free: 1, pro: 1, premium: -1, premium_group: -1 };
+
+function isServerFeatureEnabled(flagName) {
+  const val = process.env[`FF_${flagName}`];
+  return val === 'true' || val === '1';
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -48,30 +57,54 @@ export default async function handler(req, res) {
 
     // 2. Server-side ownership check
     const adminClient = createClient(supabaseUrl, supabaseSecretKey);
-    const { data: existingPf } = await adminClient.from('portfolios').select('owner_user_id,master_profile_json').eq('id', portfolioId).maybeSingle();
+    const { data: existingPf } = await adminClient.from('portfolios').select('owner_user_id,master_profile_json,is_finalized').eq('id', portfolioId).maybeSingle();
 
     if (existingPf && existingPf.owner_user_id !== userId) {
       return res.status(403).json({ error: 'Forbidden — You do not own this portfolio' });
     }
 
+    // 3. Get subscription and determine effective plan
     const { data: subscription } = await adminClient
       .from('subscriptions')
-      .select('plan_id,status')
+      .select('plan_id,status,group_id')
       .eq('user_id', userId)
       .maybeSingle();
 
-    const isPro = subscription?.plan_id === 'pro' && subscription?.status === 'active';
+    let effectivePlan = subscription?.plan_id || 'free';
+    const subStatus = subscription?.status || 'active';
+    const isActiveSubscription = subStatus === 'active' || subStatus === 'grace' || subStatus === 'canceling';
 
+    // Check group membership for premium_group resolution
+    if (effectivePlan !== 'premium' && effectivePlan !== 'pro') {
+      const { data: membership } = await adminClient
+        .from('group_members')
+        .select('group_id')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .maybeSingle();
+      if (membership) {
+        const { data: group } = await adminClient
+          .from('groups')
+          .select('status')
+          .eq('id', membership.group_id)
+          .eq('status', 'active')
+          .maybeSingle();
+        if (group) effectivePlan = 'premium';
+      }
+    }
+
+    const isPaidPlan = HOSTING_PLANS.has(effectivePlan) && isActiveSubscription;
+
+    // 4. Handle export consumption
     if (action === 'consume_export') {
       if (!existingPf) return res.status(404).json({ error: 'Portfolio not found' });
-      if (isPro) return res.status(200).json({ success: true, unlimited: true });
+      if (isPaidPlan) return res.status(200).json({ success: true, unlimited: true });
 
       const month = new Date().toISOString().slice(0, 7);
       const storedProfile = existingPf.master_profile_json || {};
       const usage = storedProfile.exportUsage || {};
       const count = usage.month === month ? Number(usage.count || 0) : 0;
-      if (count >= 1) return res.status(403).json({ error: 'Free plan includes 1 HTML export per month.' });
-
+      // Free HTML export is unlimited per spec
       storedProfile.exportUsage = { month, count: count + 1 };
       const { error: usageError } = await adminClient
         .from('portfolios')
@@ -82,20 +115,83 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, usage: storedProfile.exportUsage });
     }
 
-    if (!existingPf) {
-      const { count: portfolioCount } = await adminClient
-        .from('portfolios')
-        .select('id', { count: 'exact', head: true })
-        .eq('owner_user_id', userId);
-      const portfolioLimit = isPro ? 10 : 1;
-      if ((portfolioCount || 0) >= portfolioLimit) {
-        return res.status(403).json({ error: `Your plan allows ${portfolioLimit} portfolio${portfolioLimit === 1 ? '' : 's'}.` });
+    // 5. Hosting paywall enforcement
+    if (isServerFeatureEnabled('HOSTING_PAYWALL_ENABLED')) {
+      if (!isPaidPlan) {
+        // Check Keep It Live
+        const { data: kil } = await adminClient
+          .from('keep_live_entitlements')
+          .select('status')
+          .eq('portfolio_id', portfolioId)
+          .eq('user_id', userId)
+          .eq('status', 'active')
+          .maybeSingle();
+
+        if (kil) {
+          // Keep It Live: existing content stays, but no new publishes
+          return res.status(403).json({ error: 'Publishing changes is locked. Renew your subscription to update your portfolio.' });
+        }
+
+        return res.status(403).json({ error: 'Online publishing is available with Pro.' });
       }
     }
+
+    // 6. Free finalization check
+    if (isServerFeatureEnabled('FREE_FINALIZATION_LOCK_ENABLED')) {
+      if (effectivePlan === 'free' && existingPf?.is_finalized) {
+        return res.status(403).json({ error: 'Editing is locked for this finalized Free portfolio. Upgrade to Pro to continue editing.' });
+      }
+    }
+
+    // 7. Portfolio limit check for new portfolios
+    if (!existingPf) {
+      const portfolioLimit = PLAN_PORTFOLIO_LIMITS[effectivePlan] ?? 1;
+
+      if (effectivePlan === 'free' && isServerFeatureEnabled('ENTITLEMENT_ENFORCEMENT_ENABLED')) {
+        // Free: check lifetime creation history
+        const { count: totalCreated } = await adminClient
+          .from('portfolio_creation_history')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('action', 'create');
+        if ((totalCreated || 0) >= 1) {
+          return res.status(403).json({ error: 'The Free plan includes one portfolio. Upgrade to Pro for a hosted portfolio.' });
+        }
+      } else if (effectivePlan === 'pro' && isServerFeatureEnabled('ENTITLEMENT_ENFORCEMENT_ENABLED')) {
+        // Pro: check persistent slot creation history (prevent delete -> create loop)
+        const { count: totalCreated } = await adminClient
+          .from('portfolio_creation_history')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('action', 'create');
+        if ((totalCreated || 0) >= 1) {
+          return res.status(403).json({ error: 'Your Pro subscription includes one persistent portfolio slot. You can edit, reset, or restore your existing slot, or upgrade to Premium for multiple portfolios.' });
+        }
+      } else if (portfolioLimit !== -1) {
+        const { count: portfolioCount } = await adminClient
+          .from('portfolios')
+          .select('id', { count: 'exact', head: true })
+          .eq('owner_user_id', userId);
+        if ((portfolioCount || 0) >= portfolioLimit) {
+          return res.status(403).json({ error: `Your plan allows ${portfolioLimit} portfolio${portfolioLimit === 1 ? '' : 's'}.` });
+        }
+      }
+
+      // Record creation in history
+      try {
+        await adminClient.from('portfolio_creation_history').insert([{
+          user_id: userId,
+          portfolio_id: portfolioId,
+          action: 'create'
+        }]);
+      } catch (_) {}
+    }
+
+    // 8. Build published profile
     const safeMasterProfile = JSON.parse(JSON.stringify(masterProfile || {}));
-    safeMasterProfile.isPro = isPro;
-    safeMasterProfile.hideWatermark = isPro && Boolean(safeMasterProfile.hideWatermark);
-    safeMasterProfile.hideThemeBadge = isPro && Boolean(safeMasterProfile.hideThemeBadge);
+    safeMasterProfile.isPro = isPaidPlan;
+    safeMasterProfile.hideWatermark = isPaidPlan && Boolean(safeMasterProfile.hideWatermark);
+    safeMasterProfile.hideThemeBadge = isPaidPlan && Boolean(safeMasterProfile.hideThemeBadge);
 
     const publishedAt = new Date().toISOString();
     const publishedSnapshot = JSON.parse(JSON.stringify(safeMasterProfile));
@@ -103,7 +199,7 @@ export default async function handler(req, res) {
     safeMasterProfile.publishedProfile = publishedSnapshot;
     safeMasterProfile.publishedAt = publishedAt;
 
-    // 3. Mark published in Supabase Postgres
+    // 9. Mark published in Supabase Postgres
     const { data: updatedPf, error: updateErr } = await adminClient.from('portfolios').upsert([
       {
         id: portfolioId,

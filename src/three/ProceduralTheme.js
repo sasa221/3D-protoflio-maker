@@ -264,7 +264,47 @@ export const THEMES = {
     id: 'cosmic', name: 'Cosmic Elite', emoji: '✨',
     primaryColor: 0x8844ff, secondaryColor: 0x4488ff, accentColor: 0xcc88ff,
     bgColor: 0x040408, particleCount: 5000, glowIntensity: 1.8,
-    keywords: [] // Catch-all default for any unrecognized profession
+    keywords: ['astronomy', 'astrophysicist', 'cosmic', 'space', 'spacecraft', 'فلك', 'فيزياء فلكية']
+  },
+
+  minimal: {
+    id: 'minimal', name: 'Minimal Orbit', emoji: '🪐',
+    primaryColor: 0x38bdf8, secondaryColor: 0x94a3b8, accentColor: 0xe2e8f0,
+    bgColor: 0x07090e, particleCount: 1500, glowIntensity: 1.2,
+    keywords: [
+      'general', 'generalist', 'specialist', 'professional', 'associate',
+      'coordinator', 'assistant', 'officer', 'representative', 'supervisor',
+      'administrator', 'freelancer', 'consultant', 'advisor',
+      'عام', 'مهني', 'أخصائي', 'مساعد', 'منسق', 'مسؤول', 'مشرف', 'إداري'
+    ]
+  },
+
+  obsidian: {
+    id: 'obsidian', name: 'Obsidian Luxe', emoji: '⚜️',
+    primaryColor: 0xd4af37, secondaryColor: 0x94a3b8, accentColor: 0xf3f4f6,
+    bgColor: 0x050505, particleCount: 2200, glowIntensity: 2.2,
+    keywords: [
+      'executive', 'founder', 'co-founder', 'ceo', 'cto', 'cmo', 'coo', 'cio',
+      'president', 'vice president', 'vp', 'director', 'managing director', 'principal',
+      'partner', 'managing partner', 'board member', 'investor', 'venture capitalist',
+      'luxury', 'consulting partner', 'strategy director', 'chief',
+      'مؤسس', 'شريك مؤسس', 'رئيس تنفيذي', 'مدير تنفيذي', 'رئيس', 'نائب رئيس',
+      'مستثمر', 'مستشار استراتيجي', 'شريك إداري'
+    ]
+  },
+
+  quantum: {
+    id: 'quantum', name: 'Quantum Aurora', emoji: '⚛️',
+    primaryColor: 0x8b5cf6, secondaryColor: 0x10b981, accentColor: 0xec4899,
+    bgColor: 0x03030c, particleCount: 4200, glowIntensity: 2.6,
+    keywords: [
+      'quantum', 'ai researcher', 'ai scientist', 'deep tech', 'robotics',
+      'robotics engineer', 'creative technologist', 'innovation lead',
+      'r&d engineer', 'r&d', 'computational', 'applied scientist', 'biotech researcher',
+      'nanotechnology', 'future', 'futurist', 'vr developer', 'ar developer',
+      'xr developer', 'metaverse', 'spatial computing',
+      'باحث ذكاء اصطناعي', 'روبوتات', 'مهندس روبوتات', 'تقنيات إبداعية', 'ابتكار', 'باحث علمي'
+    ]
   }
 };
 
@@ -277,16 +317,15 @@ export function classifyProfession(title = '') {
     .replace(/\s+/g, ' ')           // normalize spaces
     .replace(/[.,،؛]/g, '');        // remove punctuation
 
-  if (!normalized) return THEMES.cosmic;
+  if (!normalized) return THEMES.minimal;
 
   let bestMatch = null;
   let bestScore = 0;
 
   for (const theme of Object.values(THEMES)) {
-    if (theme.id === 'cosmic') continue; // skip default, only use as fallback
     let score = 0;
 
-    for (const keyword of theme.keywords) {
+    for (const keyword of (theme.keywords || [])) {
       if (normalized.includes(keyword)) {
         // Longer keyword = more specific match = higher score
         score += keyword.length * 2;
@@ -306,8 +345,8 @@ export function classifyProfession(title = '') {
     }
   }
 
-  // Return best match if score is meaningful, else cosmic default
-  return (bestMatch && bestScore >= 4) ? bestMatch : THEMES.cosmic;
+  // Return best match if score is meaningful, else minimal default
+  return (bestMatch && bestScore >= 4) ? bestMatch : THEMES.minimal;
 }
 
 /**
@@ -315,7 +354,7 @@ export function classifyProfession(title = '') {
  */
 export function getThemeById(id) {
   const normalizedId = id === 'cyber' ? 'hacker' : id;
-  return THEMES[normalizedId] || THEMES.cosmic;
+  return THEMES[normalizedId] || THEMES.minimal;
 }
 
 /**

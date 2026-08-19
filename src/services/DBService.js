@@ -8,6 +8,7 @@
 
 import { supabase } from './SupabaseClient.js';
 import { globalEntitlements } from './EntitlementService.js';
+import { isFeatureEnabled } from '../config/FeatureFlags.js';
 import { ensureStableIDs, createDefaultVariant } from './PortfolioVariantService.js';
 import { migrateLegacyBase64Assets } from './AssetStorageService.js';
 
@@ -33,9 +34,37 @@ export async function fetchUserProfileAndEntitlements(user) {
       .single();
 
     const planId = sub?.plan_id || 'free';
-    globalEntitlements.setSubscription(sub || { user_id: user.id, plan_id: 'free', status: 'active' });
 
-    return { profile, planId, subscription: sub };
+    // 3. Fetch Group Membership (if any)
+    let groupMembership = null;
+    try {
+      const { data: gm } = await supabase
+        .from('group_members')
+        .select('group_id, role, status')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .maybeSingle();
+      groupMembership = gm;
+    } catch (_) {}
+
+    // 4. Fetch Keep It Live entitlements
+    let keepLiveEntitlements = [];
+    try {
+      const { data: kl } = await supabase
+        .from('keep_live_entitlements')
+        .select('portfolio_id, status, starts_at, expires_at')
+        .eq('user_id', user.id)
+        .eq('status', 'active');
+      keepLiveEntitlements = kl || [];
+    } catch (_) {}
+
+    globalEntitlements.setSubscription(
+      sub || { user_id: user.id, plan_id: 'free', status: 'active' },
+      groupMembership,
+      keepLiveEntitlements
+    );
+
+    return { profile, planId, subscription: sub, groupMembership, keepLiveEntitlements };
   } catch (e) {
     console.warn('Error loading Supabase profile/subscription:', e.message);
     return { profile: null, planId: 'free' };
@@ -316,6 +345,15 @@ export async function createPortfolio(data = {}) {
     }
     throw new Error('Failed to create portfolio in database: ' + error.message);
   }
+
+  // Record portfolio creation in history for entitlement tracking
+  try {
+    await supabase.from('portfolio_creation_history').insert([{
+      user_id: user.id,
+      portfolio_id: portfolioId,
+      action: 'create'
+    }]);
+  } catch (_) {}
 
   return inserted || row;
 }

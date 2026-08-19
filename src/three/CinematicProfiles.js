@@ -49,9 +49,9 @@ export const CINEMATIC_PROFILES = {
 
 export function getCinematicProfileKey(themeId = '') {
   const id = (themeId || '').toLowerCase();
-  if (['data', 'growth', 'marketing', 'cosmic', 'finance'].includes(id)) return 'data';
-  if (['code', 'blueprint', 'legal', 'education'].includes(id)) return 'code';
-  if (['hacker', 'cyber', 'media', 'health', 'creative'].includes(id)) return 'cyber';
+  if (['data', 'growth', 'marketing', 'cosmic', 'finance', 'obsidian'].includes(id)) return 'data';
+  if (['code', 'blueprint', 'legal', 'education', 'minimal'].includes(id)) return 'code';
+  if (['hacker', 'cyber', 'media', 'health', 'creative', 'quantum'].includes(id)) return 'cyber';
   return 'default';
 }
 

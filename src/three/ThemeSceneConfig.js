@@ -96,10 +96,33 @@ export const THEME_SCENE_CONFIG = {
     particleMode: 'galaxy',
     orbitalRings: 3,
     wireframe: true
+  },
+  minimal: {
+    shape: 'sphere',
+    particleCount: 1500,
+    particleMode: 'point',
+    orbitalRings: 2,
+    wireframe: true
+  },
+  obsidian: {
+    shape: 'dodecahedron',
+    particleCount: 2200,
+    particleMode: 'cube',
+    glassPrisms: 6,
+    morphCore: false,
+    wireframe: true
+  },
+  quantum: {
+    shape: 'torus',
+    particleCount: 4200,
+    particleMode: 'rainbow',
+    morphCore: true,
+    orbitalRings: 4,
+    wireframe: false
   }
 };
 
 export function getThemeSceneConfig(themeId = '') {
-  const id = (themeId || 'cosmic').toLowerCase();
-  return THEME_SCENE_CONFIG[id] || THEME_SCENE_CONFIG.cosmic;
+  const id = (themeId || 'minimal').toLowerCase();
+  return THEME_SCENE_CONFIG[id] || THEME_SCENE_CONFIG.minimal;
 }

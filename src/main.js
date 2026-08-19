@@ -37,6 +37,10 @@ import { renderPortfolioVariantManager } from './ui/PortfolioVariantManager.js';
 import { renderAnalyticsDashboard } from './ui/AnalyticsDashboard.js';
 import { initPublicPortfolioAnalytics } from './services/AnalyticsService.js';
 import { openBillingModal } from './ui/BillingModal.js';
+import { globalEntitlements } from './services/EntitlementService.js';
+import { canAccessTheme, getThemeTier, getThemeBadge } from './config/ThemeTierConfig.js';
+import { isFeatureEnabled } from './config/FeatureFlags.js';
+import { PLANS } from './config/PlanConfig.js';
 import { renderCustomDomainPanel } from './ui/CustomDomainPanel.js';
 import { renderProductionReadinessPanel } from './ui/ProductionReadinessPanel.js';
 import confetti from 'canvas-confetti';
@@ -486,18 +490,26 @@ async function initStudio() {
 async function refreshStudioEntitlements({ notify = false } = {}) {
   const authUser = await getCurrentAuthUser();
   if (!authUser) return false;
-  const previousPlan = isPro() ? 'pro' : 'free';
+  const previousPlan = globalEntitlements.getEffectivePlanId();
   await fetchUserProfileAndEntitlements(authUser);
-  const nextPlan = isPro() ? 'pro' : 'free';
-  portfolioData.isPro = nextPlan === 'pro';
+  const nextPlan = globalEntitlements.getEffectivePlanId();
+  portfolioData.isPro = nextPlan !== 'free';
   if (!portfolioData.isPro) {
     portfolioData.hideWatermark = false;
     portfolioData.hideThemeBadge = false;
   }
+  // Update tier chip to show current plan
   const tierChip = document.getElementById('tier-chip');
   if (tierChip) {
-    tierChip.textContent = portfolioData.isPro ? '💎 PRO' : '🆓 FREE';
-    tierChip.className = `tier-chip ${portfolioData.isPro ? 'tier-pro' : 'tier-free'}`;
+    const chipConfig = {
+      free: { text: '🆓 FREE', cls: 'tier-free' },
+      pro: { text: '💎 PRO', cls: 'tier-pro' },
+      premium: { text: '👑 PREMIUM', cls: 'tier-premium' },
+      premium_group: { text: '👥 GROUP', cls: 'tier-premium' }
+    };
+    const chip = chipConfig[nextPlan] || chipConfig.free;
+    tierChip.textContent = chip.text;
+    tierChip.className = 'tier-chip ' + chip.cls;
   }
   buildThemeGrid();
   renderPublishTab();
@@ -568,8 +580,8 @@ function buildHTML() {
         <div class="logo-name">3D Portfolio Maker</div>
         <div class="logo-sub">Ultra Studio v3.0</div>
       </div>
-      <div class="tier-chip ${isPro() ? 'tier-pro' : 'tier-free'}" id="tier-chip" onclick="handleUpgradeClick()" style="cursor:pointer">
-        ${isPro() ? '💎 PRO' : '🆓 FREE'}
+      <div class="tier-chip ${globalEntitlements.getEffectivePlanId() !== 'free' ? 'tier-pro' : 'tier-free'}" id="tier-chip" onclick="handleUpgradeClick()" style="cursor:pointer">
+        ${(() => { const p = globalEntitlements.getEffectivePlanId(); return p === 'premium' ? '👑 PREMIUM' : p === 'premium_group' ? '👥 GROUP' : p === 'pro' ? '💎 PRO' : '🆓 FREE'; })()}
       </div>
       <button class="admin-btn" id="logout-btn" title="Logout" onclick="handleLogout()" style="font-size:16px">🚪</button>
     </div>
@@ -2468,27 +2480,34 @@ window.removeCert = function(i) {
 // ─── THEME GRID ─────────────────────────────
 const THEME_DESCRIPTORS = {
   code: { tag: 'Tech & Dev', desc: 'Code matrix neon flow' },
+  creative: { tag: 'Creative UI', desc: 'Vibrant fluid prism' },
+  minimal: { tag: 'Universal Minimal', desc: 'Subtle orbital geometry & calm space' },
   hacker: { tag: 'Cybersecurity', desc: 'Command shield and stream' },
   data: { tag: 'Data & AI', desc: 'Dense galactic orbital chart' },
   blueprint: { tag: 'Engineering', desc: 'Precision structural grid' },
-  creative: { tag: 'Creative UI', desc: 'Vibrant fluid prism' },
   media: { tag: 'Cinema & Media', desc: 'Aperture camera ring' },
   health: { tag: 'Health & Bio', desc: 'Double-helix cellular pulse' },
   marketing: { tag: 'Growth & Biz', desc: 'Dynamic ascending energy' },
-  finance: { tag: 'Finance & Fintech', desc: 'Golden metrics & orbital rings' },
   education: { tag: 'Academia', desc: 'Cosmic nebula knowledge flow' },
+  cosmic: { tag: 'Cosmic Nebula', desc: 'Starlight atmospheric depth' },
+  finance: { tag: 'Finance & Fintech', desc: 'Golden metrics & orbital rings' },
   legal: { tag: 'Prestige & Legal', desc: 'Understated structured lines' },
-  cosmic: { tag: 'Executive Minimal', desc: 'Starlight atmospheric depth' }
+  obsidian: { tag: 'Executive Luxury', desc: 'Deep obsidian crystal & gold chrome' },
+  quantum: { tag: 'Quantum Deep-Tech', desc: 'Layered aurora ribbons & spatial energy' }
 };
 
 function buildThemeGrid() {
   const el = document.getElementById('theme-grid');
   if (!el) return;
   const themes = getAllThemes();
+  const userTier = globalEntitlements.getThemeTier();
   el.innerHTML = themes.map(t => {
-    const freeThemes = ['cosmic', 'code', 'creative', 'media'];
-    const isLocked = !isPro() && !freeThemes.includes(t.id);
+    const themeTierBadge = getThemeBadge(t.id);
+    const isLocked = isFeatureEnabled('THEME_PAYWALL_ENABLED') ? !canAccessTheme(userTier, t.id) : (!isPro() && !['code', 'creative', 'minimal'].includes(t.id));
     const meta = THEME_DESCRIPTORS[t.id] || { tag: 'Visual Theme', desc: t.name };
+    const badgeHTML = themeTierBadge
+      ? '<span class="pro-badge" style="font-size:0.6rem;padding:1px 5px">' + themeTierBadge + '</span>'
+      : '';
     return `
       <div class="theme-card ${currentTheme?.id === t.id ? 'active' : ''}" onclick="selectTheme('${t.id}', ${isLocked})" style="display:flex;flex-direction:column;gap:4px;padding:12px 10px;text-align:left;position:relative">
         <div style="display:flex;justify-content:space-between;align-items:center">
@@ -2496,7 +2515,7 @@ function buildThemeGrid() {
           <span style="font-size:0.62rem;font-weight:800;color:var(--primary);background:rgba(124,58,237,0.15);padding:2px 6px;border-radius:8px">${meta.tag}</span>
         </div>
         <div class="theme-name" style="font-size:0.82rem;font-weight:800;color:#fff;margin-top:2px">
-          ${t.name} ${isLocked ? '<span class="pro-badge" style="font-size:0.6rem;padding:1px 5px">PRO</span>' : ''}
+          ${t.name} ${badgeHTML}
         </div>
         <div style="font-size:0.68rem;color:rgba(255,255,255,0.5);line-height:1.3">${meta.desc}</div>
       </div>
@@ -2506,7 +2525,10 @@ function buildThemeGrid() {
 
 window.selectTheme = function(id, locked) {
   if (locked) {
-    showToast('info', '💎', 'Upgrade to Pro to unlock all 11 3D themes!');
+    const requiredTier = getThemeTier(id);
+    const tierLabel = requiredTier === 'premium' ? 'Premium' : 'Pro';
+    const themeName = getThemeById(id)?.name || id;
+    showToast('info', '🔒', themeName + ' is available with ' + tierLabel + '.');
     handleUpgradeClick();
     return;
   }

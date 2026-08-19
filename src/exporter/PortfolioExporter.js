@@ -632,8 +632,8 @@ function buildPortfolioHTML(data, theme) {
     }
 
     function buildThemeScene(t) {
-      const themeId = (t.id || 'cosmic').toLowerCase();
-      const cfg = THEME_SCENE_CONFIG[themeId] || THEME_SCENE_CONFIG.cosmic;
+      const themeId = (t.id || 'minimal').toLowerCase();
+      const cfg = THEME_SCENE_CONFIG[themeId] || THEME_SCENE_CONFIG.minimal || THEME_SCENE_CONFIG.cosmic;
 
       // 1. Particle Cloud
       const count = cfg.particleCount || 3000;

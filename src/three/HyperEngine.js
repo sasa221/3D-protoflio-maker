@@ -116,6 +116,10 @@ export class HyperEngine {
       case 'finance':   this._buildDataGalaxy(theme); break;  // golden charts
       case 'education': this._buildCosmic(theme); break;       // knowledge nebula
       case 'legal':     this._buildBlueprint(theme); break;    // structured grids
+      case 'minimal':   this._buildMinimalOrbit(theme); break; // clean restrained orbits
+      case 'obsidian':  this._buildObsidianLuxe(theme); break; // luxury black glass & gold
+      case 'quantum':   this._buildQuantumAurora(theme); break;// futuristic aurora waves
+      case 'cosmic':
       default:          this._buildCosmic(theme);
     }
 
@@ -126,6 +130,37 @@ export class HyperEngine {
   // ──────────────────────────────────────────
   // THEME BUILDERS
   // ──────────────────────────────────────────
+
+  _buildMinimalOrbit(theme) {
+    // Restrained subtle particles
+    this._createParticleField(theme, 1500, 'point');
+    // Concentric elegant orbital rings
+    this._createOrbitalRings(theme, 2);
+    // Clean minimalist sphere core
+    this._createGeometricCore(theme, 'sphere');
+  }
+
+  _buildObsidianLuxe(theme) {
+    // Precise crisp glint particles
+    this._createParticleField(theme, 2200, 'cube');
+    // Architectural black-glass bevels & prisms
+    this._createGlassPrisms(theme, 6);
+    // Precision metallic dodecahedron core
+    this._createGeometricCore(theme, 'dodecahedron');
+    // Architectural wireframe structures
+    this._createWireframeStructures(theme);
+  }
+
+  _buildQuantumAurora(theme) {
+    // Dynamic luminous stream particles
+    this._createRainbowParticles(theme, 4200);
+    // Fluid quantum core
+    this._createMorphCore(theme);
+    // Layered dimensional energy rings
+    this._createOrbitalRings(theme, 4);
+    // Spatial energy stream lines
+    this._createDataStreams(theme, 20);
+  }
 
   _buildCodeMatrix(theme) {
     // Falling code rain particles
