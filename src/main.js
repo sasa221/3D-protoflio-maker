@@ -973,7 +973,7 @@ function buildHTML() {
     </div>
   </div>
 </div>
-};
+`;
 }
 window.buildHTML = buildHTML;
 

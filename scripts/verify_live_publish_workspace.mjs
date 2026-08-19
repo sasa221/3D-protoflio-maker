@@ -49,6 +49,9 @@ async function runPublishWorkspaceLiveAudit() {
           window.portfolioData.publishedAt = null;
           window.portfolioData.published_at = null;
         }
+        if (typeof window.renderPublishTab === 'function') {
+          window.renderPublishTab();
+        }
         if (typeof window.switchWorkspace === 'function') {
           window.switchWorkspace('publish');
         } else if (typeof window.switchTab === 'function') {
@@ -57,15 +60,16 @@ async function runPublishWorkspaceLiveAudit() {
       });
       await page.waitForTimeout(600);
 
-      const publishPanel = await page.$('#panel-publish, #publish-panel-content');
-      if (!publishPanel) {
-        console.error('  ❌ FAIL: Publish panel not found in DOM');
+      const publishPanel = await page.$('#panel-publish');
+      const publishContent = await page.$('#publish-panel-content');
+      if (!publishPanel || !publishContent) {
+        console.error('  ❌ FAIL: Publish panel or content not found in DOM');
         totalErrors++;
         await context.close();
         continue;
       }
 
-      const panelText = await publishPanel.innerText();
+      const panelText = await publishContent.innerText();
 
       // Free user invariants
       const hasFreeHeader = panelText.includes('Publish & Export');
