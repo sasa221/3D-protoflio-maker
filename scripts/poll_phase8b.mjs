@@ -5,14 +5,14 @@ async function check() {
       const m = html.match(/src="(\/assets\/index-[^"]+\.js)"/);
       const asset = m ? m[1] : 'not found';
       console.log(`[Attempt ${i}/25] Live Asset: ${asset}`);
-      if (asset !== '/assets/index-BILdPQ1W.js' && asset !== '/assets/index-CxJj5vkH.js') {
+      if (asset !== '/assets/index-BILdPQ1W.js' && asset !== '/assets/index-CxJj5vkH.js' && asset !== '/assets/index-DNPaSDcz.js' && asset !== '/assets/index-GCSbVwzy.js' && asset !== '/assets/index-Bo7lm4pa.js') {
         console.log(`\n======================================================`);
-        console.log(`✅ NEW PHASE 8B BUNDLE DEPLOYED: ${asset}`);
+        console.log(`✅ NEW 8-DIGIT OTP BUNDLE DEPLOYED: ${asset}`);
         console.log(`======================================================\n`);
         const js = await fetch('https://portfolio-maker-murex.vercel.app' + asset).then(r => r.text());
+        console.log('Has Generic Verification Text:', js.includes('sent a verification code to'));
+        console.log('Has 6-Digit Hardcoded Text:', js.includes('sent a 6-digit verification code'));
         console.log('Has Payment Requests Tab:', js.includes('Payment Requests'));
-        console.log('Has Verify Email OTP Screen:', js.includes('Verify your email') || js.includes('otp-digit'));
-        console.log('Has InstaPay Payment UI:', js.includes('Pay with InstaPay') || js.includes('MANUAL INSTAPAY TRANSFER'));
         console.log('Has 15 Themes:', js.includes('Minimal Orbit') && js.includes('Obsidian Luxe') && js.includes('Quantum Aurora'));
         return;
       }

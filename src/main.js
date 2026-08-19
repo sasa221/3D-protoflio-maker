@@ -462,14 +462,35 @@ function init() {
   });
 }
 
+export function resetStudioState() {
+  portfolioData = {
+    name: '', tagline: '', profession: '', bio: '',
+    location: '', avatar: '',
+    social: { github: '', linkedin: '', twitter: '', email: '', website: '' },
+    skills: [],
+    projects: [],
+    experience: [],
+    education: [],
+    resume: null,
+    viewMode: 'cinematic',
+    contactMessage: "I'm always open to new opportunities and collaborations.",
+    theme: 'code',
+    customColors: null
+  };
+}
+
 async function initStudio() {
+  resetStudioState();
   try {
     const authUser = await getCurrentAuthUser();
     if (authUser) {
       await fetchUserProfileAndEntitlements(authUser);
       const cloudPortfolio = await loadUserPortfoliosFromSupabase(authUser);
       if (cloudPortfolio) {
-        Object.assign(portfolioData, cloudPortfolio);
+        portfolioData = { ...portfolioData, ...cloudPortfolio };
+      } else {
+        portfolioData.name = authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'Your Portfolio';
+        portfolioData.social.email = authUser.email || '';
       }
     }
   } catch (e) {

@@ -7,6 +7,7 @@
 
 import { getCurrentAuthUser } from './AuthService.js';
 import { createPortfolio, saveDraft, publishPortfolio, loadUserPortfoliosFromSupabase } from './DBService.js';
+import { ScopedStorageService } from './ScopedStorageService.js';
 
 const STORAGE_KEY = 'portfolio_onboarding_state_v3';
 const SESSION_KEY = 'portfolio_onboarding_session_v3';
@@ -71,11 +72,10 @@ export class OnboardingService {
 
   loadState() {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = ScopedStorageService.getItem(STORAGE_KEY, this.state.ownerUserId);
       if (!stored) return this.freshState();
-      const parsed = JSON.parse(stored);
-      if (!parsed.ownerUserId && parsed.sessionId !== this.sessionId) return this.freshState();
-      return this.normalizeState(parsed);
+      if (!stored.ownerUserId && stored.sessionId !== this.sessionId) return this.freshState();
+      return this.normalizeState(stored);
     } catch (e) {
       return this.freshState();
     }
@@ -94,14 +94,15 @@ export class OnboardingService {
   saveState(partialState) {
     this.state = this.normalizeState({ ...this.state, ...partialState, sessionId: this.sessionId });
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+      ScopedStorageService.setItem(STORAGE_KEY, this.state, this.state.ownerUserId);
     } catch (e) {}
     return this.state;
   }
 
   resetState() {
+    const prevUserId = this.state.ownerUserId;
     this.state = this.freshState();
-    localStorage.removeItem(STORAGE_KEY);
+    ScopedStorageService.removeItem(STORAGE_KEY, prevUserId);
     return this.state;
   }
 

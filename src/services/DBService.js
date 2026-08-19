@@ -139,32 +139,25 @@ export async function loadUserPortfoliosFromSupabase(user) {
   }
 }
 
+import { ScopedStorageService } from './ScopedStorageService.js';
+
 export async function createInitialSupabasePortfolio(user) {
   const portfolioId = 'pf_' + Date.now();
   const slug = 'user-' + user.id.substr(0, 8);
+  const defaultName = user.user_metadata?.full_name || user.user_metadata?.name || 'Your Portfolio';
 
   const initialMaster = {
     id: portfolioId,
-    name: 'SALEH MOHAMED ABOREHAB Portfolio',
-    profession: 'Front-End Developer',
-    bio: 'Motivated Front-End Developer.',
+    owner_user_id: user.id,
+    name: defaultName,
+    profession: '',
+    bio: '',
     theme: 'code',
-    education: [
-      { id: 'edu_1', degree: 'Bachelor of Computer Science', institution: 'Helwan University', grade: '3.35', dates: '2023 – 2027' }
-    ],
-    experience: [
-      { id: 'exp_1', role: 'Web Developer Trainee', company: 'National Telecommunication Institute – NTI', dates: 'Sept 2025 – Oct 2025' },
-      { id: 'exp_2', role: 'Data Analysis Trainee', company: 'Ministry of Communications and Information Technology – MCIT', dates: 'Sept 2023 – Nov 2023' }
-    ],
-    projects: [
-      { id: 'proj_1', name: 'Clothe Website', tech: 'HTML · CSS · JavaScript', description: 'E-commerce web application.' },
-      { id: 'proj_2', name: 'Array ADT Manager in C++', tech: 'C++', description: 'Data structures C++ implementation.' }
-    ],
-    skills: [
-      { id: 'sk_1', name: 'JavaScript' },
-      { id: 'sk_2', name: 'HTML5' },
-      { id: 'sk_3', name: 'Power BI' }
-    ]
+    education: [],
+    experience: [],
+    projects: [],
+    skills: [],
+    social: { github: '', linkedin: '', twitter: '', email: user.email || '', website: '' }
   };
 
   ensureStableIDs(initialMaster);
@@ -240,9 +233,10 @@ export async function loadVariantsFromSupabase(portfolioId) {
 export function savePortfolioDebounced(masterProfile, onStatusChange) {
   if (!masterProfile || !masterProfile.id) return;
 
-  // 1. Instant local offline draft update (Resilience Layer)
+  // 1. Instant local offline draft update (User Scoped Resilience Layer)
   try {
-    localStorage.setItem(`draft_${masterProfile.id}`, JSON.stringify(masterProfile));
+    const currentUserId = masterProfile.owner_user_id || null;
+    ScopedStorageService.setItem(`draft_${masterProfile.id}`, masterProfile, currentUserId);
   } catch (e) {}
 
   if (onStatusChange) onStatusChange('Saving...');
@@ -270,15 +264,16 @@ export function savePortfolioDebounced(masterProfile, onStatusChange) {
           default_variant_id: masterProfile.activeVariantId,
           updated_at: updatedAt
         })
-        .eq('id', masterProfile.id);
+        .eq('id', masterProfile.id)
+        .eq('owner_user_id', user.data.user.id);
 
       if (error) {
         console.warn('Supabase autosave error:', error.message);
         if (onStatusChange) onStatusChange('Save Failed — Saved Locally');
       } else {
         currentServerUpdatedAt = updatedAt;
-        // Clear local draft cache on successful Supabase persistence
-        localStorage.removeItem(`draft_${masterProfile.id}`);
+        // Clear user-scoped local draft cache on successful Supabase persistence
+        ScopedStorageService.removeItem(`draft_${masterProfile.id}`, user.data.user.id);
         if (onStatusChange) onStatusChange('Saved');
       }
     } catch (e) {

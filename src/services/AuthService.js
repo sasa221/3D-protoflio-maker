@@ -6,6 +6,7 @@
 
 import { supabase } from './SupabaseClient.js';
 import { globalEntitlements } from './EntitlementService.js';
+import { ScopedStorageService } from './ScopedStorageService.js';
 
 export async function signUpUser(email, password, displayName = '') {
   const { data, error } = await supabase.auth.signUp({
@@ -34,9 +35,9 @@ export async function logoutUser() {
   const { error } = await supabase.auth.signOut();
   if (error) console.warn('Supabase logout warning:', error.message);
 
-  // Clear memory cache
+  // Clear memory cache and user storage
   try {
-    sessionStorage.clear();
+    ScopedStorageService.wipeAllUserCaches();
   } catch (e) {}
 }
 
