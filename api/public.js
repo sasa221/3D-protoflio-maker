@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
+import { sendBrevoEmail } from '../src/services/BrevoDispatcher.js';
+import { generatePasswordResetEmail } from '../src/services/EmailTemplates.js';
 
 const RESERVED_SLUGS = new Set(['admin', 'api', 'login', 'studio', 'start', 'privacy', 'terms', 'reset-password']);
 
@@ -136,22 +138,12 @@ export default async function handler(req, res) {
       }
 
       const actionUrl = linkData.properties?.action_link || 'https://portfolio-maker-murex.vercel.app/reset-password';
-      await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: { 'api-key': brevoApiKey, 'content-type': 'application/json', 'accept': 'application/json' },
-        body: JSON.stringify({
-          sender: { name: senderName, email: senderEmail },
-          to: [{ email: cleanEmail }],
-          subject: 'Reset Your 3D Portfolio Password',
-          htmlContent: `
-          <div style="font-family: Arial, sans-serif; background-color: #050508; color: #ffffff; padding: 30px; border-radius: 12px;">
-            <h2 style="color: #7c3aed;">⚡ 3D Portfolio Maker</h2>
-            <p>You requested a password reset for your account (<strong>${safeEscapedEmail}</strong>).</p>
-            <p>Click the secure link below to set a new password:</p>
-            <a href="${actionUrl}" style="display: inline-block; padding: 12px 24px; background: #7c3aed; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 16px 0;">Reset Password</a>
-            <p style="color: #888888; font-size: 12px; margin-top: 20px;">If you did not request this, you can safely ignore this email.</p>
-          </div>`
-        })
+      const html = generatePasswordResetEmail({ firstName: cleanEmail.split('@')[0], actionUrl });
+
+      await sendBrevoEmail({
+        to: cleanEmail,
+        subject: 'Reset Your Portfolio Maker Password',
+        htmlContent: html
       });
 
       return res.status(200).json(genericSuccessResponse);

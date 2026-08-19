@@ -6,6 +6,8 @@ import {
   adminGetPromos,
   adminGetAuditLog,
   adminGetSystemInfo,
+  adminGetPaymentRequests,
+  adminReviewPayment,
   adminOverrideUserPlan,
   adminOverridePortfolioHosting,
   adminOverrideGroupSeats,
@@ -29,6 +31,7 @@ let cachedData = {
   portfolios: [],
   groups: [],
   promos: [],
+  payments: [],
   auditLogs: [],
   system: null
 };
@@ -63,6 +66,7 @@ export async function renderAdminPage() {
           <button class="admin-tab" data-tab="portfolios">🌐 Portfolios</button>
           <button class="admin-tab" data-tab="groups">🏢 Groups</button>
           <button class="admin-tab" data-tab="kil">⏳ Keep It Live</button>
+          <button class="admin-tab" data-tab="payments">💳 Payment Requests</button>
           <button class="admin-tab" data-tab="promos">🎟️ Promo Codes</button>
           <button class="admin-tab" data-tab="themes">🎨 Themes (15)</button>
           <button class="admin-tab" data-tab="audit">🛡️ Audit Log</button>
@@ -77,6 +81,13 @@ export async function renderAdminPage() {
       <div id="admin-user-modal" class="modal-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:100;backdrop-filter:blur(8px);align-items:center;justify-content:center">
         <div class="modal-container" style="background:#0c0d14;border:1px solid rgba(255,255,255,0.15);width:min(760px,94vw);max-height:90vh;overflow-y:auto;border-radius:18px;padding:26px;color:#fff">
           <div id="admin-modal-body"></div>
+        </div>
+      </div>
+
+      <!-- Payment Review Modal -->
+      <div id="admin-payment-modal" class="modal-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:100;backdrop-filter:blur(8px);align-items:center;justify-content:center">
+        <div class="modal-container" style="background:#0c0d14;border:1px solid rgba(255,255,255,0.15);width:min(640px,94vw);max-height:90vh;overflow-y:auto;border-radius:18px;padding:26px;color:#fff">
+          <div id="admin-payment-modal-body"></div>
         </div>
       </div>
     </main>`;
@@ -109,12 +120,13 @@ async function loadAllData() {
   }
 
   try {
-    const [overviewData, usersData, portfoliosData, groupsData, promosData, auditData, systemData] = await Promise.all([
+    const [overviewData, usersData, portfoliosData, groupsData, promosData, paymentsData, auditData, systemData] = await Promise.all([
       adminGetOverview().catch(() => ({ stats: {}, featureFlags: {} })),
       adminGetUsers().catch(() => ({ users: [] })),
       adminGetPortfolios().catch(() => ({ portfolios: [] })),
       adminGetGroups().catch(() => ({ groups: [] })),
       adminGetPromos().catch(() => ({ promos: [] })),
+      adminGetPaymentRequests('all').catch(() => ({ requests: [] })),
       adminGetAuditLog(150).catch(() => ({ logs: [] })),
       adminGetSystemInfo().catch(() => ({ featureFlags: {}, pricingReference: {} }))
     ]);
@@ -125,6 +137,7 @@ async function loadAllData() {
       portfolios: portfoliosData.portfolios || [],
       groups: groupsData.groups || [],
       promos: promosData.promos || [],
+      payments: paymentsData.requests || [],
       auditLogs: auditData.logs || [],
       system: systemData
     };
@@ -162,6 +175,10 @@ function renderCurrentTab() {
     case 'kil':
       container.innerHTML = renderKILTab(cachedData.portfolios);
       break;
+    case 'payments':
+      container.innerHTML = renderPaymentsTab(cachedData.payments);
+      installPaymentsTabHandlers();
+      break;
     case 'promos':
       container.innerHTML = renderPromosTab(cachedData.promos);
       installPromosTabHandlers();
@@ -182,11 +199,11 @@ function renderCurrentTab() {
 function renderOverviewTab(data) {
   const stats = data?.stats || {};
   return `
-    <div style="background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.3);border-radius:12px;padding:14px 18px;margin-bottom:24px;display:flex;align-items:center;gap:12px">
-      <span style="font-size:22px">🔒</span>
+    <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:12px;padding:14px 18px;margin-bottom:24px;display:flex;align-items:center;gap:12px">
+      <span style="font-size:22px">💳</span>
       <div>
-        <strong style="color:#fde047;font-size:13px;display:block">PAYMENTS: Not connected yet (Phase 8B pending)</strong>
-        <span style="color:rgba(255,255,255,0.7);font-size:12px">Centralized server entitlements active. Real financial metrics (MRR/ARR) disabled until payment provider connection.</span>
+        <strong style="color:#4ade80;font-size:13px;display:block">PAYMENTS: Manual InstaPay Active (Phase 8B)</strong>
+        <span style="color:rgba(255,255,255,0.7);font-size:12px">Users submit transfer proof. Admins review and activate subscriptions with server-authoritative pricing and Brevo notifications.</span>
       </div>
     </div>
 
@@ -203,6 +220,9 @@ function renderOverviewTab(data) {
       ${renderStatCard('Keep It Live', stats.keepLivePortfolios || 0, '#f97316')}
       ${renderStatCard('Active Groups', stats.activeGroups || 0, '#14b8a6')}
       ${renderStatCard('Active Promos', stats.promoCodesCount || 0, '#eab308')}
+      ${renderStatCard('Pending Payments', stats.pendingPaymentsCount ?? 0, '#fde047')}
+      ${renderStatCard('Approved Payments', stats.approvedPaymentsCount ?? 0, '#22c55e')}
+      ${renderStatCard('Rejected Payments', stats.rejectedPaymentsCount ?? 0, '#ef4444')}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
@@ -224,49 +244,43 @@ function renderOverviewTab(data) {
 }
 
 function renderStatCard(label, val, color) {
-  const isString = typeof val === 'string';
-  const displayVal = isString ? val : (Number(val) || 0);
-  const fontSize = isString && val.length > 5 ? '15px' : '26px';
   return `
-    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:18px;position:relative;overflow:hidden">
-      <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:${color}"></div>
-      <span style="font-size:11px;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:6px">${escapeHtml(label)}</span>
-      <strong style="font-size:${fontSize};font-weight:900;color:#fff">${escapeHtml(String(displayVal))}</strong>
+    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px">
+      <span style="font-size:11px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px">${escapeHtml(label)}</span>
+      <div style="font-size:24px;font-weight:900;color:${color};margin-top:6px">${typeof val === 'number' ? val.toLocaleString() : escapeHtml(String(val))}</div>
     </div>`;
 }
 
 // ─── 2. USERS TAB ────────────────────────────────────────────────
 function renderUsersTab(users) {
   return `
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap">
-      <input type="text" id="user-search-input" placeholder="🔍 Search name, email, or user ID..." style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);padding:10px 14px;border-radius:10px;color:#fff;font-size:13px;width:min(320px,100%)"/>
-      <div style="display:flex;gap:10px;align-items:center">
-        <select id="user-filter-plan" style="background:#13141f;border:1px solid rgba(255,255,255,0.15);padding:8px 12px;border-radius:8px;color:#fff;font-size:12px">
-          <option value="all">All Plans</option>
-          <option value="free">Free</option>
-          <option value="pro">Pro</option>
-          <option value="premium">Premium</option>
-          <option value="premium_group">Group</option>
-          <option value="legacy">Legacy Users</option>
-          <option value="kil">Keep It Live</option>
-        </select>
-        <select id="user-sort" style="background:#13141f;border:1px solid rgba(255,255,255,0.15);padding:8px 12px;border-radius:8px;color:#fff;font-size:12px">
-          <option value="newest">Newest First</option>
-          <option value="oldest">Oldest First</option>
-          <option value="portfolios">Most Portfolios</option>
-        </select>
-      </div>
+    <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap">
+      <input type="text" id="user-search-input" placeholder="Search by name, email, user ID…" style="flex:1;min-width:240px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px 14px;color:#fff;font-size:13px;outline:none"/>
+      <select id="user-filter-plan" style="background:#141624;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px 14px;color:#fff;font-size:13px">
+        <option value="all">All Plans</option>
+        <option value="free">Free</option>
+        <option value="pro">Pro</option>
+        <option value="premium">Premium</option>
+        <option value="premium_group">Premium Group</option>
+        <option value="legacy">Legacy Grandfathered</option>
+        <option value="kil">Keep It Live</option>
+      </select>
+      <select id="user-sort" style="background:#141624;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px 14px;color:#fff;font-size:13px">
+        <option value="newest">Sort: Newest First</option>
+        <option value="oldest">Sort: Oldest First</option>
+        <option value="portfolios">Sort: Most Portfolios</option>
+      </select>
     </div>
 
     <div style="overflow-x:auto;border:1px solid rgba(255,255,255,0.08);border-radius:14px;background:rgba(255,255,255,0.02)">
       <table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px">
         <thead>
           <tr style="border-bottom:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);font-size:11px;text-transform:uppercase;letter-spacing:1px">
-            <th style="padding:14px 16px">User Profile</th>
-            <th style="padding:14px">Plan & Tier</th>
+            <th style="padding:14px 16px">User / Identity</th>
+            <th style="padding:14px">Effective Plan</th>
             <th style="padding:14px">Status</th>
             <th style="padding:14px">Portfolios</th>
-            <th style="padding:14px">Legacy</th>
+            <th style="padding:14px">Legacy Access</th>
             <th style="padding:14px">Joined</th>
             <th style="padding:14px 16px;text-align:right">Action</th>
           </tr>
@@ -359,125 +373,107 @@ function openUserManagementModal(user) {
   const body = document.getElementById('admin-modal-body');
   if (!modal || !body) return;
 
-  const planObj = PLANS[user.plan] || PLANS.free;
-
   body.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:14px;margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:14px">
       <div>
-        <h2 style="margin:0;font-size:20px;font-weight:900">${escapeHtml(user.name)}</h2>
-        <small style="color:rgba(255,255,255,0.5)">ID: ${escapeHtml(user.id)} • ${escapeHtml(user.email)}</small>
+        <h2 style="margin:0;font-size:18px;font-weight:900;color:#fff">${escapeHtml(user.name)}</h2>
+        <span style="font-size:12px;color:rgba(255,255,255,0.6)">${escapeHtml(user.email)}</span>
+        <small style="font-family:monospace;display:block;color:rgba(255,255,255,0.4);font-size:11px">UID: ${escapeHtml(user.id)}</small>
       </div>
-      <button id="close-user-modal" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer">✕</button>
+      <button id="close-user-modal" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer">✕</button>
     </div>
 
-    <!-- Evaluated Capabilities -->
-    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px;margin-bottom:20px">
-      <h4 style="margin:0 0 10px;font-size:12px;color:#8b5cf6;text-transform:uppercase;letter-spacing:1px">Current Evaluated Capabilities</h4>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
-        <div>canCreatePortfolio: <strong>${user.portfolioCount < (planObj.limits?.portfolios || 1) ? '✅ ALLOW' : '❌ AT LIMIT'}</strong></div>
-        <div>canPublishHosted: <strong>${planObj.hosted ? '✅ ALLOW' : '❌ DENIED (PRO+)'}</strong></div>
-        <div>canUseProThemes: <strong>${['pro', 'premium', 'premium_group'].includes(user.plan) ? '✅ ALLOW' : '❌ DENIED'}</strong></div>
-        <div>canUsePremiumThemes: <strong>${['premium', 'premium_group'].includes(user.plan) ? '✅ ALLOW' : '❌ DENIED'}</strong></div>
-        <div>canExportPDF: <strong>${user.plan !== 'free' ? '✅ ALLOW' : '❌ DENIED'}</strong></div>
-        <div>canRemoveBranding: <strong>${['premium', 'premium_group'].includes(user.plan) ? '✅ ALLOW' : '❌ DENIED'}</strong></div>
-        <div>Custom Domain: <strong>${['premium', 'premium_group'].includes(user.plan) ? '⏳ ENTITLED (COMING SOON)' : '❌ DENIED'}</strong></div>
-        <div>Legacy Access: <strong>${user.isLegacy ? '🌟 GRANDFATHERED' : 'STANDARD'}</strong></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
+      <div style="background:rgba(255,255,255,0.03);padding:12px;border-radius:8px">
+        <span style="font-size:11px;color:rgba(255,255,255,0.5)">Current Commercial Plan</span>
+        <div style="font-size:16px;font-weight:800;color:#c084fc;margin-top:2px">${escapeHtml(user.plan.toUpperCase())} (${escapeHtml(user.status)})</div>
+      </div>
+      <div style="background:rgba(255,255,255,0.03);padding:12px;border-radius:8px">
+        <span style="font-size:11px;color:rgba(255,255,255,0.5)">Legacy Access Mode</span>
+        <div style="font-size:16px;font-weight:800;color:${user.isLegacy ? '#38bdf8' : '#94a3b8'};margin-top:2px">${user.isLegacy ? 'GRANDFATHERED (ALL THEMES)' : 'STANDARD COMMERCIAL'}</div>
       </div>
     </div>
 
-    <!-- Cooldown Section (Premium) -->
-    ${user.plan.includes('premium') ? `
-      <div style="background:rgba(236,72,153,0.08);border:1px solid rgba(236,72,153,0.25);border-radius:12px;padding:12px;margin-bottom:20px;font-size:12px">
-        <h4 style="margin:0 0 6px;color:#f472b6;font-size:12px;text-transform:uppercase">7-Day Rolling Creation Cooldown</h4>
-        <div>Last Created: <strong>${user.cooldown?.lastCreatedAt ? new Date(user.cooldown.lastCreatedAt).toLocaleString() : 'None recorded'}</strong></div>
-        <div>Next Slot Available: <strong>${user.cooldown?.nextAvailableAt ? new Date(user.cooldown.nextAvailableAt).toLocaleString() : 'Available now'}</strong></div>
-        <div>Status: <strong>${user.cooldown?.remainingHours > 0 ? `⏳ ${user.cooldown.remainingHours} hours remaining` : '✅ Ready to create'}</strong></div>
-      </div>
-    ` : ''}
-
-    <!-- Plan Override Form -->
-    <div style="border:1px solid rgba(124,58,237,0.3);border-radius:12px;padding:16px;background:rgba(124,58,237,0.05)">
-      <h4 style="margin:0 0 12px;font-size:13px;color:#c084fc;font-weight:800">⚙️ Manual Plan Override (Audited)</h4>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+    <!-- Override Plan Section -->
+    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px;margin-bottom:16px">
+      <h3 style="margin:0 0 10px;font-size:14px;color:#fff;font-weight:800">Plan & Subscription Override (Audited)</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
         <div>
-          <label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">Target Commercial Plan</label>
-          <select id="override-target-plan" style="width:100%;background:#13141f;border:1px solid rgba(255,255,255,0.2);padding:8px;border-radius:8px;color:#fff;font-size:12px">
-            <option value="free" ${user.plan === 'free' ? 'selected' : ''}>Free (0 EGP)</option>
-            <option value="pro" ${user.plan === 'pro' ? 'selected' : ''}>Pro (600 EGP/mo)</option>
-            <option value="premium" ${user.plan === 'premium' ? 'selected' : ''}>Premium (1,000 EGP/mo)</option>
+          <label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">Target Plan Tier</label>
+          <select id="modal-override-plan" style="width:100%;background:#141624;border:1px solid rgba(255,255,255,0.2);padding:8px;border-radius:6px;color:#fff;font-size:12px">
+            <option value="free" ${user.plan === 'free' ? 'selected' : ''}>Free Tier</option>
+            <option value="pro" ${user.plan === 'pro' ? 'selected' : ''}>Pro Plan</option>
+            <option value="premium" ${user.plan === 'premium' ? 'selected' : ''}>Premium Plan</option>
+            <option value="premium_group" ${user.plan === 'premium_group' ? 'selected' : ''}>Premium Group</option>
           </select>
         </div>
         <div>
-          <label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">Subscription Status</label>
-          <select id="override-target-status" style="width:100%;background:#13141f;border:1px solid rgba(255,255,255,0.2);padding:8px;border-radius:8px;color:#fff;font-size:12px">
+          <label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">Subscription State</label>
+          <select id="modal-override-status" style="width:100%;background:#141624;border:1px solid rgba(255,255,255,0.2);padding:8px;border-radius:6px;color:#fff;font-size:12px">
             <option value="active" ${user.status === 'active' ? 'selected' : ''}>Active</option>
-            <option value="grace" ${user.status === 'grace' ? 'selected' : ''}>Grace Period</option>
             <option value="canceling" ${user.status === 'canceling' ? 'selected' : ''}>Canceling</option>
+            <option value="grace" ${user.status === 'grace' ? 'selected' : ''}>Grace Period</option>
             <option value="expired" ${user.status === 'expired' ? 'selected' : ''}>Expired</option>
+            <option value="keep_it_live" ${user.status === 'keep_it_live' ? 'selected' : ''}>Keep It Live</option>
           </select>
         </div>
       </div>
-      <div style="margin-bottom:12px">
-        <label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">Mandatory Audit Reason</label>
-        <input type="text" id="override-reason-input" placeholder="e.g. Support compensation, VIP sponsor..." style="width:100%;background:#13141f;border:1px solid rgba(255,255,255,0.2);padding:8px 12px;border-radius:8px;color:#fff;font-size:12px;box-sizing:border-box"/>
+      <div style="margin-bottom:10px">
+        <label style="font-size:11px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">Mandatory Audit Reason (Required for security trail)</label>
+        <input type="text" id="modal-override-reason" placeholder="e.g. VIP Customer upgrade / Manual test account setup" style="width:100%;background:#141624;border:1px solid rgba(255,255,255,0.2);padding:8px;border-radius:6px;color:#fff;font-size:12px;outline:none;box-sizing:border-box"/>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <button id="toggle-legacy-btn" style="background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.3);color:#38bdf8;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">
-          ${user.isLegacy ? 'Remove Legacy Status' : 'Grant Legacy Status'}
-        </button>
-        <button id="submit-plan-override-btn" style="background:#7c3aed;border:none;color:#fff;padding:8px 20px;border-radius:8px;font-weight:800;cursor:pointer;font-size:12px">
-          Apply Audited Override
+      <button id="modal-btn-save-plan" style="background:#7c3aed;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer">Apply Plan Override</button>
+    </div>
+
+    <!-- Legacy Access Toggle Section -->
+    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px">
+      <h3 style="margin:0 0 10px;font-size:14px;color:#fff;font-weight:800">Legacy Grandfathering Exemption</h3>
+      <p style="margin:0 0 10px;font-size:12px;color:rgba(255,255,255,0.6)">Grandfathered accounts retain access to all themes without commercial lockouts.</p>
+      <div style="display:flex;gap:10px;align-items:center">
+        <input type="text" id="modal-legacy-reason" placeholder="Reason for legacy exemption change…" style="flex:1;background:#141624;border:1px solid rgba(255,255,255,0.2);padding:8px;border-radius:6px;color:#fff;font-size:12px;outline:none"/>
+        <button id="modal-btn-toggle-legacy" style="background:rgba(56,189,248,0.2);border:1px solid rgba(56,189,248,0.4);color:#38bdf8;padding:8px 14px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer">
+          ${user.isLegacy ? 'Remove Legacy Access' : 'Grant Legacy Access'}
         </button>
       </div>
     </div>`;
 
   modal.style.display = 'flex';
+  document.getElementById('close-user-modal').addEventListener('click', () => { modal.style.display = 'none'; });
 
-  document.getElementById('close-user-modal')?.addEventListener('click', () => {
-    modal.style.display = 'none';
-  });
+  document.getElementById('modal-btn-save-plan').addEventListener('click', async () => {
+    const targetPlanId = document.getElementById('modal-override-plan').value;
+    const status = document.getElementById('modal-override-status').value;
+    const reason = document.getElementById('modal-override-reason').value;
 
-  document.getElementById('toggle-legacy-btn')?.addEventListener('click', async () => {
-    const reason = prompt(`Enter mandatory reason to ${user.isLegacy ? 'remove' : 'grant'} legacy status for ${user.name}:`);
     if (!reason || reason.trim().length < 3) {
-      alert('A valid reason is required.');
+      alert('A mandatory audit reason (at least 3 characters) is required for plan override.');
       return;
     }
+
+    try {
+      await adminOverrideUserPlan({ userId: user.id, targetPlanId, status, reason: reason.trim() });
+      alert('User plan updated successfully.');
+      modal.style.display = 'none';
+      await loadAllData();
+    } catch (err) {
+      alert(`Error updating plan: ${err.message}`);
+    }
+  });
+
+  document.getElementById('modal-btn-toggle-legacy').addEventListener('click', async () => {
+    const reason = document.getElementById('modal-legacy-reason').value;
+    if (!reason || reason.trim().length < 3) {
+      alert('A mandatory audit reason is required for legacy status changes.');
+      return;
+    }
+
     try {
       await adminOverrideUserLegacy({ userId: user.id, isLegacy: !user.isLegacy, reason: reason.trim() });
-      alert('Legacy status updated.');
+      alert('Legacy access updated successfully.');
       modal.style.display = 'none';
       await loadAllData();
     } catch (err) {
-      alert(`Error: ${err.message}`);
-    }
-  });
-
-  document.getElementById('submit-plan-override-btn')?.addEventListener('click', async () => {
-    const targetPlan = document.getElementById('override-target-plan')?.value;
-    const targetStatus = document.getElementById('override-target-status')?.value;
-    const reason = document.getElementById('override-reason-input')?.value;
-
-    if (!reason || reason.trim().length < 3) {
-      alert('Please provide a mandatory audit reason (at least 3 characters).');
-      return;
-    }
-
-    const confirmed = window.confirm(`CONFIRM AUDITED OVERRIDE:\n\nChange ${user.name} from ${user.plan.toUpperCase()} to ${targetPlan.toUpperCase()}?\nReason: "${reason}"\n\nThis will write an immutable audit log.`);
-    if (!confirmed) return;
-
-    try {
-      await adminOverrideUserPlan({
-        userId: user.id,
-        targetPlanId: targetPlan,
-        status: targetStatus,
-        reason: reason.trim()
-      });
-      alert('Plan override successfully recorded in audit log.');
-      modal.style.display = 'none';
-      await loadAllData();
-    } catch (err) {
-      alert(`Override failed: ${err.message}`);
+      alert(`Error updating legacy status: ${err.message}`);
     }
   });
 }
@@ -489,34 +485,28 @@ function renderPortfoliosTab(portfolios) {
       <table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px">
         <thead>
           <tr style="border-bottom:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);font-size:11px;text-transform:uppercase;letter-spacing:1px">
-            <th style="padding:14px 16px">Portfolio</th>
-            <th style="padding:14px">Owner</th>
+            <th style="padding:14px 16px">Portfolio Name / Slug</th>
+            <th style="padding:14px">Owner User ID</th>
             <th style="padding:14px">Theme</th>
             <th style="padding:14px">Hosting State</th>
-            <th style="padding:14px">Created</th>
-            <th style="padding:14px 16px;text-align:right">Safe Actions</th>
+            <th style="padding:14px">Finalized</th>
+            <th style="padding:14px 16px;text-align:right">Action</th>
           </tr>
         </thead>
         <tbody>
           ${portfolios.length ? portfolios.map(p => `
             <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
               <td style="padding:14px 16px">
-                <strong style="color:#fff;display:block">${escapeHtml(p.name || 'Untitled')}</strong>
-                <small style="color:rgba(255,255,255,0.5)">/u/${escapeHtml(p.slug)}</small>
+                <strong style="color:#fff;display:block">${escapeHtml(p.name)}</strong>
+                <small style="color:#38bdf8;font-family:monospace;font-size:11px">/${escapeHtml(p.slug)}</small>
+              </td>
+              <td style="padding:14px;font-family:monospace;color:rgba(255,255,255,0.6);font-size:12px">${escapeHtml(p.ownerUserId)}</td>
+              <td style="padding:14px"><span style="font-weight:700;color:#c084fc">${escapeHtml(p.theme)}</span></td>
+              <td style="padding:14px">
+                <span style="font-size:11px;color:${p.isLive ? '#4ade80' : '#94a3b8'}">● ${p.isLive ? 'HOSTED & LIVE' : 'DRAFT'}</span>
               </td>
               <td style="padding:14px">
-                <span style="color:rgba(255,255,255,0.8)">${escapeHtml(p.ownerName)}</span>
-                <small style="color:rgba(255,255,255,0.4);display:block;font-size:11px">${escapeHtml(p.ownerEmail)}</small>
-              </td>
-              <td style="padding:14px">
-                <span style="font-weight:700;color:#c084fc">${escapeHtml(p.theme)}</span>
-                <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.1);margin-left:4px">${p.tierRequired.toUpperCase()}</span>
-              </td>
-              <td style="padding:14px">
-                ${p.isLive ? '<span style="color:#4ade80;font-weight:700">🟢 LIVE</span>' : '<span style="color:rgba(255,255,255,0.4)">⚪ DRAFT</span>'}
-              </td>
-              <td style="padding:14px;color:rgba(255,255,255,0.5);font-size:12px">
-                ${new Date(p.created_at).toLocaleDateString()}
+                ${p.isFinalized ? '<span style="color:#fbbf24;font-size:11px;font-weight:700">🔒 LOCKED</span>' : '<span style="color:rgba(255,255,255,0.4);font-size:11px">EDITABLE</span>'}
               </td>
               <td style="padding:14px 16px;text-align:right">
                 <a href="/u/${escapeHtml(p.slug)}" target="_blank" style="color:#38bdf8;text-decoration:none;font-weight:700;font-size:12px;margin-right:10px">↗ Open Live</a>
@@ -602,7 +592,7 @@ function installGroupsTabHandlers() {
       }
       try {
         await adminOverrideGroupSeats({ groupId, seatLimit: newSeats, reason: reason.trim() });
-        alert('Seats successfully updated.');
+        alert('Group seats adjusted.');
         await loadAllData();
       } catch (err) {
         alert(`Failed: ${err.message}`);
@@ -613,50 +603,274 @@ function installGroupsTabHandlers() {
 
 // ─── 5. KEEP IT LIVE TAB ─────────────────────────────────────────
 function renderKILTab(portfolios) {
+  const kilPortfolios = portfolios.filter(p => p.hasKeepLive);
   return `
-    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:20px;margin-bottom:20px">
-      <h3 style="margin:0 0 8px;font-size:16px;color:#fff;font-weight:800">Keep It Live Retentions (500 EGP/year/portfolio)</h3>
-      <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.6)">Read-only hosting continuity for expired subscribers. Active portfolios governed by KIL entitlements are listed below.</p>
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:18px;margin-bottom:20px">
+      <h3 style="margin:0 0 6px;font-size:16px;color:#fff;font-weight:800">Keep It Live Retained Portfolios</h3>
+      <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.6)">Annual 500 EGP/portfolio hosting fee for users without active Pro/Premium subscriptions.</p>
     </div>
+
     <div style="overflow-x:auto;border:1px solid rgba(255,255,255,0.08);border-radius:14px;background:rgba(255,255,255,0.02)">
       <table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px">
         <thead>
           <tr style="border-bottom:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);font-size:11px;text-transform:uppercase;letter-spacing:1px">
-            <th style="padding:14px 16px">Portfolio Name</th>
-            <th style="padding:14px">Owner</th>
-            <th style="padding:14px">Live URL</th>
-            <th style="padding:14px">KIL Protection</th>
+            <th style="padding:14px 16px">Portfolio</th>
+            <th style="padding:14px">Owner User ID</th>
+            <th style="padding:14px">Status</th>
+            <th style="padding:14px 16px;text-align:right">Action</th>
           </tr>
         </thead>
         <tbody>
-          ${portfolios.map(p => `
+          ${kilPortfolios.length ? kilPortfolios.map(p => `
             <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
               <td style="padding:14px 16px"><strong style="color:#fff">${escapeHtml(p.name)}</strong></td>
-              <td style="padding:14px;color:rgba(255,255,255,0.7)">${escapeHtml(p.ownerEmail)}</td>
-              <td style="padding:14px"><a href="/u/${escapeHtml(p.slug)}" target="_blank" style="color:#38bdf8;text-decoration:none">/u/${escapeHtml(p.slug)}</a></td>
-              <td style="padding:14px"><span style="color:rgba(255,255,255,0.5)">Standard / Inactive</span></td>
-            </tr>`).join('')}
+              <td style="padding:14px;font-family:monospace;color:rgba(255,255,255,0.6)">${escapeHtml(p.ownerUserId)}</td>
+              <td style="padding:14px"><span style="color:#f97316;font-weight:700">● KEEP IT LIVE ACTIVE</span></td>
+              <td style="padding:14px 16px;text-align:right">
+                <a href="/u/${escapeHtml(p.slug)}" target="_blank" style="color:#38bdf8;font-size:12px;font-weight:700;text-decoration:none">↗ View Live</a>
+              </td>
+            </tr>`).join('') : `<tr><td colspan="4" style="padding:32px;text-align:center;color:rgba(255,255,255,0.4)">No portfolios currently on Keep It Live entitlement.</td></tr>`}
         </tbody>
       </table>
     </div>`;
 }
 
-// ─── 6. PROMO CODES TAB ──────────────────────────────────────────
-function renderPromosTab(promos) {
+// ─── 6. PAYMENT REQUESTS TAB (PHASE 8B) ──────────────────────────
+function renderPaymentsTab(requests) {
   return `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
-      <div>
-        <h3 style="margin:0;font-size:18px;font-weight:900;color:#fff">Commercial Promo Codes</h3>
-        <small style="color:rgba(255,255,255,0.5)">Server-authoritative discounts for future checkout workflows.</small>
-      </div>
-      <button id="open-create-promo-btn" style="background:#7c3aed;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:700;cursor:pointer;font-size:12px">+ Create Promo Code</button>
+    <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;align-items:center;">
+      <select id="payment-filter-status" style="background:#141624;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px 14px;color:#fff;font-size:13px">
+        <option value="pending">Filter: Pending Review Only</option>
+        <option value="approved">Filter: Approved</option>
+        <option value="rejected">Filter: Rejected</option>
+        <option value="all">Filter: All Payments</option>
+      </select>
+      <input type="text" id="payment-search-input" placeholder="Search by customer, plan, or request ID…" style="flex:1;min-width:240px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px 14px;color:#fff;font-size:13px;outline:none"/>
     </div>
 
     <div style="overflow-x:auto;border:1px solid rgba(255,255,255,0.08);border-radius:14px;background:rgba(255,255,255,0.02)">
       <table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px">
         <thead>
           <tr style="border-bottom:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);font-size:11px;text-transform:uppercase;letter-spacing:1px">
-            <th style="padding:14px 16px">Code</th>
+            <th style="padding:14px 16px">Customer</th>
+            <th style="padding:14px">Requested Plan</th>
+            <th style="padding:14px">Expected Amount</th>
+            <th style="padding:14px">Promo Code</th>
+            <th style="padding:14px">Submitted</th>
+            <th style="padding:14px">Status</th>
+            <th style="padding:14px 16px;text-align:right">Review</th>
+          </tr>
+        </thead>
+        <tbody id="payments-table-body">
+          ${renderPaymentRows(requests)}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function renderPaymentRows(requests) {
+  if (!requests.length) {
+    return `<tr><td colspan="7" style="padding:32px;text-align:center;color:rgba(255,255,255,0.4)">No payment requests found.</td></tr>`;
+  }
+  return requests.map(r => {
+    const statusColor = r.status === 'APPROVED' ? '#4ade80' : r.status === 'REJECTED' ? '#f87171' : '#fde047';
+    return `
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
+        <td style="padding:14px 16px">
+          <strong style="color:#fff;display:block">${escapeHtml(r.userName || 'User')}</strong>
+          <small style="color:rgba(255,255,255,0.5);font-size:11px">${escapeHtml(r.userEmail || 'N/A')}</small>
+          <small style="display:block;font-family:monospace;color:rgba(255,255,255,0.3);font-size:10px">${escapeHtml(r.id)}</small>
+        </td>
+        <td style="padding:14px">
+          <strong style="color:#c084fc">${escapeHtml(r.plan_id.toUpperCase())}</strong>
+          ${r.group_seats ? `<small style="display:block;color:rgba(255,255,255,0.5)">(${r.group_seats} seats)</small>` : ''}
+        </td>
+        <td style="padding:14px">
+          <strong style="color:#fff">${r.expected_amount_egp} EGP</strong>
+        </td>
+        <td style="padding:14px">
+          ${r.promo_code ? `<span style="background:rgba(234,179,8,0.2);color:#fde047;font-family:monospace;font-size:11px;padding:2px 6px;border-radius:4px">${escapeHtml(r.promo_code)} (-${r.discount_amount_egp} EGP)</span>` : '<span style="color:rgba(255,255,255,0.3);font-size:11px">None</span>'}
+        </td>
+        <td style="padding:14px;color:rgba(255,255,255,0.5);font-size:12px">
+          ${new Date(r.created_at).toLocaleString()}
+        </td>
+        <td style="padding:14px">
+          <span style="font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;background:${statusColor}22;color:${statusColor};border:1px solid ${statusColor}44">
+            ● ${escapeHtml(r.status)}
+          </span>
+        </td>
+        <td style="padding:14px 16px;text-align:right">
+          <button class="review-payment-btn" data-req-id="${escapeHtml(r.id)}" style="background:rgba(124,58,237,0.2);border:1px solid rgba(124,58,237,0.4);color:#c084fc;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">
+            🔍 Review Proof
+          </button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function installPaymentsTabHandlers() {
+  const statusFilter = document.getElementById('payment-filter-status');
+  const searchInput = document.getElementById('payment-search-input');
+
+  const filterAndRender = () => {
+    const status = statusFilter?.value || 'pending';
+    const query = (searchInput?.value || '').toLowerCase();
+
+    let filtered = cachedData.payments.filter(r => {
+      if (status !== 'all' && r.status.toLowerCase() !== status) return false;
+      if (!query) return true;
+      return (
+        (r.userName || '').toLowerCase().includes(query) ||
+        (r.userEmail || '').toLowerCase().includes(query) ||
+        (r.plan_id || '').toLowerCase().includes(query) ||
+        (r.id || '').toLowerCase().includes(query)
+      );
+    });
+
+    const tbody = document.getElementById('payments-table-body');
+    if (tbody) tbody.innerHTML = renderPaymentRows(filtered);
+    attachReviewPaymentButtons();
+  };
+
+  statusFilter?.addEventListener('change', filterAndRender);
+  searchInput?.addEventListener('input', filterAndRender);
+  attachReviewPaymentButtons();
+}
+
+function attachReviewPaymentButtons() {
+  document.querySelectorAll('.review-payment-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const reqId = btn.dataset.reqId;
+      const request = cachedData.payments.find(r => r.id === reqId);
+      if (request) openPaymentReviewModal(request);
+    });
+  });
+}
+
+function openPaymentReviewModal(request) {
+  const modal = document.getElementById('admin-payment-modal');
+  const body = document.getElementById('admin-payment-modal-body');
+  if (!modal || !body) return;
+
+  const isPending = request.status === 'PENDING';
+
+  body.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:12px">
+      <div>
+        <h2 style="margin:0;font-size:18px;font-weight:900;color:#fff">Review Manual InstaPay Transfer</h2>
+        <span style="font-size:12px;color:rgba(255,255,255,0.6)">Request ID: <code style="color:#c084fc">${escapeHtml(request.id)}</code></span>
+      </div>
+      <button id="close-payment-modal" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer">✕</button>
+    </div>
+
+    <!-- Request Details -->
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px;margin-bottom:16px;font-size:13px;line-height:1.7">
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:rgba(255,255,255,0.6)">Customer:</span>
+        <strong>${escapeHtml(request.userName)} (${escapeHtml(request.userEmail)})</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:rgba(255,255,255,0.6)">Plan Requested:</span>
+        <strong style="color:#c084fc">${escapeHtml(request.plan_id.toUpperCase())} ${request.group_seats ? `(${request.group_seats} seats)` : ''}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:rgba(255,255,255,0.6)">Expected Amount:</span>
+        <strong style="color:#4ade80">${request.expected_amount_egp} EGP</strong>
+      </div>
+      ${request.promo_code ? `
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:rgba(255,255,255,0.6)">Promo Discount:</span>
+          <span style="color:#fde047">${escapeHtml(request.promo_code)} (-${request.discount_amount_egp} EGP)</span>
+        </div>
+      ` : ''}
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:rgba(255,255,255,0.6)">Submitted Date:</span>
+        <span>${new Date(request.created_at).toLocaleString()}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:rgba(255,255,255,0.6)">Current Status:</span>
+        <strong style="color:${request.status === 'APPROVED' ? '#4ade80' : request.status === 'REJECTED' ? '#f87171' : '#fde047'}">${escapeHtml(request.status)}</strong>
+      </div>
+    </div>
+
+    <!-- Transfer Proof Image -->
+    <div style="margin-bottom:20px;text-align:center">
+      <span style="font-size:12px;color:rgba(255,255,255,0.6);display:block;margin-bottom:8px">Uploaded InstaPay Screenshot:</span>
+      ${request.signedProofUrl ? `
+        <a href="${escapeHtml(request.signedProofUrl)}" target="_blank" title="Click to view full image">
+          <img src="${escapeHtml(request.signedProofUrl)}" style="max-height:220px;max-width:100%;border-radius:10px;border:1px solid rgba(255,255,255,0.2);box-shadow:0 8px 20px rgba(0,0,0,0.5);cursor:zoom-in"/>
+        </a>
+      ` : `
+        <div style="padding:24px;background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.15);border-radius:10px;color:rgba(255,255,255,0.4);font-size:12px">
+          Proof stored at: <code>${escapeHtml(request.proof_storage_path || 'Pending upload')}</code>
+        </div>
+      `}
+    </div>
+
+    ${isPending ? `
+      <div style="display:flex;gap:12px">
+        <button id="btn-approve-payment" style="flex:1;padding:12px;background:#22c55e;border:none;border-radius:10px;color:#fff;font-weight:800;font-size:13px;cursor:pointer">
+          ✓ Approve & Activate Plan
+        </button>
+        <button id="btn-reject-payment" style="flex:1;padding:12px;background:#ef4444;border:none;border-radius:10px;color:#fff;font-weight:800;font-size:13px;cursor:pointer">
+          ✕ Reject Payment
+        </button>
+      </div>
+    ` : `
+      <div style="padding:12px;background:rgba(255,255,255,0.04);border-radius:8px;text-align:center;color:rgba(255,255,255,0.5);font-size:12px">
+        This payment request has already been ${escapeHtml(request.status.toLowerCase())} ${request.rejection_reason ? `(Reason: ${escapeHtml(request.rejection_reason)})` : ''}.
+      </div>
+    `}
+  `;
+
+  modal.style.display = 'flex';
+  document.getElementById('close-payment-modal').addEventListener('click', () => { modal.style.display = 'none'; });
+
+  document.getElementById('btn-approve-payment')?.addEventListener('click', async () => {
+    if (!confirm(`Activate ${request.plan_id.toUpperCase()} plan for ${request.userName}?`)) return;
+    try {
+      await adminReviewPayment({ requestId: request.id, decision: 'APPROVED' });
+      alert('Payment approved and subscription activated.');
+      modal.style.display = 'none';
+      await loadAllData();
+    } catch (err) {
+      alert(`Approval error: ${err.message}`);
+    }
+  });
+
+  document.getElementById('btn-reject-payment')?.addEventListener('click', async () => {
+    const reason = prompt('Enter mandatory rejection reason to send to the user (e.g. transfer not found, incorrect amount, blurry receipt):');
+    if (!reason || reason.trim().length < 3) {
+      alert('A valid rejection reason is required.');
+      return;
+    }
+    try {
+      await adminReviewPayment({ requestId: request.id, decision: 'REJECTED', reason: reason.trim() });
+      alert('Payment rejected.');
+      modal.style.display = 'none';
+      await loadAllData();
+    } catch (err) {
+      alert(`Rejection error: ${err.message}`);
+    }
+  });
+}
+
+// ─── 7. PROMOS TAB ───────────────────────────────────────────────
+function renderPromosTab(promos) {
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <div>
+        <h3 style="margin:0;font-size:16px;color:#fff;font-weight:800">Commercial Promo Codes</h3>
+        <span style="font-size:12px;color:rgba(255,255,255,0.5)">Discount codes evaluated exclusively on the server.</span>
+      </div>
+      <button id="btn-open-create-promo" style="background:#7c3aed;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">➕ Create Promo Code</button>
+    </div>
+
+    <div style="overflow-x:auto;border:1px solid rgba(255,255,255,0.08);border-radius:14px;background:rgba(255,255,255,0.02)">
+      <table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px">
+        <thead>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);font-size:11px;text-transform:uppercase;letter-spacing:1px">
+            <th style="padding:14px 16px">Promo Code</th>
             <th style="padding:14px">Discount</th>
             <th style="padding:14px">Applicable Plans</th>
             <th style="padding:14px">Redemptions</th>
@@ -665,59 +879,67 @@ function renderPromosTab(promos) {
           </tr>
         </thead>
         <tbody>
-          ${promos.length ? promos.map(pr => `
+          ${promos.length ? promos.map(p => `
             <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
-              <td style="padding:14px 16px"><strong style="font-family:monospace;color:#fbbf24;font-size:14px">${escapeHtml(pr.code)}</strong></td>
-              <td style="padding:14px">${pr.discount_value}${pr.discount_type === 'percentage' ? '%' : ' EGP'} OFF</td>
-              <td style="padding:14px;color:rgba(255,255,255,0.7)">${escapeHtml((pr.applicable_plans || []).join(', '))}</td>
-              <td style="padding:14px">${pr.redemption_count || 0} / ${pr.max_redemptions || '∞'}</td>
-              <td style="padding:14px">${pr.active ? '<span style="color:#4ade80">● Active</span>' : '<span style="color:#f87171">✕ Disabled</span>'}</td>
+              <td style="padding:14px 16px;font-family:monospace;font-weight:800;color:#eab308">${escapeHtml(p.code)}</td>
+              <td style="padding:14px"><strong style="color:#fff">${p.discount_value}${p.discount_type === 'percentage' ? '%' : ' EGP'} OFF</strong></td>
+              <td style="padding:14px;color:rgba(255,255,255,0.7)">${p.applicable_plans?.length ? escapeHtml(p.applicable_plans.join(', ')) : 'ALL PLANS'}</td>
+              <td style="padding:14px">${p.redemption_count || 0} / ${p.max_redemptions || '∞'}</td>
+              <td style="padding:14px"><span style="font-size:11px;color:${p.active ? '#4ade80' : '#f87171'}">● ${p.active ? 'ACTIVE' : 'DISABLED'}</span></td>
               <td style="padding:14px 16px;text-align:right">
-                ${pr.active ? `<button class="disable-promo-btn" data-promo-id="${escapeHtml(pr.id)}" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#f87171;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">Disable</button>` : '<span style="color:rgba(255,255,255,0.3)">Archived</span>'}
+                ${p.active ? `<button class="disable-promo-btn" data-promo-id="${escapeHtml(p.id)}" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#f87171;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">Disable</button>` : '<span style="color:rgba(255,255,255,0.3);font-size:11px">Disabled</span>'}
               </td>
-            </tr>`).join('') : `<tr><td colspan="6" style="padding:32px;text-align:center;color:rgba(255,255,255,0.4)">No promo codes created yet.</td></tr>`}
+            </tr>`).join('') : `<tr><td colspan="6" style="padding:32px;text-align:center;color:rgba(255,255,255,0.4)">No promo codes registered.</td></tr>`}
         </tbody>
       </table>
     </div>`;
 }
 
 function installPromosTabHandlers() {
-  document.getElementById('open-create-promo-btn')?.addEventListener('click', () => {
-    const code = prompt('Enter uppercase promo code (e.g. LAUNCH50):');
+  document.getElementById('btn-open-create-promo')?.addEventListener('click', async () => {
+    const code = prompt('Enter promo code (e.g. LAUNCH20):');
     if (!code) return;
-    const discountType = prompt('Enter discount type: "percentage" or "fixed_amount":', 'percentage');
-    if (!discountType || !['percentage', 'fixed_amount'].includes(discountType)) return;
-    const discountValue = Number(prompt('Enter discount amount (e.g. 20 for 20%):', '20'));
-    if (isNaN(discountValue) || discountValue <= 0) return;
-    const reason = prompt('Enter mandatory audit reason for creating promo:');
-    if (!reason || reason.trim().length < 3) return;
+    const discountType = prompt('Discount type (percentage or fixed_amount):', 'percentage');
+    const discountValue = Number(prompt('Discount value (e.g. 20 for 20% or 100 for 100 EGP):', '20'));
+    const reason = prompt('Mandatory audit reason for creating promo:');
 
-    adminCreatePromo({
-      code: code.trim().toUpperCase(),
-      discountType,
-      discountValue,
-      applicablePlans: ['pro', 'premium'],
-      reason: reason.trim()
-    }).then(() => {
+    if (!reason || reason.trim().length < 3) {
+      alert('A valid reason is required.');
+      return;
+    }
+
+    try {
+      await adminCreatePromo({
+        code: code.trim().toUpperCase(),
+        discountType,
+        discountValue,
+        applicablePlans: ['pro', 'premium'],
+        reason: reason.trim()
+      });
       alert('Promo code created.');
-      loadAllData();
-    }).catch(err => alert(`Failed: ${err.message}`));
+      await loadAllData();
+    } catch (err) {
+      alert(`Error creating promo: ${err.message}`);
+    }
   });
 
   document.querySelectorAll('.disable-promo-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const promoId = btn.dataset.promoId;
-      const reason = prompt('Enter mandatory audit reason to disable promo:');
+      const reason = prompt('Enter mandatory reason to disable promo:');
       if (!reason || reason.trim().length < 3) return;
-      adminDisablePromo({ promoId, reason: reason.trim() }).then(() => {
+      try {
+        await adminDisablePromo({ promoId, reason: reason.trim() });
         alert('Promo disabled.');
-        loadAllData();
-      }).catch(err => alert(`Failed: ${err.message}`));
+        await loadAllData();
+      } catch (err) {
+        alert(`Error: ${err.message}`);
+      }
     });
   });
 }
 
-// ─── 7. THEMES TAB (15 THEMES) ───────────────────────────────────
+// ─── 8. THEMES TAB (15 THEMES) ───────────────────────────────────
 function renderThemesTab() {
   const themes = getAllThemes();
   return `
@@ -730,7 +952,6 @@ function renderThemesTab() {
       ${themes.map(t => {
         const tier = getThemeTier(t.id);
         const badge = getThemeBadge(t.id);
-        const primaryHex = '#' + (t.primaryColor || 0x7c3aed).toString(16).padStart(6, '0');
         const badgeColor = tier === 'premium' ? '#ec4899' : tier === 'pro' ? '#fbbf24' : '#06b6d4';
         return `
           <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px;display:flex;align-items:center;justify-content:space-between">
@@ -750,7 +971,7 @@ function renderThemesTab() {
     </div>`;
 }
 
-// ─── 8. AUDIT LOG TAB ────────────────────────────────────────────
+// ─── 9. AUDIT LOG TAB ────────────────────────────────────────────
 function renderAuditTab(logs) {
   return `
     <div style="overflow-x:auto;border:1px solid rgba(255,255,255,0.08);border-radius:14px;background:rgba(255,255,255,0.02)">
@@ -778,7 +999,7 @@ function renderAuditTab(logs) {
     </div>`;
 }
 
-// ─── 9. SYSTEM TAB (READ-ONLY) ───────────────────────────────────
+// ─── 10. SYSTEM TAB (READ-ONLY) ───────────────────────────────────
 function renderSystemTab(system) {
   const flags = system?.featureFlags || {};
   return `

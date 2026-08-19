@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
+import { sendBrevoEmail } from '../src/services/BrevoDispatcher.js';
+import { generatePaymentApprovedEmail, generatePaymentRejectedEmail } from '../src/services/EmailTemplates.js';
 
 const VALID_PLANS = ['free', 'pro', 'premium', 'premium_group'];
 const VALID_STATUSES = ['active', 'canceling', 'expired', 'grace', 'keep_it_live'];
@@ -82,7 +84,7 @@ export default async function handler(req, res) {
   }
 
   const context = await requireAdmin(req, res);
-  if (!context || res.headersSent) return;
+  if (!context?.admin) return;
 
   if (req.method === 'GET' && action === 'me') {
     return res.status(200).json({ isAdmin: true, user: { id: context.user.id, email: context.user.email } });
@@ -96,19 +98,22 @@ export default async function handler(req, res) {
       portfoliosRes,
       groupsRes,
       keepLivesRes,
-      promosRes
+      promosRes,
+      paymentsRes
     ] = await Promise.all([
       context.admin.from('profiles').select('id,email,display_name,created_at,is_admin'),
       context.admin.from('subscriptions').select('user_id,plan_id,status,group_id,metadata'),
       context.admin.from('portfolios').select('id,owner_user_id,published_at,theme,is_finalized'),
       context.admin.from('groups').select('id,status').eq('status', 'active'),
       context.admin.from('keep_live_entitlements').select('id,status').eq('status', 'active'),
-      context.admin.from('promo_codes').select('id,active').eq('active', true)
+      context.admin.from('promo_codes').select('id,active').eq('active', true),
+      context.admin.from('manual_payment_requests').select('id,status')
     ]);
 
     const usersList = profilesRes.data || [];
     const subsList = subscriptionsRes.data || [];
     const pfsList = portfoliosRes.data || [];
+    const paymentsList = paymentsRes.data || [];
 
     const planCounts = { free: 0, pro: 0, premium: 0, premium_group: 0 };
     subsList.forEach(s => {
@@ -119,6 +124,10 @@ export default async function handler(req, res) {
     const publishedCount = pfsList.filter(p => p.published_at).length;
     const draftCount = pfsList.filter(p => !p.published_at).length;
     const finalizedFreeCount = pfsList.filter(p => p.is_finalized).length;
+
+    const pendingPaymentsCount = paymentsRes.error ? 'N/A — Migration Pending' : paymentsList.filter(p => p.status === 'PENDING').length;
+    const approvedPaymentsCount = paymentsRes.error ? 'N/A — Migration Pending' : paymentsList.filter(p => p.status === 'APPROVED').length;
+    const rejectedPaymentsCount = paymentsRes.error ? 'N/A — Migration Pending' : paymentsList.filter(p => p.status === 'REJECTED').length;
 
     const featureFlags = {
       MONETIZATION_UI_ENABLED: process.env.FF_MONETIZATION_UI_ENABLED === 'true',
@@ -146,8 +155,11 @@ export default async function handler(req, res) {
         keepLivePortfolios: keepLivesRes.error ? 'N/A — Migration Pending' : (keepLivesRes.data || []).length,
         activeGroups: groupsRes.error ? 'N/A — Migration Pending' : (groupsRes.data || []).length,
         promoCodesCount: promosRes.error ? 'N/A — Migration Pending' : (promosRes.data || []).length,
+        pendingPaymentsCount,
+        approvedPaymentsCount,
+        rejectedPaymentsCount,
         enforcementStatus: isEnforcementActive ? 'ACTIVE (SOME FLAGS ON)' : 'OFF (LEGACY MODE)',
-        paymentsConnected: false
+        paymentsConnected: 'Manual InstaPay (Phase 8B active)'
       },
       featureFlags
     });
@@ -539,6 +551,182 @@ export default async function handler(req, res) {
     );
 
     return res.status(200).json({ success: true, userId, legacy_access: isLegacy });
+  }
+
+  // 14. Payment Requests List (with customer profile & signed proof URL)
+  if (req.method === 'GET' && action === 'payment-requests') {
+    const statusFilter = req.query.status;
+    let query = context.admin.from('manual_payment_requests').select('*').order('created_at', { ascending: false }).limit(200);
+    if (statusFilter && statusFilter !== 'all') {
+      query = query.eq('status', statusFilter.toUpperCase());
+    }
+
+    const { data: requests, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+
+    const userIds = (requests || []).map(r => r.user_id);
+    const { data: profiles } = await context.admin.from('profiles').select('id,email,display_name').in('id', userIds);
+    const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+
+    const enriched = await Promise.all((requests || []).map(async (r) => {
+      const p = profileMap.get(r.user_id) || {};
+      let signedProofUrl = null;
+      if (r.proof_storage_path) {
+        const { data: signed } = await context.admin.storage.from('payment_proofs').createSignedUrl(r.proof_storage_path, 3600).catch(() => ({ data: null }));
+        signedProofUrl = signed?.signedUrl || null;
+      }
+      return {
+        ...r,
+        userName: p.display_name || p.email?.split('@')[0] || 'User',
+        userEmail: p.email || 'N/A',
+        signedProofUrl
+      };
+    }));
+
+    return res.status(200).json({ requests: enriched });
+  }
+
+  // 15. Review Payment (Approve or Reject with Brevo Notification & Audit)
+  if (req.method === 'POST' && action === 'review-payment') {
+    const { requestId, decision, reason } = req.body || {};
+    if (!requestId || !['APPROVED', 'REJECTED'].includes(decision)) {
+      return res.status(400).json({ error: 'requestId and decision (APPROVED|REJECTED) are required' });
+    }
+
+    const { data: request, error: reqErr } = await context.admin.from('manual_payment_requests').select('*').eq('id', requestId).maybeSingle();
+    if (reqErr || !request) return res.status(404).json({ error: 'Payment request not found' });
+    if (request.status !== 'PENDING') {
+      return res.status(400).json({ error: `Cannot review request with status ${request.status}. Request is already resolved.` });
+    }
+
+    const { data: profile } = await context.admin.from('profiles').select('email,display_name').eq('id', request.user_id).maybeSingle();
+    const userEmail = profile?.email;
+    const userName = profile?.display_name || userEmail?.split('@')[0] || 'Member';
+    const now = new Date().toISOString();
+
+    if (decision === 'APPROVED') {
+      // 1. Mark request APPROVED
+      await context.admin.from('manual_payment_requests').update({
+        status: 'APPROVED',
+        reviewed_by: context.user.id,
+        reviewed_at: now,
+        updated_at: now
+      }).eq('id', requestId);
+
+      // 2. Activate Subscription
+      const periodDays = request.plan_id === 'keep_it_live' ? 365 : 30;
+      const periodEnd = new Date(Date.now() + periodDays * 24 * 60 * 60 * 1000).toISOString();
+
+      await context.admin.from('subscriptions').upsert([{
+        user_id: request.user_id,
+        plan_id: request.plan_id === 'keep_it_live' ? 'free' : request.plan_id,
+        status: 'active',
+        current_period_end: periodEnd,
+        metadata: {
+          source: 'manual_instapay',
+          payment_request_id: requestId,
+          approved_by: context.user.id,
+          amount_egp: request.expected_amount_egp,
+          approved_at: now
+        },
+        updated_at: now
+      }], { onConflict: 'user_id' });
+
+      // Handle Group
+      if (request.plan_id === 'premium_group') {
+        const seats = Number(request.group_seats) || 2;
+        await context.admin.from('groups').upsert([{
+          owner_user_id: request.user_id,
+          seat_limit: seats,
+          plan_type: 'premium_group',
+          status: 'active',
+          updated_at: now
+        }], { onConflict: 'owner_user_id' });
+      }
+
+      // Handle Keep It Live
+      if (request.plan_id === 'keep_it_live' && request.portfolio_id) {
+        await context.admin.from('keep_live_entitlements').upsert([{
+          portfolio_id: request.portfolio_id,
+          user_id: request.user_id,
+          status: 'active',
+          starts_at: now,
+          expires_at: periodEnd,
+          updated_at: now
+        }], { onConflict: 'portfolio_id' });
+      }
+
+      // 3. Write Audit Log
+      await writeAuditLog(
+        context.admin,
+        context.user.id,
+        request.user_id,
+        'MANUAL_PAYMENT_APPROVED',
+        { status: 'PENDING' },
+        { status: 'APPROVED', plan_id: request.plan_id, amount_egp: request.expected_amount_egp },
+        'InstaPay transfer confirmed by admin',
+        { requestId, plan: request.plan_id, seats: request.group_seats }
+      );
+
+      // 4. Send Confirmation Email via Brevo
+      if (userEmail) {
+        const html = generatePaymentApprovedEmail({
+          firstName: userName,
+          planName: request.plan_id,
+          activeUntil: periodEnd,
+          groupSeats: request.group_seats,
+          portfolioName: request.portfolio_id ? 'Keep It Live Portfolio' : null
+        });
+        await sendBrevoEmail({
+          to: userEmail,
+          subject: `🎉 Your Portfolio Maker ${request.plan_id.toUpperCase()} Plan is Now Active!`,
+          htmlContent: html
+        }).catch(err => console.error('Approval email error:', err));
+      }
+
+      return res.status(200).json({ success: true, requestId, status: 'APPROVED', activeUntil: periodEnd });
+    }
+
+    if (decision === 'REJECTED') {
+      const rejReason = reason && String(reason).trim().length >= 3 ? String(reason).trim() : 'Transfer receipt could not be verified.';
+
+      // 1. Mark request REJECTED
+      await context.admin.from('manual_payment_requests').update({
+        status: 'REJECTED',
+        reviewed_by: context.user.id,
+        reviewed_at: now,
+        rejection_reason: rejReason,
+        updated_at: now
+      }).eq('id', requestId);
+
+      // 2. Write Audit Log
+      await writeAuditLog(
+        context.admin,
+        context.user.id,
+        request.user_id,
+        'MANUAL_PAYMENT_REJECTED',
+        { status: 'PENDING' },
+        { status: 'REJECTED', reason: rejReason },
+        rejReason,
+        { requestId, plan: request.plan_id }
+      );
+
+      // 3. Send Rejection Email via Brevo
+      if (userEmail) {
+        const html = generatePaymentRejectedEmail({
+          firstName: userName,
+          planName: request.plan_id,
+          reason: rejReason
+        });
+        await sendBrevoEmail({
+          to: userEmail,
+          subject: `Payment Verification Notice — Portfolio Maker`,
+          htmlContent: html
+        }).catch(err => console.error('Rejection email error:', err));
+      }
+
+      return res.status(200).json({ success: true, requestId, status: 'REJECTED', reason: rejReason });
+    }
   }
 
   return res.status(405).json({ error: 'Unsupported admin action' });

@@ -95,21 +95,50 @@ export async function requestPasswordReset(email) {
   return data;
 }
 
-export async function resendConfirmationEmail(email) {
-  if (!email || !email.includes('@')) {
-    throw new Error('Valid email address required.');
+export async function verifyEmailOtp(email, token) {
+  if (!email || !token) throw new Error('Email and 6-digit verification code are required.');
+
+  // Try signup type first
+  let result = await supabase.auth.verifyOtp({
+    email: email.trim(),
+    token: token.trim(),
+    type: 'signup'
+  });
+
+  if (result.error) {
+    // Fallback to email type
+    result = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: token.trim(),
+      type: 'email'
+    });
   }
 
+  if (result.error) throw result.error;
+
+  if (result.data?.session?.user) {
+    try {
+      sessionStorage.setItem('supabase_user_cache', JSON.stringify(result.data.session.user));
+    } catch (e) {}
+  }
+
+  return result.data;
+}
+
+export async function resendEmailOtp(email) {
+  if (!email || !email.includes('@')) throw new Error('Valid email address required.');
   const { data, error } = await supabase.auth.resend({
     type: 'signup',
     email: email.trim()
   });
-
   if (error) throw error;
   return data;
 }
 
-export const resendConfirmation = resendConfirmationEmail;
+export function isEmailVerified(user) {
+  if (!user) return false;
+  return Boolean(user.email_confirmed_at || user.confirmed_at || user.user_metadata?.email_verified);
+}
 
 export async function updateUserPassword(newPassword) {
   const { data, error } = await supabase.auth.updateUser({
@@ -268,6 +297,49 @@ export function adminOverrideUserLegacy({ userId, isLegacy, reason }) {
     method: 'POST',
     body: JSON.stringify({ userId, isLegacy, reason })
   });
+}
+
+export function adminGetPaymentRequests(status = 'all') {
+  return adminRequest(`/api/admin?action=payment-requests&status=${status}`);
+}
+
+export function adminReviewPayment({ requestId, decision, reason }) {
+  return adminRequest('/api/admin?action=review-payment', {
+    method: 'POST',
+    body: JSON.stringify({ requestId, decision, reason })
+  });
+}
+
+export async function submitManualPayment(payload) {
+  const session = await getAuthSession();
+  if (!session?.access_token) throw new Error('Authentication required');
+
+  const res = await fetch('/api/billing?action=submit-manual-payment', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Payment submission failed');
+  return data;
+}
+
+export async function getUserPaymentStatus() {
+  const session = await getAuthSession();
+  if (!session?.access_token) return { requests: [] };
+
+  const res = await fetch('/api/billing?action=get-payment-status', {
+    headers: {
+      'Authorization': `Bearer ${session.access_token}`
+    }
+  });
+
+  const data = await res.json().catch(() => ({ requests: [] }));
+  return data;
 }
 
 // Backward-compat alias for legacy tests

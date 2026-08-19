@@ -196,6 +196,14 @@ export function getPlanConfig(planId) {
   return PLANS[planId] || PLANS.free;
 }
 
+export const INSTAPAY_CONFIG = {
+  accountName: 'Portfolio Maker Billing',
+  instapayId: 'portfoliomaker@instapay',
+  phoneNumber: '+20 100 000 0000',
+  bankName: 'National Bank of Egypt (NBE)',
+  instructions: 'Transfer the exact EGP amount using InstaPay to the account details above, then take a screenshot of the transfer confirmation and upload it below.'
+};
+
 /**
  * Format price for display.
  */
@@ -210,3 +218,4 @@ export function formatPrice(amountEGP, period = '/month') {
 export function getGroupPrice(seats) {
   return GROUP_SEAT_PRICING[seats] || null;
 }
+

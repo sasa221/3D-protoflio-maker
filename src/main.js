@@ -6,7 +6,7 @@ import './index.css';
 import { renderAuthPage, renderResetPasswordPage } from './AuthPage.js';
 import { renderAdminPage } from './AdminPage.js';
 import { supabase } from './services/SupabaseClient.js';
-import { isLoggedIn, getCurrentUser, getCurrentAuthUser, isPro, logout, upgradeToPro, isAdmin, redeemPromoCode, subscribeToAuthStateChange } from './services/AuthService.js';
+import { isLoggedIn, getCurrentUser, getCurrentAuthUser, isPro, logout, upgradeToPro, isAdmin, redeemPromoCode, subscribeToAuthStateChange, isEmailVerified } from './services/AuthService.js';
 
 window.supabase = supabase;
 window.getCurrentAuthUser = getCurrentAuthUser;
@@ -297,6 +297,12 @@ async function router() {
     const authUser = await getCurrentAuthUser();
     if (!authUser) {
       window.location.href = '/login';
+      return;
+    }
+    if (!isEmailVerified(authUser)) {
+      renderAuthPage(() => {
+        window.location.href = '/studio';
+      });
       return;
     }
     initStudio();
