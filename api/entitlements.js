@@ -242,13 +242,13 @@ export default async function handler(req, res) {
       const { data: userData } = await userClient.auth.getUser();
       if (!userData?.user) return res.status(401).json({ error: 'Invalid session' });
 
-      const adminClient = createClient(supabaseUrl, supabaseServiceKey);
-      const { data: profile } = await adminClient.from('profiles').select('is_admin').eq('id', userData.user.id).maybeSingle();
       const allowedEmails = new Set((process.env.ADMIN_EMAILS || 'saleh2005mohamed@gmail.com').split(',').map(e => e.trim().toLowerCase()).filter(Boolean));
       const userEmail = (userData.user.email || '').trim().toLowerCase();
-      if (!profile?.is_admin && !allowedEmails.has(userEmail)) {
+      if (!allowedEmails.has(userEmail)) {
         return res.status(403).json({ error: 'Administrator access required' });
       }
+
+      const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
       const limit = Math.min(Number(req.query.limit) || 100, 500);
       const { data: logs, error: logErr } = await adminClient.from('entitlement_audit_log').select('*').order('created_at', { ascending: false }).limit(limit);

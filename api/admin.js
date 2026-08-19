@@ -35,13 +35,12 @@ async function requireAdmin(req, res) {
   const { data, error } = await auth.auth.getUser();
   if (error || !data?.user) return res.status(401).json({ error: 'Invalid or expired session' });
   
-  const admin = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
-  const { data: profile } = await admin.from('profiles').select('is_admin').eq('id', data.user.id).maybeSingle();
-  
   const userEmail = (data.user.email || '').trim().toLowerCase();
-  if (!profile?.is_admin && !isAllowedAdminEmail(userEmail)) {
+  if (!isAllowedAdminEmail(userEmail)) {
     return res.status(403).json({ error: 'Administrator access required' });
   }
+  
+  const admin = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
   return { user: data.user, admin };
 }
 
@@ -116,7 +115,7 @@ export default async function handler(req, res) {
     } catch (_) {}
 
     try {
-      const { data: dbProfiles } = await context.admin.from('profiles').select('id,email,display_name,created_at,is_admin');
+      const { data: dbProfiles } = await context.admin.from('profiles').select('id,email,display_name,created_at');
       if (dbProfiles && dbProfiles.length > 0) {
         const existingIds = new Set(usersList.map(u => u.id));
         dbProfiles.forEach(p => {
@@ -197,7 +196,7 @@ export default async function handler(req, res) {
     } catch (_) {}
 
     try {
-      const { data: dbProfiles } = await context.admin.from('profiles').select('id,email,display_name,created_at,is_admin');
+      const { data: dbProfiles } = await context.admin.from('profiles').select('id,email,display_name,created_at');
       if (dbProfiles && dbProfiles.length > 0) {
         const existingIds = new Set(usersList.map(u => u.id));
         dbProfiles.forEach(p => {
