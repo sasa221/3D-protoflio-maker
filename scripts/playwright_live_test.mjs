@@ -89,7 +89,9 @@ async function runLiveProductionTest() {
   // ─────────────────────────────────────────────────────────────
   console.log('\nPART A2: Testing Theme Preview (No Modal Auto-Launch & No Saved Theme Mutation)...');
   
-  const initialTheme = await p1.evaluate(() => window.portfolioData?.theme || 'minimal');
+  const initialTheme = await p1.evaluate(() => {
+    return (typeof window.getCurrentPortfolioTheme === 'function' ? window.getCurrentPortfolioTheme() : window.portfolioData?.theme) || 'minimal';
+  });
   console.log('  Initial Active Saved Theme:', initialTheme);
 
   // Click Preview on Cyber Command
@@ -104,13 +106,14 @@ async function runLiveProductionTest() {
   const previewAudit = await p1.evaluate((init) => {
     const overlay = document.querySelector('.billing-modal-overlay');
     const modalVisible = Boolean(overlay && window.getComputedStyle(overlay).display === 'flex');
-    const currentSavedTheme = window.portfolioData?.theme;
+    const currentSavedTheme = (typeof window.getCurrentPortfolioTheme === 'function' ? window.getCurrentPortfolioTheme() : window.portfolioData?.theme) || 'minimal';
     return {
       modalAutoOpened: modalVisible,
       currentSavedTheme,
       themeUnchanged: currentSavedTheme === init
     };
   }, initialTheme);
+
 
   console.log('  Pricing Modal Auto-Opened after Preview:', previewAudit.modalAutoOpened ? 'FAIL (Opened)' : 'PASS (Did NOT open)');
   console.log('  Active Theme unchanged after Preview:', previewAudit.themeUnchanged ? 'PASS' : 'FAIL', `(${previewAudit.currentSavedTheme})`);

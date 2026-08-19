@@ -2651,6 +2651,11 @@ function buildThemeGrid() {
   `;
 }
 
+window.getCurrentPortfolioTheme = function() {
+  return portfolioData?.theme || 'minimal';
+};
+window.portfolioData = portfolioData;
+
 window.previewTheme = function(id) {
   const theme = getThemeById(id);
   if (!theme) return;
@@ -2658,6 +2663,7 @@ window.previewTheme = function(id) {
   sceneDirector?.setTheme(theme);
   showToast('info', '👁️', `Previewing ${theme.name} (Temporary 3D Preview). Upgrade to apply permanently.`);
 };
+
 
 window.selectTheme = function(id) {
   const userTier = globalEntitlements.getThemeTier();
