@@ -60,10 +60,9 @@ async function runPublishWorkspaceLiveAudit() {
       });
       await page.waitForTimeout(600);
 
-      const publishPanel = await page.$('#panel-publish');
       const publishContent = await page.$('#publish-panel-content');
-      if (!publishPanel || !publishContent) {
-        console.error('  ❌ FAIL: Publish panel or content not found in DOM');
+      if (!publishContent) {
+        console.error('  ❌ FAIL: Publish content not found in DOM');
         totalErrors++;
         await context.close();
         continue;

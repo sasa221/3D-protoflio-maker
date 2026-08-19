@@ -2854,6 +2854,7 @@ function buildThemeGrid() {
     </div>
   `;
 }
+window.buildThemeGrid = buildThemeGrid;
 
 window.getCurrentPortfolioTheme = function() {
   return portfolioData?.theme || 'minimal';
