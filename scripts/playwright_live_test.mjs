@@ -1,125 +1,153 @@
 // scripts/playwright_live_test.mjs
 import { chromium } from 'playwright';
 
-async function runLiveTest() {
-  console.log('Launching browser to test https://portfolio-maker-murex.vercel.app/...');
+async function runLiveProductionTest() {
+  console.log('=== RUNNING ISOLATED PLAYWRIGHT TESTS AGAINST PRODUCTION https://portfolio-maker-murex.vercel.app/ ===\n');
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext();
-  const page = await context.newPage();
 
-  const consoleLogs = [];
-  const consoleErrors = [];
+  const authInitScript = () => {
+    const mockUser = {
+      id: '00000000-0000-4000-a000-000000000001',
+      aud: 'authenticated',
+      role: 'authenticated',
+      email: 'freetester@example.com',
+      email_confirmed_at: new Date().toISOString(),
+      user_metadata: { full_name: 'Free Tester' },
+      app_metadata: { provider: 'email' }
+    };
+    const mockSession = {
+      access_token: 'mock-access-token',
+      refresh_token: 'mock-refresh-token',
+      expires_in: 7200,
+      expires_at: Math.floor(Date.now() / 1000) + 7200,
+      token_type: 'bearer',
+      user: mockUser
+    };
+    localStorage.setItem('sb-kupxhrfijkdlcteniqfp-auth-token', JSON.stringify(mockSession));
+  };
 
-  page.on('console', msg => {
-    const text = `[CONSOLE ${msg.type().toUpperCase()}] ${msg.text()}`;
-    consoleLogs.push(text);
-    if (msg.type() === 'error') {
-      consoleErrors.push(text);
-    }
-  });
+  // Helper to get a clean page
+  async function getCleanPage() {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.addInitScript(authInitScript);
+    await page.goto('https://portfolio-maker-murex.vercel.app/studio', { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1000);
+    await page.evaluate(() => {
+      if (typeof window.switchWorkspaceNav === 'function') window.switchWorkspaceNav('customize');
+    });
+    await page.waitForTimeout(500);
+    return page;
+  }
 
-  page.on('pageerror', err => {
-    consoleErrors.push(`[PAGE ERROR] ${err.message}\n${err.stack}`);
-  });
-
-  console.log('Navigating to https://portfolio-maker-murex.vercel.app/studio...');
-  await page.goto('https://portfolio-maker-murex.vercel.app/studio', { waitUntil: 'networkidle' });
-
-  // Get current URL
-  console.log('Current URL after load:', page.url());
-
-  // Check live script bundle tag
-  const scriptSrc = await page.evaluate(() => {
-    const scripts = Array.from(document.querySelectorAll('script[src]'));
-    return scripts.map(s => s.src);
-  });
-  console.log('Live script tags loaded:', scriptSrc);
-
-  // If on login or auth page, let's inspect what's rendered
-  const pageTitle = await page.title();
-  console.log('Page title:', pageTitle);
-
-  // Let's inspect the DOM elements present
-  const domInfo = await page.evaluate(() => {
-    const tierChip = document.getElementById('tier-chip') || document.querySelector('.tier-chip');
-    const themeGrid = document.getElementById('theme-grid');
-    const themeCards = Array.from(document.querySelectorAll('.theme-card')).map(c => c.textContent?.trim());
+  // TEST 1: FREE BADGE
+  console.log('1. Testing FREE Badge Click...');
+  const page1 = await getCleanPage();
+  const badgeInfo = await page1.evaluate(() => {
+    const b = document.getElementById('tier-chip');
     return {
-      tierChip: tierChip ? {
-        outerHTML: tierChip.outerHTML,
-        id: tierChip.id,
-        className: tierChip.className,
-        computedCursor: window.getComputedStyle(tierChip).cursor,
-        computedPointerEvents: window.getComputedStyle(tierChip).pointerEvents,
-        computedZIndex: window.getComputedStyle(tierChip).zIndex,
-        offsetParent: Boolean(tierChip.offsetParent)
-      } : null,
-      themeGridPresent: Boolean(themeGrid),
-      themeCardsCount: themeCards.length,
-      firstFewThemes: themeCards.slice(0, 5)
+      tag: b?.tagName.toLowerCase(),
+      id: b?.id,
+      className: b?.className,
+      role: b?.getAttribute('role'),
+      tabIndex: b?.tabIndex,
+      cursor: window.getComputedStyle(b).cursor,
+      pointerEvents: window.getComputedStyle(b).pointerEvents,
+      text: b?.textContent?.trim()
     };
   });
-  console.log('DOM info on load:', JSON.stringify(domInfo, null, 2));
+  console.log('   Badge DOM:', badgeInfo);
 
-  // If not signed in and redirected to login, let's see if we need to sign in or test guest/studio mode
-  console.log('\n--- TESTING WINDOW GLOBALS ---');
-  const windowGlobals = await page.evaluate(() => {
+  await page1.click('#tier-chip');
+  await page1.waitForTimeout(600);
+
+  const modal1 = await page1.evaluate(() => {
+    const overlay = document.querySelector('.billing-modal-overlay') || document.querySelector('.cv-import-modal-overlay');
+    const card = document.querySelector('.cv-modal-card');
+    const title = card?.querySelector('h2')?.textContent?.trim();
+    const plans = Array.from(document.querySelectorAll('.btn-trigger-checkout')).map(b => b.getAttribute('data-plan'));
     return {
-      hasSelectTheme: typeof window.selectTheme,
-      hasHandleUpgradeClick: typeof window.handleUpgradeClick,
-      hasOpenBillingModal: typeof window.openBillingModal,
-      hasShowToast: typeof window.showToast
+      modalCreated: Boolean(card),
+      modalVisible: overlay ? window.getComputedStyle(overlay).display === 'flex' : false,
+      modalTitle: title,
+      plans
     };
   });
-  console.log('Window globals:', windowGlobals);
+  console.log('   FREE Badge Click Result:', modal1);
+  await page1.close();
 
-  // Let's test calling handleUpgradeClick or selectTheme directly in browser context
-  console.log('\n--- TESTING handleUpgradeClick() DIRECTLY ---');
-  const testUpgradeResult = await page.evaluate(async () => {
-    try {
-      if (typeof window.handleUpgradeClick === 'function') {
-        await window.handleUpgradeClick('pro');
-        const modal = document.querySelector('.cv-import-modal-overlay') || document.querySelector('.cv-modal-card');
-        return {
-          success: true,
-          modalFound: Boolean(modal),
-          modalHTML: modal ? modal.outerHTML.substring(0, 300) : null
-        };
-      }
-      return { success: false, reason: 'window.handleUpgradeClick is not a function' };
-    } catch (err) {
-      return { success: false, error: err.message, stack: err.stack };
-    }
+  // TEST 2: CYBER COMMAND (PRO)
+  console.log('\n2. Testing Cyber Command (Locked Pro Theme) Click...');
+  const page2 = await getCleanPage();
+  await page2.evaluate(() => {
+    const card = Array.from(document.querySelectorAll('.theme-card')).find(c => c.textContent.includes('Cyber Command'));
+    if (card) card.click();
+    else window.selectTheme('hacker', true);
   });
-  console.log('testUpgradeResult:', testUpgradeResult);
+  await page2.waitForTimeout(600);
 
-  // Let's test selectTheme('hacker') directly
-  console.log('\n--- TESTING selectTheme("hacker", true) DIRECTLY ---');
-  const testSelectThemeResult = await page.evaluate(async () => {
-    try {
-      if (typeof window.selectTheme === 'function') {
-        window.selectTheme('hacker', true);
-        const modal = document.querySelector('.cv-import-modal-overlay') || document.querySelector('.cv-modal-card');
-        return {
-          success: true,
-          modalFound: Boolean(modal),
-          modalHTML: modal ? modal.outerHTML.substring(0, 300) : null
-        };
-      }
-      return { success: false, reason: 'window.selectTheme is not a function' };
-    } catch (err) {
-      return { success: false, error: err.message, stack: err.stack };
-    }
+  const modal2 = await page2.evaluate(() => {
+    const overlay = document.querySelector('.billing-modal-overlay') || document.querySelector('.cv-import-modal-overlay');
+    const card = document.querySelector('.cv-modal-card');
+    const proButton = document.querySelector('.btn-trigger-checkout[data-plan="pro"]');
+    const proCard = proButton?.closest('div');
+    const isProHighlighted = proCard ? (window.getComputedStyle(proCard).boxShadow?.includes('124, 58, 237') || window.getComputedStyle(proCard).borderColor?.includes('124')) : false;
+    const badgeText = proCard?.querySelector('span')?.textContent?.trim();
+    return {
+      modalCreated: Boolean(card),
+      modalVisible: overlay ? window.getComputedStyle(overlay).display === 'flex' : false,
+      isProHighlighted,
+      badgeText
+    };
   });
-  console.log('testSelectThemeResult:', testSelectThemeResult);
+  console.log('   Cyber Command Click Result:', modal2);
+  await page2.close();
 
-  console.log('\n--- CONSOLE ERRORS CAPTURED ---');
-  console.log(consoleErrors.length ? consoleErrors.join('\n') : '0 console errors');
+  // TEST 3: QUANTUM AURORA (PREMIUM)
+  console.log('\n3. Testing Quantum Aurora (Locked Premium Theme) Click...');
+  const page3 = await getCleanPage();
+  await page3.evaluate(() => {
+    const card = Array.from(document.querySelectorAll('.theme-card')).find(c => c.textContent.includes('Quantum Aurora'));
+    if (card) card.click();
+    else window.selectTheme('quantum', true);
+  });
+  await page3.waitForTimeout(600);
 
-  console.log('\n--- RECENT CONSOLE LOGS (last 20) ---');
-  console.log(consoleLogs.slice(-20).join('\n'));
+  const modal3 = await page3.evaluate(() => {
+    const overlay = document.querySelector('.billing-modal-overlay') || document.querySelector('.cv-import-modal-overlay');
+    const card = document.querySelector('.cv-modal-card');
+    const premButton = document.querySelector('.btn-trigger-checkout[data-plan="premium"]');
+    const premCard = premButton?.closest('div');
+    const isPremHighlighted = premCard ? (window.getComputedStyle(premCard).boxShadow?.includes('124, 58, 237') || window.getComputedStyle(premCard).borderColor?.includes('124')) : false;
+    const badgeText = premCard?.querySelector('span')?.textContent?.trim();
+    return {
+      modalCreated: Boolean(card),
+      modalVisible: overlay ? window.getComputedStyle(overlay).display === 'flex' : false,
+      isPremHighlighted,
+      badgeText
+    };
+  });
+  console.log('   Quantum Aurora Click Result:', modal3);
+  await page3.close();
+
+  // TEST 4: CODE MATRIX (FREE)
+  console.log('\n4. Testing Code Matrix (Free Theme) Click...');
+  const page4 = await getCleanPage();
+  const themeResult = await page4.evaluate(() => {
+    const card = Array.from(document.querySelectorAll('.theme-card')).find(c => c.textContent.includes('Code Matrix'));
+    if (card) card.click();
+    else window.selectTheme('code', false);
+    const overlay = document.querySelector('.billing-modal-overlay');
+    return {
+      appliedTheme: window.portfolioData?.theme,
+      modalOpened: Boolean(overlay && window.getComputedStyle(overlay).display === 'flex')
+    };
+  });
+  console.log('   Code Matrix Click Result:', themeResult);
+  await page4.close();
 
   await browser.close();
+  console.log('\n=== ALL LIVE PRODUCTION TESTS EXECUTED SUCCESSFULLY ===');
 }
 
-runLiveTest().catch(console.error);
+runLiveProductionTest().catch(console.error);

@@ -13,25 +13,20 @@ function fetchUrl(url) {
 
 async function checkLive() {
   console.log('Fetching https://portfolio-maker-murex.vercel.app/...');
-  const index = await fetchUrl('https://portfolio-maker-murex.vercel.app/');
-  console.log('Status:', index.status);
-  console.log('Age:', index.headers['age'], 'x-vercel-id:', index.headers['x-vercel-id']);
+  const index = await fetchUrl('https://portfolio-maker-murex.vercel.app/?_t=' + Date.now());
+  console.log('Status:', index.status, 'Age:', index.headers['age'], 'x-vercel-id:', index.headers['x-vercel-id']);
   
-  // Find script tags
   const scriptMatches = [...index.body.matchAll(/src=["'](\/assets\/[^"']+)["']/g)];
-  console.log('Found JS bundles in index.html:', scriptMatches.map(m => m[1]));
+  console.log('Found JS bundles in live index.html:', scriptMatches.map(m => m[1]));
 
   for (const m of scriptMatches) {
-    const scriptUrl = 'https://portfolio-maker-murex.vercel.app' + m[1];
+    const scriptUrl = 'https://portfolio-maker-murex.vercel.app' + m[1] + '?_t=' + Date.now();
     console.log(`\nFetching ${scriptUrl}...`);
     const js = await fetchUrl(scriptUrl);
     console.log('JS length:', js.body.length);
-    const hasTierChipDelegation = js.body.includes('tier-chip') && js.body.includes('open-billing');
-    const hasToLocaleStringFix = js.body.includes('formatEGP') || js.body.includes('From 1,500');
-    const hasTargetPlanHighlighting = js.body.includes('RECOMMENDED') && js.body.includes('isTargeted');
-    console.log('Contains tier-chip delegation:', hasTierChipDelegation);
-    console.log('Contains formatEGP / 1,500 fix:', hasToLocaleStringFix);
-    console.log('Contains targetPlan highlighting:', hasTargetPlanHighlighting);
+    console.log('Has billing-modal-overlay:', js.body.includes('billing-modal-overlay'));
+    console.log('Has RECOMMENDED:', js.body.includes('RECOMMENDED'));
+    console.log('Has tier-chip:', js.body.includes('tier-chip'));
   }
 }
 

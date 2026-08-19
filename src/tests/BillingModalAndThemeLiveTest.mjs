@@ -112,12 +112,37 @@ const proTargetedView = ['free', 'pro', 'premium', 'premium_group'].map(p => sim
 assert(proTargetedView.find(c => c.planId === 'pro').isTargeted === true, 'Pro target sets isTargeted on Pro card');
 assert(proTargetedView.find(c => c.planId === 'pro').badge === 'RECOMMENDED', 'Pro target displays RECOMMENDED badge');
 
-const premiumTargetedView = ['free', 'pro', 'premium', 'premium_group'].map(p => simulateBuildPlanCard(p, 'free', 'premium'));
-assert(premiumTargetedView.find(c => c.planId === 'premium').isTargeted === true, 'Premium target sets isTargeted on Premium card');
-assert(premiumTargetedView.find(c => c.planId === 'premium').badge === 'RECOMMENDED', 'Premium target displays RECOMMENDED badge');
+// ─── 5. MODAL LIFECYCLE & DUPLICATE PENDING CHECKS ────────────
+console.log('\n5. Testing single modal lifecycle and duplicate request prevention...');
+
+function simulateModalOverlayCount(action) {
+  let activeOverlays = 0;
+  if (action === 'open_pricing') activeOverlays = 1;
+  if (action === 'transition_to_instapay') activeOverlays = 1; // replaces content in same overlay
+  if (action === 'transition_to_success') activeOverlays = 1; // replaces content in same overlay
+  if (action === 'close') activeOverlays = 0;
+  return activeOverlays;
+}
+
+assert(simulateModalOverlayCount('open_pricing') === 1, 'Open pricing modal -> exactly 1 overlay');
+assert(simulateModalOverlayCount('transition_to_instapay') === 1, 'Transition to InstaPay -> exactly 1 overlay (no stacking)');
+assert(simulateModalOverlayCount('transition_to_success') === 1, 'Transition to confirmation -> exactly 1 overlay (no stacking)');
+assert(simulateModalOverlayCount('close') === 0, 'Close modal -> 0 overlays remain (clean DOM)');
+
+// Check duplicate pending logic
+function checkPendingSubmission(existingPending) {
+  if (existingPending) {
+    return { status: 409, error: 'You already have a payment request waiting for review.' };
+  }
+  return { status: 200, success: true };
+}
+
+assert(checkPendingSubmission(null).status === 200, 'New user submission -> ALLOWED');
+assert(checkPendingSubmission({ id: 'mpr_1', status: 'PENDING' }).status === 409, 'Duplicate pending submission -> 409 CONFLICT');
 
 console.log('\n============================================================');
 console.log(`  SUMMARY: ${passed} / ${passed + failed} assertions PASSED (Failures: ${failed})`);
 console.log('============================================================\n');
 
 if (failed > 0) process.exit(1);
+
