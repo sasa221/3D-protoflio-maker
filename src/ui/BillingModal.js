@@ -11,11 +11,31 @@ import { submitManualPayment, getUserPaymentStatus, redeemPromoCode, getPublicPa
 
 let modalContainer = null;
 
-export async function openBillingModal(currentUserId, onSubscriptionUpdated) {
-  if (!currentUserId) {
-    window.location.href = '/login?next=/studio';
-    return;
+export async function openBillingModal(arg1, arg2, arg3) {
+  let currentUserId = null;
+  let onSubscriptionUpdated = null;
+  let targetPlan = null;
+
+  if (typeof arg1 === 'object' && arg1 !== null) {
+    currentUserId = arg1.currentUserId || arg1.userId || null;
+    onSubscriptionUpdated = arg1.onSubscriptionUpdated || null;
+    targetPlan = arg1.targetPlan || arg1.recommendedPlan || null;
+  } else {
+    currentUserId = arg1 || null;
+    onSubscriptionUpdated = arg2 || null;
+    if (typeof arg3 === 'object' && arg3 !== null) {
+      targetPlan = arg3.targetPlan || arg3.recommendedPlan || null;
+    } else if (typeof arg3 === 'string') {
+      targetPlan = arg3;
+    }
   }
+
+  if (!currentUserId) {
+    try {
+      const { data } = await getUserPaymentStatus().catch(() => ({}));
+    } catch (_) {}
+  }
+
   if (modalContainer) modalContainer.remove();
 
   modalContainer = document.createElement('div');
@@ -26,16 +46,16 @@ export async function openBillingModal(currentUserId, onSubscriptionUpdated) {
   let pendingRequests = [];
   try {
     const statusData = await getUserPaymentStatus();
-    pendingRequests = (statusData.requests || []).filter(r => r.status === 'PENDING');
+    pendingRequests = (statusData?.requests || []).filter(r => r.status === 'PENDING');
   } catch (_) {}
 
-  renderBillingMainView(currentPlan, pendingRequests, onSubscriptionUpdated);
+  renderBillingMainView(currentPlan, pendingRequests, onSubscriptionUpdated, targetPlan);
   document.body.appendChild(modalContainer);
 }
 
-function renderBillingMainView(currentPlan, pendingRequests, onSubscriptionUpdated) {
+function renderBillingMainView(currentPlan, pendingRequests, onSubscriptionUpdated, targetPlan = null) {
   const cardsHTML = ['free', 'pro', 'premium', 'premium_group']
-    .map(id => buildPlanCard(id, currentPlan))
+    .map(id => buildPlanCard(id, currentPlan, targetPlan))
     .join('');
 
   modalContainer.innerHTML = `
@@ -84,21 +104,22 @@ function renderBillingMainView(currentPlan, pendingRequests, onSubscriptionUpdat
   });
 }
 
-function buildPlanCard(planId, currentPlan) {
+function buildPlanCard(planId, currentPlan, targetPlan = null) {
   const plan = PLANS[planId] || PLANS.free;
   const isCurrent = currentPlan === planId;
-  const isHighlighted = planId === 'pro';
+  const isTargeted = Boolean(targetPlan && targetPlan === planId);
+  const isHighlighted = isTargeted || (!targetPlan && planId === 'pro');
 
   const bg = isHighlighted
-    ? 'linear-gradient(135deg, rgba(124,58,237,0.15), rgba(6,182,212,0.1))'
+    ? 'linear-gradient(135deg, rgba(124,58,237,0.18), rgba(6,182,212,0.12))'
     : 'rgba(255,255,255,0.02)';
   const border = isHighlighted
-    ? '2px solid rgba(124,58,237,0.6)'
+    ? '2px solid rgba(124,58,237,0.85)'
     : isCurrent
-      ? '1px solid rgba(124,58,237,0.5)'
+      ? '1px solid rgba(16,185,129,0.5)'
       : '1px solid rgba(255,255,255,0.08)';
-  const shadow = isHighlighted ? 'box-shadow: 0 0 30px rgba(124,58,237,0.2);' : '';
-  const nameColor = isHighlighted ? 'color: #a855f7;' : '';
+  const shadow = isHighlighted ? 'box-shadow: 0 0 35px rgba(124,58,237,0.3);' : '';
+  const nameColor = isHighlighted ? 'color: #c084fc;' : '';
 
   let pricePrefix = '';
   let priceAmount = 0;
@@ -121,6 +142,8 @@ function buildPlanCard(planId, currentPlan) {
   let badgeHTML = '';
   if (isCurrent) {
     badgeHTML = '<span style="position: absolute; top: 12px; right: 12px; font-size: 0.6rem; color: #10b981; font-weight: 800; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); border-radius: 12px; padding: 2px 8px;">CURRENT</span>';
+  } else if (isTargeted) {
+    badgeHTML = '<span style="position: absolute; top: 12px; right: 12px; font-size: 0.6rem; color: #38bdf8; font-weight: 800; background: rgba(56,189,248,0.2); border: 1px solid rgba(56,189,248,0.4); border-radius: 12px; padding: 2px 8px;">RECOMMENDED</span>';
   } else if (plan.badge) {
     badgeHTML = '<span style="position: absolute; top: 12px; right: 12px; font-size: 0.6rem; color: #f59e0b; font-weight: 800; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3); border-radius: 12px; padding: 2px 8px;">' + plan.badge + '</span>';
   }

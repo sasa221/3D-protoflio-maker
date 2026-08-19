@@ -634,7 +634,7 @@ function buildHTML() {
         <div class="logo-name">3D Portfolio Maker</div>
         <div class="logo-sub">Ultra Studio v3.0</div>
       </div>
-      <div class="tier-chip ${globalEntitlements.getEffectivePlanId() !== 'free' ? 'tier-pro' : 'tier-free'}" id="tier-chip" onclick="handleUpgradeClick()" style="cursor:pointer">
+      <div class="tier-chip ${globalEntitlements.getEffectivePlanId() !== 'free' ? 'tier-pro' : 'tier-free'}" id="tier-chip" role="button" tabindex="0" aria-label="View plan and billing" onclick="handleUpgradeClick()" style="cursor:pointer">
         ${(() => { const p = globalEntitlements.getEffectivePlanId(); return p === 'premium' ? '👑 PREMIUM' : p === 'premium_group' ? '👥 GROUP' : p === 'pro' ? '💎 PRO' : '🆓 FREE'; })()}
       </div>
       <button class="admin-btn" id="logout-btn" title="Logout" onclick="handleLogout()" style="font-size:16px">🚪</button>
@@ -2816,14 +2816,31 @@ window.handleLogout = function() {
 
 window.handleUpgradeClick = async function(targetPlanId = null) {
   const user = await getCurrentAuthUser().catch(() => null);
-  if (!user) {
-    window.location.href = '/login?next=/studio';
-    return;
-  }
-  openBillingModal(user.id, () => {
-    refreshStudioEntitlements({ notify: true });
+  openBillingModal({
+    currentUserId: user?.id,
+    targetPlan: targetPlanId,
+    onSubscriptionUpdated: () => {
+      refreshStudioEntitlements({ notify: true });
+    }
   });
 };
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', (e) => {
+    const chip = e.target.closest('#tier-chip, .tier-chip, [data-action="open-billing"]');
+    if (chip) {
+      e.stopPropagation();
+      window.handleUpgradeClick();
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target && (e.target.id === 'tier-chip' || e.target.classList?.contains('tier-chip'))) {
+      e.preventDefault();
+      window.handleUpgradeClick();
+    }
+  });
+}
 
 // ─── ADMIN DASHBOARD ─────────────────────────
 window.openAdmin = async function() {

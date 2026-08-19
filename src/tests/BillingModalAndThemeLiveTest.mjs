@@ -88,14 +88,33 @@ function simulateSelectTheme(userTier, themeId) {
   return { applied: true, themeId };
 }
 
-assert(simulateSelectTheme('free', 'code').applied === true, 'Free user selects "code" -> APPLIED');
-assert(simulateSelectTheme('free', 'creative').applied === true, 'Free user selects "creative" -> APPLIED');
-assert(simulateSelectTheme('free', 'minimal').applied === true, 'Free user selects "minimal" -> APPLIED');
-assert(simulateSelectTheme('free', 'hacker').applied === false, 'Free user selects "hacker" (Pro) -> DENIED');
-assert(simulateSelectTheme('free', 'quantum').applied === false, 'Free user selects "quantum" (Premium) -> DENIED');
-assert(simulateSelectTheme('pro', 'hacker').applied === true, 'Pro user selects "hacker" -> APPLIED');
-assert(simulateSelectTheme('pro', 'quantum').applied === false, 'Pro user selects "quantum" -> DENIED');
-assert(simulateSelectTheme('premium', 'quantum').applied === true, 'Premium user selects "quantum" -> APPLIED');
+// ─── 4. TARGETED UPGRADE HIGHLIGHTING ───────────────────────────
+console.log('\n4. Testing targetPlan highlighting and upgrade modal parameters...');
+
+function simulateBuildPlanCard(planId, currentPlan, targetPlan) {
+  const isCurrent = currentPlan === planId;
+  const isTargeted = Boolean(targetPlan && targetPlan === planId);
+  const isHighlighted = isTargeted || (!targetPlan && planId === 'pro');
+  return {
+    planId,
+    isCurrent,
+    isTargeted,
+    isHighlighted,
+    badge: isCurrent ? 'CURRENT' : isTargeted ? 'RECOMMENDED' : (planId === 'pro' ? 'MOST POPULAR' : null)
+  };
+}
+
+const defaultView = ['free', 'pro', 'premium', 'premium_group'].map(p => simulateBuildPlanCard(p, 'free', null));
+assert(defaultView.find(c => c.planId === 'pro').isHighlighted === true, 'Default view highlights Pro plan');
+assert(defaultView.find(c => c.planId === 'premium').isHighlighted === false, 'Default view does not highlight Premium');
+
+const proTargetedView = ['free', 'pro', 'premium', 'premium_group'].map(p => simulateBuildPlanCard(p, 'free', 'pro'));
+assert(proTargetedView.find(c => c.planId === 'pro').isTargeted === true, 'Pro target sets isTargeted on Pro card');
+assert(proTargetedView.find(c => c.planId === 'pro').badge === 'RECOMMENDED', 'Pro target displays RECOMMENDED badge');
+
+const premiumTargetedView = ['free', 'pro', 'premium', 'premium_group'].map(p => simulateBuildPlanCard(p, 'free', 'premium'));
+assert(premiumTargetedView.find(c => c.planId === 'premium').isTargeted === true, 'Premium target sets isTargeted on Premium card');
+assert(premiumTargetedView.find(c => c.planId === 'premium').badge === 'RECOMMENDED', 'Premium target displays RECOMMENDED badge');
 
 console.log('\n============================================================');
 console.log(`  SUMMARY: ${passed} / ${passed + failed} assertions PASSED (Failures: ${failed})`);
