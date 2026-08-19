@@ -342,6 +342,16 @@ export async function getUserPaymentStatus() {
   return data;
 }
 
+export async function getPublicPaymentConfig() {
+  try {
+    const res = await fetch('/api/billing?action=payment-config');
+    const data = await res.json().catch(() => ({ configured: false }));
+    return data || { configured: false };
+  } catch (_) {
+    return { configured: false };
+  }
+}
+
 // Backward-compat alias for legacy tests
 export function adminSetUserPlan(userId, planId) {
   return adminOverrideUserPlan({ userId, targetPlanId: planId, reason: 'Legacy direct plan set' });

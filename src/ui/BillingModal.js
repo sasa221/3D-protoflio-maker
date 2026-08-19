@@ -6,8 +6,8 @@
  */
 
 import { globalEntitlements } from '../services/EntitlementService.js';
-import { PLANS, INSTAPAY_CONFIG, GROUP_SEAT_PRICING, formatPrice } from '../config/PlanConfig.js';
-import { submitManualPayment, getUserPaymentStatus, redeemPromoCode } from '../services/AuthService.js';
+import { PLANS, GROUP_SEAT_PRICING, formatPrice } from '../config/PlanConfig.js';
+import { submitManualPayment, getUserPaymentStatus, redeemPromoCode, getPublicPaymentConfig } from '../services/AuthService.js';
 
 let modalContainer = null;
 
@@ -127,7 +127,7 @@ function buildPlanCard(planId, currentPlan) {
     + '</div>';
 }
 
-function openInstaPayModal(planId, onSubscriptionUpdated) {
+async function openInstaPayModal(planId, onSubscriptionUpdated) {
   const plan = PLANS[planId] || PLANS.pro;
   let baseAmount = plan.priceMonthlyEGP || 600;
   let groupSeats = 2;
@@ -135,10 +135,11 @@ function openInstaPayModal(planId, onSubscriptionUpdated) {
     baseAmount = GROUP_SEAT_PRICING[2];
   }
 
+  const paymentConfig = await getPublicPaymentConfig();
+  const isConfigured = Boolean(paymentConfig?.configured);
+
   const wrapper = document.createElement('div');
   wrapper.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10002;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:16px;';
-
-  const isConfigured = Boolean(INSTAPAY_CONFIG.isConfigured);
 
   wrapper.innerHTML = `
     <div style="background:#0e101c;border:1px solid rgba(255,255,255,0.15);border-radius:20px;max-width:540px;width:100%;max-height:92vh;overflow-y:auto;padding:28px;color:#fff;position:relative;">
@@ -154,22 +155,22 @@ function openInstaPayModal(planId, onSubscriptionUpdated) {
         <div style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.3);border-radius:14px;padding:18px;margin-bottom:20px;font-size:13px;line-height:1.7;">
           <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
             <span style="color:rgba(255,255,255,0.6);">Account Name:</span>
-            <strong>${INSTAPAY_CONFIG.accountName || 'N/A'}</strong>
+            <strong>${escapeHtml(paymentConfig.displayName || 'N/A')}</strong>
           </div>
           <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-            <span style="color:rgba(255,255,255,0.6);">InstaPay ID:</span>
-            <strong style="font-family:monospace;color:#38bdf8;">${INSTAPAY_CONFIG.instapayId || 'N/A'}</strong>
+            <span style="color:rgba(255,255,255,0.6);">InstaPay ID / Address:</span>
+            <strong style="font-family:monospace;color:#38bdf8;">${escapeHtml(paymentConfig.instapayAddress || 'N/A')}</strong>
           </div>
-          ${INSTAPAY_CONFIG.phoneNumber ? `
+          ${paymentConfig.phoneNumber ? `
             <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
               <span style="color:rgba(255,255,255,0.6);">Phone Number:</span>
-              <strong>${INSTAPAY_CONFIG.phoneNumber}</strong>
+              <strong>${escapeHtml(paymentConfig.phoneNumber)}</strong>
             </div>
           ` : ''}
-          ${INSTAPAY_CONFIG.bankName ? `
+          ${paymentConfig.bankName ? `
             <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
               <span style="color:rgba(255,255,255,0.6);">Bank:</span>
-              <span>${INSTAPAY_CONFIG.bankName}</span>
+              <span>${escapeHtml(paymentConfig.bankName)}</span>
             </div>
           ` : ''}
           <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;margin-top:8px;">

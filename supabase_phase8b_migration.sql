@@ -35,7 +35,7 @@ CREATE INDEX IF NOT EXISTS idx_manual_payments_created
   ON public.manual_payment_requests(created_at DESC);
 
 -- ============================================
--- 2. RLS Security Policies
+-- 2. RLS Security Policies for Payment Requests
 -- ============================================
 ALTER TABLE public.manual_payment_requests ENABLE ROW LEVEL SECURITY;
 
@@ -54,3 +54,27 @@ CREATE POLICY IF NOT EXISTS "Users can cancel own pending requests"
   ON public.manual_payment_requests FOR UPDATE
   USING (auth.uid() = user_id AND status = 'PENDING')
   WITH CHECK (status = 'CANCELLED');
+
+-- ============================================
+-- 3. Storage Bucket & Policies for Payment Proofs
+-- ============================================
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('payment_proofs', 'payment_proofs', false)
+ON CONFLICT (id) DO UPDATE SET public = false;
+
+-- Users can upload proof to their own folder: <user_id>/proofs/*
+CREATE POLICY IF NOT EXISTS "Users can upload own payment proofs"
+  ON storage.objects FOR INSERT
+  WITH CHECK (
+    bucket_id = 'payment_proofs'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+-- Users can read own payment proofs
+CREATE POLICY IF NOT EXISTS "Users can read own payment proofs"
+  ON storage.objects FOR SELECT
+  USING (
+    bucket_id = 'payment_proofs'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+

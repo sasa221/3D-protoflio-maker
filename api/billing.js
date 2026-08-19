@@ -37,6 +37,22 @@ export default async function handler(req, res) {
   const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   // ─────────────────────────────────────────────────────────────
+  // 0. ACTION: PAYMENT CONFIG (Public Read-Only Destination Info)
+  // ─────────────────────────────────────────────────────────────
+  if (action === 'payment-config' || (req.method === 'GET' && action === 'config')) {
+    const isConfigured = Boolean(process.env.PAYMENT_INSTAPAY_NAME && process.env.PAYMENT_INSTAPAY_ADDRESS);
+    return res.status(200).json({
+      configured: isConfigured,
+      method: 'INSTAPAY',
+      displayName: isConfigured ? process.env.PAYMENT_INSTAPAY_NAME : null,
+      instapayAddress: isConfigured ? process.env.PAYMENT_INSTAPAY_ADDRESS : null,
+      phoneNumber: isConfigured ? (process.env.PAYMENT_INSTAPAY_PHONE || null) : null,
+      bankName: isConfigured ? (process.env.PAYMENT_INSTAPAY_BANK || null) : null,
+      paymentNote: isConfigured ? (process.env.PAYMENT_INSTAPAY_NOTE || null) : null
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // 1. ACTION: SUBMIT MANUAL INSTAPAY PAYMENT
   // ─────────────────────────────────────────────────────────────
   if (action === 'submit-manual-payment') {

@@ -167,7 +167,17 @@ check('Group 5-seat price is 2800 EGP', GROUP_SEAT_PRICING[5] === 2800);
 // ─────────────────────────────────────────────────────────────
 console.log('\n4. Testing Billing Router API Handlers & Guardrails...');
 
-// Test 4.1: Unauthenticated manual payment submission is rejected with 401
+// Test 4.1: Public payment-config action
+const { req: configReq, res: configRes } = createMockReqRes({
+  method: 'GET',
+  query: { action: 'payment-config' }
+});
+await billingHandler(configReq, configRes);
+check('payment-config action returns HTTP 200', configRes.statusCode === 200);
+check('payment-config returns method INSTAPAY', configRes.body?.method === 'INSTAPAY');
+check('payment-config contains no leaked API keys or private credentials', !configRes.body?.apiKey && !configRes.body?.secretKey);
+
+// Test 4.2: Unauthenticated manual payment submission is rejected with 401
 const { req: unauthReq, res: unauthRes } = createMockReqRes({
   method: 'POST',
   query: { action: 'submit-manual-payment' },
@@ -176,7 +186,7 @@ const { req: unauthReq, res: unauthRes } = createMockReqRes({
 await billingHandler(unauthReq, unauthRes);
 check('submit-manual-payment rejects unauthenticated request with 401', unauthRes.statusCode === 401);
 
-// Test 4.2: Method not allowed on GET submit-manual-payment
+// Test 4.3: Method not allowed on GET submit-manual-payment
 const { req: getSubmitReq, res: getSubmitRes } = createMockReqRes({
   method: 'GET',
   query: { action: 'submit-manual-payment' }
@@ -184,7 +194,7 @@ const { req: getSubmitReq, res: getSubmitRes } = createMockReqRes({
 await billingHandler(getSubmitReq, getSubmitRes);
 check('submit-manual-payment rejects GET method with 405', getSubmitRes.statusCode === 405);
 
-// Test 4.3: Missing auth token on admin payment requests list
+// Test 4.4: Missing auth token on admin payment requests list
 const { req: unauthAdminReq, res: unauthAdminRes } = createMockReqRes({
   method: 'GET',
   query: { action: 'payment-requests' }
@@ -192,7 +202,7 @@ const { req: unauthAdminReq, res: unauthAdminRes } = createMockReqRes({
 await adminHandler(unauthAdminReq, unauthAdminRes);
 check('admin payment-requests rejects unauthenticated request with 401', unauthAdminRes.statusCode === 401);
 
-// Test 4.4: Missing auth token on admin review-payment
+// Test 4.5: Missing auth token on admin review-payment
 const { req: unauthReviewReq, res: unauthReviewRes } = createMockReqRes({
   method: 'POST',
   query: { action: 'review-payment' },
@@ -200,6 +210,18 @@ const { req: unauthReviewReq, res: unauthReviewRes } = createMockReqRes({
 });
 await adminHandler(unauthReviewReq, unauthReviewRes);
 check('admin review-payment rejects unauthenticated request with 401', unauthReviewRes.statusCode === 401);
+
+// ─────────────────────────────────────────────────────────────
+// 4.6. Static Audit of supabase_phase8b_migration.sql
+// ─────────────────────────────────────────────────────────────
+console.log('\n4.6. Auditing supabase_phase8b_migration.sql...');
+
+const migrationSql = fs.readFileSync(path.join(projectRoot, 'supabase_phase8b_migration.sql'), 'utf8');
+check('Migration defines manual_payment_requests table', migrationSql.includes('CREATE TABLE IF NOT EXISTS public.manual_payment_requests'));
+check('Migration defines status constraint (PENDING, APPROVED, REJECTED, CANCELLED)', migrationSql.includes("CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'))"));
+check('Migration enables RLS on manual_payment_requests', migrationSql.includes('ALTER TABLE public.manual_payment_requests ENABLE ROW LEVEL SECURITY;'));
+check('Migration provisions private payment_proofs storage bucket', migrationSql.includes("VALUES ('payment_proofs', 'payment_proofs', false)"));
+check('Migration enforces user-isolated folder storage RLS for proofs', migrationSql.includes("auth.uid()::text = (storage.foldername(name))[1]"));
 
 // ─────────────────────────────────────────────────────────────
 // 5. Serverless Function Count Audit (Limit <= 10, Target 6)
