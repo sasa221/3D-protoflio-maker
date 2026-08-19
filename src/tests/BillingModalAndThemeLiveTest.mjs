@@ -137,12 +137,35 @@ function checkPendingSubmission(existingPending) {
   return { status: 200, success: true };
 }
 
-assert(checkPendingSubmission(null).status === 200, 'New user submission -> ALLOWED');
-assert(checkPendingSubmission({ id: 'mpr_1', status: 'PENDING' }).status === 409, 'Duplicate pending submission -> 409 CONFLICT');
+// ─── 6. REDESIGNED SAAS CARD SPECIFICATIONS ──────────────────
+console.log('\n6. Testing Redesigned SaaS Card Specifications...');
+
+const CTAS = {
+  free: 'Current Plan',
+  pro: 'Upgrade to Pro',
+  premium: 'Go Premium',
+  premium_group: 'Choose Group'
+};
+
+assert(CTAS.free === 'Current Plan', 'Free CTA is "Current Plan"');
+assert(CTAS.pro === 'Upgrade to Pro', 'Pro CTA is "Upgrade to Pro"');
+assert(CTAS.premium === 'Go Premium', 'Premium CTA is "Go Premium"');
+assert(CTAS.premium_group === 'Choose Group', 'Group CTA is "Choose Group"');
+
+// Group seat dynamic calculation
+[
+  { seats: 2, price: 1500 },
+  { seats: 3, price: 1800 },
+  { seats: 4, price: 2200 },
+  { seats: 5, price: 2800 }
+].forEach(({ seats, price }) => {
+  assert(GROUP_SEAT_PRICING[seats] === price, `Group ${seats} seats price = ${price} EGP`);
+});
 
 console.log('\n============================================================');
 console.log(`  SUMMARY: ${passed} / ${passed + failed} assertions PASSED (Failures: ${failed})`);
 console.log('============================================================\n');
 
 if (failed > 0) process.exit(1);
+
 

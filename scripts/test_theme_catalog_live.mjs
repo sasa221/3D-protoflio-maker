@@ -74,7 +74,7 @@ async function runThemeCatalogAudit() {
       canScroll: sidebarContent ? sidebarContent.scrollHeight > sidebarContent.clientHeight : false,
       totalCards: cards.length,
       unlockedCards: cardDetails.filter(c => !c.isLocked),
-      lockedProCards: cardDetails.filter(c => c.isLocked && c.badge?.includes('PRO')),
+      lockedProCards: cardDetails.filter(c => c.isLocked && c.badge === '🔒 PRO'),
       lockedPremiumCards: cardDetails.filter(c => c.isLocked && c.badge?.includes('PREMIUM')),
       cards: cardDetails
     };
@@ -83,8 +83,8 @@ async function runThemeCatalogAudit() {
   console.log('\nAudit Result Summary:');
   console.log('- Total Cards in DOM:', auditResult.totalCards);
   console.log('- Selectable / Unlocked:', auditResult.unlockedCards.length, '->', auditResult.unlockedCards.map(c => c.name).join(', '));
-  console.log('- Locked Pro:', auditResult.lockedProCards.length, '->', auditResult.lockedProCards.map(c => c.name).join(', '));
-  console.log('- Locked Premium:', auditResult.lockedPremiumCards.length, '->', auditResult.lockedPremiumCards.map(c => c.name).join(', '));
+  console.log('- Locked Pro (🔒 PRO):', auditResult.lockedProCards.length, '->', auditResult.lockedProCards.map(c => c.name).join(', '));
+  console.log('- Locked Premium (💎 PREMIUM):', auditResult.lockedPremiumCards.length, '->', auditResult.lockedPremiumCards.map(c => c.name).join(', '));
   console.log('- Sidebar Scrollable:', auditResult.canScroll, `(${auditResult.sidebarScrollHeight}px scrollHeight vs ${auditResult.sidebarClientHeight}px clientHeight)`);
 
   console.log('\nAll 15 Cards in DOM:');
@@ -119,7 +119,7 @@ async function runThemeCatalogAudit() {
 
   // Test clicking locked Pro theme (Cyber Command)
   console.log('\n4. Testing Click on Cyber Command (Pro)...');
-  const cyberClick = await page.evaluate(() => {
+  await page.evaluate(() => {
     const card = Array.from(document.querySelectorAll('#theme-grid .theme-card')).find(c => c.textContent.includes('Cyber Command'));
     if (card) card.click();
   });
