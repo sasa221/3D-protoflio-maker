@@ -377,44 +377,51 @@ async function renderInstaPayView(planId, onSubscriptionUpdated, previousPlan, p
 
       ${isConfigured ? `
         <!-- INSTAPAY DETAILS CARD -->
-        <div style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.3);border-radius:14px;padding:16px;margin-bottom:18px;font-size:13px;line-height:1.7;">
-          ${paymentConfig.displayName ? `
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
-              <span style="color:rgba(255,255,255,0.6);">Account Name:</span>
-              <strong>${escapeHtml(paymentConfig.displayName)}</strong>
-            </div>
-          ` : ''}
-          ${paymentConfig.instapayAddress ? `
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
-              <span style="color:rgba(255,255,255,0.6);">InstaPay Address / IPA:</span>
+        <div style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.3);border-radius:16px;padding:18px;margin-bottom:18px;font-size:13px;line-height:1.7;">
+          <div style="font-size:11px;font-weight:800;color:#c084fc;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">
+            ⚡ Pay via InstaPay
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap;">
+            <span style="color:rgba(255,255,255,0.6);">Account Name:</span>
+            <strong style="color:#fff;">${escapeHtml(paymentConfig.displayName || 'SALEH MOHAMED SALEH')}</strong>
+          </div>
+
+          <!-- OPTION 1: INSTAPAY ADDRESS -->
+          <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span style="color:rgba(255,255,255,0.6);font-size:12px;">InstaPay Address (IPA):</span>
               <div style="display:flex;align-items:center;gap:6px;">
-                <strong style="font-family:monospace;color:#38bdf8;">${escapeHtml(paymentConfig.instapayAddress)}</strong>
-                <button type="button" id="btn-copy-address" style="background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.3);color:#38bdf8;padding:2px 8px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:700;">Copy</button>
+                <strong style="font-family:monospace;color:#38bdf8;font-size:13px;">${escapeHtml(paymentConfig.instapayAddress || 'saleh2005mohamed@instapay')}</strong>
+                <button type="button" id="btn-copy-address" style="background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.3);color:#38bdf8;padding:3px 8px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:700;">Copy</button>
               </div>
             </div>
-          ` : ''}
-          ${paymentConfig.phoneNumber ? `
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
-              <span style="color:rgba(255,255,255,0.6);">Phone Number:</span>
-              <strong>${escapeHtml(paymentConfig.phoneNumber)}</strong>
+          </div>
+
+          <div style="text-align:center;font-size:11px;font-weight:800;color:rgba(255,255,255,0.4);letter-spacing:2px;margin:4px 0;">─── OR ───</div>
+
+          <!-- OPTION 2: PHONE NUMBER -->
+          <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 12px;margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span style="color:rgba(255,255,255,0.6);font-size:12px;">Phone Number:</span>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <strong style="font-family:monospace;color:#38bdf8;font-size:13px;">${escapeHtml(paymentConfig.phoneNumber || '01270024222')}</strong>
+                <button type="button" id="btn-copy-phone" style="background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.3);color:#38bdf8;padding:3px 8px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:700;">Copy</button>
+              </div>
             </div>
-          ` : ''}
-          ${paymentConfig.bankName ? `
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
-              <span style="color:rgba(255,255,255,0.6);">Bank:</span>
-              <span>${escapeHtml(paymentConfig.bankName)}</span>
-            </div>
-          ` : ''}
-          ${paymentConfig.paymentNote ? `
-            <div style="margin-top:6px;padding-top:6px;border-top:1px dashed rgba(255,255,255,0.1);font-size:11px;color:rgba(255,255,255,0.7);">
-              ℹ️ ${escapeHtml(paymentConfig.paymentNote)}
-            </div>
-          ` : ''}
-          <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;margin-top:8px;">
+          </div>
+
+          <!-- EXPLICIT APPROVED INSTAPAY NOTES -->
+          <div style="background:rgba(234,179,8,0.06);border:1px solid rgba(234,179,8,0.2);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:11.5px;color:rgba(255,255,255,0.85);line-height:1.5;">
+            <div style="margin-bottom:4px;">ℹ️ <strong>Both options transfer to the same InstaPay account.</strong></div>
+            <div style="color:#fde047;">⚠️ <strong>Important: This is an InstaPay transfer, not a mobile wallet transfer.</strong></div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;margin-top:10px;">
             <span style="color:#fff;font-weight:700;">Exact Amount:</span>
             <div style="display:flex;align-items:center;gap:8px;">
-              <strong id="final-amount-display" style="font-size:16px;color:#4ade80;">${baseAmount} EGP</strong>
-              <button type="button" id="btn-copy-amount" style="background:rgba(74,222,128,0.15);border:1px solid rgba(74,222,128,0.3);color:#4ade80;padding:2px 8px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:700;">Copy</button>
+              <strong id="final-amount-display" style="font-size:17px;color:#4ade80;">${baseAmount} EGP</strong>
+              <button type="button" id="btn-copy-amount" style="background:rgba(74,222,128,0.15);border:1px solid rgba(74,222,128,0.3);color:#4ade80;padding:3px 8px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:700;">Copy</button>
             </div>
           </div>
         </div>
@@ -498,9 +505,19 @@ async function renderInstaPayView(planId, onSubscriptionUpdated, previousPlan, p
 
   // Copy InstaPay address
   modalContainer.querySelector('#btn-copy-address')?.addEventListener('click', (e) => {
-    const addr = paymentConfig?.instapayAddress || '';
+    const addr = paymentConfig?.instapayAddress || 'saleh2005mohamed@instapay';
     if (addr && navigator.clipboard) {
       navigator.clipboard.writeText(addr);
+      e.target.textContent = '✓ Copied!';
+      setTimeout(() => { if (e.target) e.target.textContent = 'Copy'; }, 2000);
+    }
+  });
+
+  // Copy Phone Number
+  modalContainer.querySelector('#btn-copy-phone')?.addEventListener('click', (e) => {
+    const phone = paymentConfig?.phoneNumber || '01270024222';
+    if (phone && navigator.clipboard) {
+      navigator.clipboard.writeText(phone);
       e.target.textContent = '✓ Copied!';
       setTimeout(() => { if (e.target) e.target.textContent = 'Copy'; }, 2000);
     }
@@ -515,6 +532,7 @@ async function renderInstaPayView(planId, onSubscriptionUpdated, previousPlan, p
       setTimeout(() => { if (e.target) e.target.textContent = 'Copy'; }, 2000);
     }
   });
+
 
   let selectedProofBase64 = null;
   let selectedContentType = null;

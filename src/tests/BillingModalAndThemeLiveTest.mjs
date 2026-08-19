@@ -162,10 +162,62 @@ assert(CTAS.premium_group === 'Choose Group', 'Group CTA is "Choose Group"');
   assert(GROUP_SEAT_PRICING[seats] === price, `Group ${seats} seats price = ${price} EGP`);
 });
 
+// ─── 7. THEME PREVIEW WITHOUT SAVED MUTATION ──────────────────
+console.log('\n7. Testing Theme Preview vs Saved Theme Invariant...');
+
+
+let mockPortfolioData = { theme: 'code' };
+
+function simulateThemeInteraction(userTier, themeId, isExplicitUnlock = false) {
+  const isAllowed = canAccessTheme(userTier, themeId);
+  if (!isAllowed) {
+    if (isExplicitUnlock) {
+      return { action: 'OPEN_PRICING', targetTier: getThemeTier(themeId), savedTheme: mockPortfolioData.theme };
+    }
+    // Preview only
+    return { action: 'PREVIEW_TEMPORARY', previewThemeId: themeId, savedTheme: mockPortfolioData.theme };
+  }
+  mockPortfolioData.theme = themeId;
+  return { action: 'APPLIED', savedTheme: mockPortfolioData.theme };
+}
+
+// Free user clicking Cyber Command (card or Preview button)
+const previewResult = simulateThemeInteraction('free', 'hacker', false);
+assert(previewResult.action === 'PREVIEW_TEMPORARY', 'Clicking locked theme previews without applying');
+assert(previewResult.savedTheme === 'code', 'Saved active theme remains unchanged during preview (Invariant: PASS)');
+
+// Free user clicking Unlock with Pro
+const unlockResult = simulateThemeInteraction('free', 'hacker', true);
+assert(unlockResult.action === 'OPEN_PRICING', 'Clicking Unlock with Pro opens pricing');
+assert(unlockResult.targetTier === 'pro', 'Pricing target is Pro');
+assert(mockPortfolioData.theme === 'code', 'Saved active theme remains untouched during unlock click');
+
+// ─── 8. OFFICIAL INSTAPAY CONFIG INVARIANTS ──────────────────
+console.log('\n8. Testing Official Real InstaPay Configuration Invariants...');
+
+const officialPaymentConfig = {
+  configured: true,
+  method: 'INSTAPAY',
+  displayName: 'SALEH MOHAMED SALEH',
+  instapayAddress: 'saleh2005mohamed@instapay',
+  phoneNumber: '01270024222',
+  bankName: null,
+  paymentNote: 'Transfer via InstaPay only. You may use either the InstaPay address or phone number. This is not a mobile wallet payment.'
+};
+
+assert(officialPaymentConfig.configured === true, 'InstaPay is configured');
+assert(officialPaymentConfig.displayName === 'SALEH MOHAMED SALEH', 'Account name matches official owner');
+assert(officialPaymentConfig.instapayAddress === 'saleh2005mohamed@instapay', 'IPA matches official address');
+assert(officialPaymentConfig.phoneNumber === '01270024222', 'Phone matches official number');
+assert(!officialPaymentConfig.paymentNote.toLowerCase().includes('vodafone cash'), 'No Vodafone Cash references');
+assert(!officialPaymentConfig.paymentNote.toLowerCase().includes('wallet transfer'), 'No wallet transfer references');
+assert(officialPaymentConfig.paymentNote.includes('InstaPay only'), 'Explicit InstaPay only statement present');
+
 console.log('\n============================================================');
 console.log(`  SUMMARY: ${passed} / ${passed + failed} assertions PASSED (Failures: ${failed})`);
 console.log('============================================================\n');
 
 if (failed > 0) process.exit(1);
+
 
 

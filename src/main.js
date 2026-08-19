@@ -2550,48 +2550,122 @@ const THEME_DESCRIPTORS = {
   quantum: { tag: 'Quantum Deep-Tech', desc: 'Layered aurora ribbons & spatial energy' }
 };
 
+function renderThemeCard(t, userTier) {
+  const requiredTier = getThemeTier(t.id);
+  const isLocked = !canAccessTheme(userTier, t.id);
+  const isActive = currentTheme?.id === t.id;
+  const meta = THEME_DESCRIPTORS[t.id] || { tag: 'Visual Theme', desc: t.name };
+
+  let badgeHTML = '';
+  if (requiredTier === 'pro') {
+    badgeHTML = '<span class="pro-badge" style="font-size:0.62rem;padding:2px 7px;background:rgba(124,58,237,0.2);color:#c084fc;border:1px solid rgba(124,58,237,0.45);border-radius:6px;font-weight:800;letter-spacing:0.5px;">🔒 PRO</span>';
+  } else if (requiredTier === 'premium') {
+    badgeHTML = '<span class="pro-badge" style="font-size:0.62rem;padding:2px 7px;background:rgba(6,182,212,0.2);color:#38bdf8;border:1px solid rgba(6,182,212,0.45);border-radius:6px;font-weight:800;letter-spacing:0.5px;">💎 PREMIUM</span>';
+  } else {
+    badgeHTML = '<span style="font-size:0.58rem;padding:2px 6px;background:rgba(56,189,248,0.1);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);border-radius:6px;font-weight:700;">FREE</span>';
+  }
+
+  const ctaButtons = !isLocked
+    ? `
+      <button type="button" class="theme-action-btn btn-apply-theme" onclick="event.stopPropagation(); selectTheme('${t.id}')" style="width: 100%; padding: 6px 10px; border-radius: 8px; background: ${isActive ? 'rgba(124,58,237,0.3)' : 'rgba(255,255,255,0.06)'}; border: 1px solid ${isActive ? '#7c3aed' : 'rgba(255,255,255,0.12)'}; color: #fff; font-size: 0.72rem; font-weight: 700; cursor: pointer; transition: all 0.2s ease;">
+        ${isActive ? '✓ Active Theme' : 'Apply Theme'}
+      </button>
+    `
+    : `
+      <div style="display: flex; gap: 6px; width: 100%;">
+        <button type="button" class="theme-action-btn btn-preview-theme" onclick="event.stopPropagation(); previewTheme('${t.id}')" style="flex: 1; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 0.68rem; font-weight: 700; cursor: pointer; transition: all 0.2s ease;">
+          👁️ Preview
+        </button>
+        <button type="button" class="theme-action-btn btn-unlock-theme" onclick="event.stopPropagation(); handleUpgradeClick('${requiredTier}')" style="flex: 1.3; padding: 6px 8px; border-radius: 8px; background: ${requiredTier === 'premium' ? 'linear-gradient(135deg, #0891b2, #7c3aed)' : 'linear-gradient(135deg, #7c3aed, #06b6d4)'}; border: none; color: #fff; font-size: 0.68rem; font-weight: 800; cursor: pointer; transition: all 0.2s ease; white-space: nowrap;">
+          ${requiredTier === 'premium' ? 'Unlock Premium' : 'Unlock with Pro'}
+        </button>
+      </div>
+    `;
+
+  return `
+    <div class="theme-card ${isActive ? 'active' : ''} ${isLocked ? 'theme-card--locked' : ''}" data-theme-id="${t.id}" onclick="${isLocked ? `previewTheme('${t.id}')` : `selectTheme('${t.id}')`}" style="display:flex;flex-direction:column;gap:4px;padding:12px 10px;text-align:left;position:relative;cursor:pointer;border-radius:12px;transition:all 0.2s ease;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span class="theme-emoji" style="font-size:1.4rem;">${t.emoji}</span>
+        ${badgeHTML}
+      </div>
+      <div class="theme-name" style="font-size:0.82rem;font-weight:800;color:#fff;margin-top:2px;display:flex;align-items:center;justify-content:space-between;gap:4px;">
+        <span>${t.name}</span>
+        <span style="font-size:0.58rem;font-weight:700;color:var(--primary);background:rgba(124,58,237,0.12);padding:1px 5px;border-radius:6px;">${meta.tag}</span>
+      </div>
+      <div style="font-size:0.68rem;color:rgba(255,255,255,0.55);line-height:1.35;margin-bottom:6px;">${meta.desc}</div>
+      <div style="margin-top:auto;padding-top:4px;">
+        ${ctaButtons}
+      </div>
+    </div>
+  `;
+}
+
 function buildThemeGrid() {
   const el = document.getElementById('theme-grid');
   if (!el) return;
-  const themes = getAllThemes();
   const userTier = globalEntitlements.getThemeTier();
-  el.innerHTML = themes.map(t => {
-    const requiredTier = getThemeTier(t.id);
-    const isLocked = !canAccessTheme(userTier, t.id);
-    const meta = THEME_DESCRIPTORS[t.id] || { tag: 'Visual Theme', desc: t.name };
-    
-    let badgeHTML = '';
-    if (requiredTier === 'pro') {
-      badgeHTML = '<span class="pro-badge" style="font-size:0.6rem;padding:1px 6px;background:rgba(124,58,237,0.2);color:#c084fc;border:1px solid rgba(124,58,237,0.4);border-radius:6px;font-weight:800">🔒 PRO</span>';
-    } else if (requiredTier === 'premium') {
-      badgeHTML = '<span class="pro-badge" style="font-size:0.6rem;padding:1px 6px;background:rgba(6,182,212,0.2);color:#38bdf8;border:1px solid rgba(6,182,212,0.4);border-radius:6px;font-weight:800">💎 PREMIUM</span>';
-    }
 
-    return `
-      <div class="theme-card ${currentTheme?.id === t.id ? 'active' : ''} ${isLocked ? 'theme-card--locked' : ''}" onclick="selectTheme('${t.id}', ${isLocked})" style="display:flex;flex-direction:column;gap:4px;padding:12px 10px;text-align:left;position:relative;cursor:pointer;">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span class="theme-emoji" style="font-size:1.4rem">${t.emoji}</span>
-          <span style="font-size:0.62rem;font-weight:800;color:var(--primary);background:rgba(124,58,237,0.15);padding:2px 6px;border-radius:8px">${meta.tag}</span>
+  const starterIds = ['code', 'creative', 'minimal'];
+  const proIds = ['hacker', 'data', 'blueprint', 'media', 'health', 'marketing', 'education'];
+  const premiumIds = ['cosmic', 'finance', 'legal', 'obsidian', 'quantum'];
+
+  const starterCards = starterIds.map(id => renderThemeCard(getThemeById(id), userTier)).join('');
+  const proCards = proIds.map(id => renderThemeCard(getThemeById(id), userTier)).join('');
+  const premiumCards = premiumIds.map(id => renderThemeCard(getThemeById(id), userTier)).join('');
+
+  el.innerHTML = `
+    <div class="theme-catalog-container" style="display: flex; flex-direction: column; gap: 20px; width: 100%;">
+      <!-- STARTER THEMES -->
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+          <div style="font-size: 0.72rem; font-weight: 800; letter-spacing: 1px; color: #38bdf8; text-transform: uppercase;">🌟 Starter Themes</div>
+          <span style="font-size: 0.62rem; color: rgba(255,255,255,0.5); font-weight: 700;">3 Included</span>
         </div>
-        <div class="theme-name" style="font-size:0.82rem;font-weight:800;color:#fff;margin-top:2px;display:flex;align-items:center;justify-content:space-between;gap:4px;">
-          <span>${t.name}</span> ${badgeHTML}
+        <div class="theme-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          ${starterCards}
         </div>
-        <div style="font-size:0.68rem;color:rgba(255,255,255,0.5);line-height:1.3">${meta.desc}</div>
       </div>
-    `;
-  }).join('');
+
+      <!-- PRO THEMES -->
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+          <div style="font-size: 0.72rem; font-weight: 800; letter-spacing: 1px; color: #c084fc; text-transform: uppercase;">⚡ Pro Themes</div>
+          <span style="font-size: 0.62rem; color: rgba(255,255,255,0.5); font-weight: 700;">7 Professional Themes</span>
+        </div>
+        <div class="theme-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          ${proCards}
+        </div>
+      </div>
+
+      <!-- PREMIUM THEMES -->
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+          <div style="font-size: 0.72rem; font-weight: 800; letter-spacing: 1px; color: #34d399; text-transform: uppercase;">👑 Premium Themes</div>
+          <span style="font-size: 0.62rem; color: rgba(255,255,255,0.5); font-weight: 700;">5 Exclusive Themes</span>
+        </div>
+        <div class="theme-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          ${premiumCards}
+        </div>
+      </div>
+    </div>
+  `;
 }
 
-window.selectTheme = function(id, locked) {
+window.previewTheme = function(id) {
+  const theme = getThemeById(id);
+  if (!theme) return;
+  engine?.applyTheme(theme);
+  sceneDirector?.setTheme(theme);
+  showToast('info', '👁️', `Previewing ${theme.name} (Temporary 3D Preview). Upgrade to apply permanently.`);
+};
+
+window.selectTheme = function(id) {
   const userTier = globalEntitlements.getThemeTier();
   const requiredTier = getThemeTier(id);
   const isAllowed = canAccessTheme(userTier, id);
 
-  if (locked || !isAllowed) {
-    const tierLabel = requiredTier === 'premium' ? 'Premium' : 'Pro';
-    const themeName = getThemeById(id)?.name || id;
-    showToast('info', '🔒', `${themeName} is available with ${tierLabel}.`);
-    handleUpgradeClick(requiredTier);
+  if (!isAllowed) {
+    window.previewTheme(id);
     return;
   }
   const theme = getThemeById(id);
@@ -2605,6 +2679,7 @@ window.selectTheme = function(id, locked) {
   showToast('success', theme.emoji, `${theme.name} World activated!`);
   autoSave();
 };
+
 
 // ─── PRESETS ────────────────────────────────
 window.loadPreset = function(key) {

@@ -40,17 +40,24 @@ export default async function handler(req, res) {
   // 0. ACTION: PAYMENT CONFIG (Public Read-Only Destination Info)
   // ─────────────────────────────────────────────────────────────
   if (action === 'payment-config' || (req.method === 'GET' && action === 'config')) {
-    const isConfigured = Boolean(process.env.PAYMENT_INSTAPAY_NAME && process.env.PAYMENT_INSTAPAY_ADDRESS);
+    const displayName = process.env.PAYMENT_INSTAPAY_NAME || 'SALEH MOHAMED SALEH';
+    const instapayAddress = process.env.PAYMENT_INSTAPAY_ADDRESS || 'saleh2005mohamed@instapay';
+    const phoneNumber = process.env.PAYMENT_INSTAPAY_PHONE || '01270024222';
+    const paymentNote = process.env.PAYMENT_INSTAPAY_NOTE || 'Transfer via InstaPay only. You may use either the InstaPay address or phone number. This is not a mobile wallet payment.';
+    const bankName = process.env.PAYMENT_INSTAPAY_BANK || null;
+    const isConfigured = Boolean(displayName && instapayAddress);
+
     return res.status(200).json({
       configured: isConfigured,
       method: 'INSTAPAY',
-      displayName: isConfigured ? process.env.PAYMENT_INSTAPAY_NAME : null,
-      instapayAddress: isConfigured ? process.env.PAYMENT_INSTAPAY_ADDRESS : null,
-      phoneNumber: isConfigured ? (process.env.PAYMENT_INSTAPAY_PHONE || null) : null,
-      bankName: isConfigured ? (process.env.PAYMENT_INSTAPAY_BANK || null) : null,
-      paymentNote: isConfigured ? (process.env.PAYMENT_INSTAPAY_NOTE || null) : null
+      displayName,
+      instapayAddress,
+      phoneNumber,
+      bankName,
+      paymentNote
     });
   }
+
 
   // ─────────────────────────────────────────────────────────────
   // 1. ACTION: SUBMIT MANUAL INSTAPAY PAYMENT

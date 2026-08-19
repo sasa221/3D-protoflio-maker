@@ -2,7 +2,7 @@
 import { chromium } from 'playwright';
 
 async function runLiveProductionTest() {
-  console.log('=== PHASE 8C REDESIGNED PLANS & PRICING MODAL ACCEPTANCE SUITE ===');
+  console.log('=== FINAL THEME UX & REAL INSTAPAY PRODUCTION ACCEPTANCE SUITE ===');
   console.log('Target: https://portfolio-maker-murex.vercel.app/\n');
 
   const browser = await chromium.launch({ headless: true });
@@ -12,7 +12,7 @@ async function runLiveProductionTest() {
       id: '00000000-0000-4000-a000-000000000001',
       aud: 'authenticated',
       role: 'authenticated',
-      email: 'freetester_redesign@example.com',
+      email: 'freetester_themes@example.com',
       email_confirmed_at: new Date().toISOString(),
       user_metadata: { full_name: 'Free Tester' },
       app_metadata: { provider: 'email' }
@@ -42,177 +42,188 @@ async function runLiveProductionTest() {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // TEST 1: FREE BADGE -> REDESIGNED PRICING MODAL AUDIT
+  // PART A: 15 THEME CATALOG DOM AUDIT BEFORE ANY CLICK
   // ─────────────────────────────────────────────────────────────
-  console.log('1. Auditing Redesigned Plans & Pricing Modal Structure & Typography...');
+  console.log('PART A: Auditing 15-Theme Catalog in Customize Workspace...');
   const { context: ctx1, page: p1 } = await getCleanPage();
 
-  await p1.click('#tier-chip');
-  await p1.waitForTimeout(600);
+  const themeAudit = await p1.evaluate(() => {
+    const cards = Array.from(document.querySelectorAll('.theme-card'));
+    const cyberCard = cards.find(c => c.textContent.includes('Cyber Command'));
+    const quantumCard = cards.find(c => c.textContent.includes('Quantum Aurora'));
 
-  const modalAudit = await p1.evaluate(() => {
-    const overlay = document.querySelector('.billing-modal-overlay');
-    const card = document.querySelector('.cv-modal-card');
-    const eyebrow = card?.querySelector('div > span')?.textContent?.trim();
-    const title = card?.querySelector('h2')?.textContent?.trim();
-    const subtitle = card?.querySelector('p')?.textContent?.trim();
-    const planCards = Array.from(document.querySelectorAll('.pricing-card'));
+    const details = cards.map(c => {
+      const name = c.querySelector('.theme-name span')?.textContent?.trim();
+      const badge = c.querySelector('.pro-badge')?.textContent?.trim() || 'FREE';
+      const isLocked = c.classList.contains('theme-card--locked');
+      const hasPreviewBtn = Boolean(c.querySelector('.btn-preview-theme'));
+      const hasUnlockBtn = Boolean(c.querySelector('.btn-unlock-theme'));
+      const hasApplyBtn = Boolean(c.querySelector('.btn-apply-theme'));
 
-    const cardsDetails = planCards.map(c => {
-      const name = c.querySelector('h3')?.textContent?.trim();
-      const pos = c.querySelector('p')?.textContent?.trim();
-      const price = c.querySelector('div span')?.textContent?.trim();
-      const badge = c.querySelector('span[style*="position: absolute"]')?.textContent?.trim();
-      const ctaBtn = c.querySelector('button');
-      const ctaText = ctaBtn?.textContent?.trim();
-      const hint = c.querySelector('div[style*="font-size: 11px"]')?.textContent?.trim();
-      const benefits = Array.from(c.querySelectorAll('ul li')).map(li => li.textContent?.trim());
-
-      return { name, pos, price, badge, ctaText, hint, benefitsCount: benefits.length, benefits };
+      return { name, badge, isLocked, hasPreviewBtn, hasUnlockBtn, hasApplyBtn };
     });
 
+    const cyberBadge = cyberCard?.querySelector('.pro-badge')?.textContent?.trim();
+    const quantumBadge = quantumCard?.querySelector('.pro-badge')?.textContent?.trim();
+
     return {
-      overlayCount: document.querySelectorAll('.billing-modal-overlay, .cv-import-modal-overlay').length,
-      overlayVisible: overlay ? window.getComputedStyle(overlay).display === 'flex' : false,
-      eyebrow,
-      title,
-      subtitle,
-      cardsCount: planCards.length,
-      cards: cardsDetails
+      totalCards: cards.length,
+      freeUnlocked: details.filter(d => !d.isLocked),
+      proLocked: details.filter(d => d.isLocked && d.badge.includes('PRO')),
+      premiumLocked: details.filter(d => d.isLocked && d.badge.includes('PREMIUM')),
+      cyberShowsPro: cyberBadge === '🔒 PRO',
+      quantumShowsPremium: quantumBadge === '💎 PREMIUM',
+      cards: details
     };
   });
 
-  console.log('   Eyebrow:', modalAudit.eyebrow);
-  console.log('   Title:', modalAudit.title);
-  console.log('   Subtitle:', modalAudit.subtitle);
-  console.log('   Cards Count:', modalAudit.cardsCount);
-  modalAudit.cards.forEach((c, idx) => {
-    console.log(`     [Card ${idx + 1}] ${c.name} | Price: ${c.price} | Pos: "${c.pos}" | Badge: ${c.badge || 'None'} | CTA: "${c.ctaText}" (Hint: ${c.hint || 'None'}) | Benefits: ${c.benefitsCount}`);
+  console.log('  Total Actual Cards in DOM:', themeAudit.totalCards);
+  console.log('  Free Unlocked (Available):', themeAudit.freeUnlocked.length, '->', themeAudit.freeUnlocked.map(c => c.name).join(', '));
+  console.log('  Pro Locked Visible:', themeAudit.proLocked.length, '->', themeAudit.proLocked.map(c => c.name).join(', '));
+  console.log('  Premium Locked Visible:', themeAudit.premiumLocked.length, '->', themeAudit.premiumLocked.map(c => c.name).join(', '));
+  console.log('  Cyber Command shows 🔒 PRO before click:', themeAudit.cyberShowsPro ? 'YES' : 'NO');
+  console.log('  Quantum Aurora shows 💎 PREMIUM before click:', themeAudit.quantumShowsPremium ? 'YES' : 'NO');
+
+  // ─────────────────────────────────────────────────────────────
+  // PART A2: THEME PREVIEW WITHOUT SAVED MUTATION & NO AUTO-PRICING
+  // ─────────────────────────────────────────────────────────────
+  console.log('\nPART A2: Testing Theme Preview (No Modal Auto-Launch & No Saved Theme Mutation)...');
+  
+  const initialTheme = await p1.evaluate(() => window.portfolioData?.theme || 'minimal');
+  console.log('  Initial Active Saved Theme:', initialTheme);
+
+  // Click Preview on Cyber Command
+  console.log('  Clicking "👁️ Preview" on Cyber Command...');
+  await p1.evaluate(() => {
+    const cyberCard = Array.from(document.querySelectorAll('.theme-card')).find(c => c.textContent.includes('Cyber Command'));
+    const previewBtn = cyberCard?.querySelector('.btn-preview-theme') || cyberCard;
+    previewBtn?.click();
   });
-
-  // ─────────────────────────────────────────────────────────────
-  // TEST 2: GROUP SEAT SELECTOR DYNAMIC PRICING
-  // ─────────────────────────────────────────────────────────────
-  console.log('\n2. Testing Group Seat Selector Dynamic Pricing...');
-  const groupPrices = {};
-  for (const seats of [2, 3, 4, 5]) {
-    await p1.selectOption('#card-group-seats-select', String(seats));
-    await p1.waitForTimeout(200);
-    const p = await p1.evaluate(() => document.getElementById('group-card-price-val')?.textContent?.trim());
-    groupPrices[seats] = p;
-    console.log(`   Group ${seats} Users -> Dynamic Price displayed: ${p} EGP`);
-  }
-
-  // Click Choose Group CTA -> InstaPay modal
-  console.log('   Clicking "Choose Group" (with 5 seats = 2,800 EGP)...');
-  await p1.click('.btn-trigger-checkout[data-plan="premium_group"]');
   await p1.waitForTimeout(500);
 
-  const groupPaymentState = await p1.evaluate(() => {
-    const overlays = document.querySelectorAll('.billing-modal-overlay, .cv-import-modal-overlay');
-    const amount = document.getElementById('final-amount-display')?.textContent?.trim();
-    const title = document.querySelector('.cv-modal-card h2')?.textContent?.trim();
-    return { overlayCount: overlays.length, amount, title };
-  });
-  console.log('   Group Payment State -> Overlays:', groupPaymentState.overlayCount, '| Amount:', groupPaymentState.amount, '| Title:', groupPaymentState.title);
+  const previewAudit = await p1.evaluate((init) => {
+    const overlay = document.querySelector('.billing-modal-overlay');
+    const modalVisible = Boolean(overlay && window.getComputedStyle(overlay).display === 'flex');
+    const currentSavedTheme = window.portfolioData?.theme;
+    return {
+      modalAutoOpened: modalVisible,
+      currentSavedTheme,
+      themeUnchanged: currentSavedTheme === init
+    };
+  }, initialTheme);
 
-  // Click Back to Plans
-  await p1.click('#btn-back-to-plans');
-  await p1.waitForTimeout(400);
-
-  // Close modal
-  await p1.click('#btn-close-billing');
-  await p1.waitForTimeout(300);
-
-  const afterCloseState = await p1.evaluate(() => document.querySelectorAll('.billing-modal-overlay, .cv-import-modal-overlay').length);
-  console.log('   Overlays after Close:', afterCloseState, '(Zero: PASS)');
-  await ctx1.close();
+  console.log('  Pricing Modal Auto-Opened after Preview:', previewAudit.modalAutoOpened ? 'FAIL (Opened)' : 'PASS (Did NOT open)');
+  console.log('  Active Theme unchanged after Preview:', previewAudit.themeUnchanged ? 'PASS' : 'FAIL', `(${previewAudit.currentSavedTheme})`);
 
   // ─────────────────────────────────────────────────────────────
-  // TEST 3: LOCKED PRO THEME (Cyber Command) -> PRO TARGETED
+  // PART A3: EXPLICIT UPGRADE BUTTON CLICKS
   // ─────────────────────────────────────────────────────────────
-  console.log('\n3. Testing Locked Pro Theme (Cyber Command) -> Pro Targeted Pricing...');
-  const { context: ctx2, page: p2 } = await getCleanPage();
-
-  await p2.evaluate(() => {
-    window.selectTheme('hacker', true);
+  console.log('\nPART A3: Testing Explicit Unlock CTA on Cyber Command ("Unlock with Pro")...');
+  await p1.evaluate(() => {
+    const cyberCard = Array.from(document.querySelectorAll('.theme-card')).find(c => c.textContent.includes('Cyber Command'));
+    const unlockBtn = cyberCard?.querySelector('.btn-unlock-theme');
+    unlockBtn?.click();
   });
-  await p2.waitForTimeout(600);
+  await p1.waitForSelector('.pricing-card', { timeout: 10000 });
 
-  const proTargetAudit = await p2.evaluate(() => {
+  const proTargetState = await p1.evaluate(() => {
     const proBtn = document.querySelector('.btn-trigger-checkout[data-plan="pro"]');
     const proCard = proBtn?.closest('.pricing-card');
     const badge = proCard?.querySelector('span[style*="position: absolute"]')?.textContent?.trim();
-    const isGlow = proCard ? (window.getComputedStyle(proCard).boxShadow?.includes('124, 58, 237') || window.getComputedStyle(proCard).borderColor?.includes('124')) : false;
-    return { badge, isGlow };
+    return { proTargeted: Boolean(badge === 'RECOMMENDED') };
   });
-  console.log('   Pro Target State -> Badge:', proTargetAudit.badge, '| Glow Highlight:', proTargetAudit.isGlow);
+  console.log('  Pro Upgrade Modal Opened & Targeted:', proTargetState.proTargeted ? 'PASS' : 'FAIL');
 
-  await p2.click('#btn-close-billing');
-  await p2.waitForTimeout(300);
-  await ctx2.close();
+  await p1.click('#btn-close-billing');
+  await p1.waitForTimeout(300);
 
-  // ─────────────────────────────────────────────────────────────
-  // TEST 4: LOCKED PREMIUM THEME (Quantum Aurora) -> PREMIUM TARGETED
-  // ─────────────────────────────────────────────────────────────
-  console.log('\n4. Testing Locked Premium Theme (Quantum Aurora) -> Premium Targeted Pricing...');
-  const { context: ctx3, page: p3 } = await getCleanPage();
-
-  await p3.evaluate(() => {
-    window.selectTheme('quantum', true);
+  console.log('  Testing Explicit Unlock CTA on Quantum Aurora ("Unlock Premium")...');
+  await p1.evaluate(() => {
+    const quantumCard = Array.from(document.querySelectorAll('.theme-card')).find(c => c.textContent.includes('Quantum Aurora'));
+    const unlockBtn = quantumCard?.querySelector('.btn-unlock-theme');
+    unlockBtn?.click();
   });
-  await p3.waitForTimeout(600);
+  await p1.waitForSelector('.pricing-card', { timeout: 10000 });
 
-  const premTargetAudit = await p3.evaluate(() => {
+  const premTargetState = await p1.evaluate(() => {
     const premBtn = document.querySelector('.btn-trigger-checkout[data-plan="premium"]');
     const premCard = premBtn?.closest('.pricing-card');
     const badge = premCard?.querySelector('span[style*="position: absolute"]')?.textContent?.trim();
-    const isGlow = premCard ? (window.getComputedStyle(premCard).boxShadow?.includes('124, 58, 237') || window.getComputedStyle(premCard).borderColor?.includes('124')) : false;
-    return { badge, isGlow };
+    return { premTargeted: Boolean(badge === 'RECOMMENDED') };
   });
-  console.log('   Premium Target State -> Badge:', premTargetAudit.badge, '| Glow Highlight:', premTargetAudit.isGlow);
+  console.log('  Premium Upgrade Modal Opened & Targeted:', premTargetState.premTargeted ? 'PASS' : 'FAIL');
 
-  await p3.click('#btn-close-billing');
-  await p3.waitForTimeout(300);
-  await ctx3.close();
+  await p1.click('#btn-close-billing');
+  await p1.waitForTimeout(300);
 
   // ─────────────────────────────────────────────────────────────
-  // TEST 5: RESPONSIVE VIEWPORT TESTS (320, 375, 390, 430, 768, 1024, 1440)
+  // PART A4: SCROLLING TO REACH LAST CARD (QUANTUM AURORA)
   // ─────────────────────────────────────────────────────────────
-  console.log('\n5. Testing Responsive Viewports & Zero Horizontal Overflow...');
-  const viewports = [320, 375, 390, 430, 768, 1024, 1440];
+  console.log('\nPART A4: Testing Full Scrolling to 15th Card (Quantum Aurora)...');
+  const scrollTest = await p1.evaluate(() => {
+    const sidebar = document.getElementById('sidebar-content');
+    const lastCard = document.querySelector('.theme-card[data-theme-id="quantum"]') || Array.from(document.querySelectorAll('.theme-card')).find(c => c.textContent.includes('Quantum Aurora'));
+    if (!sidebar || !lastCard) return { success: false };
 
-  for (const w of viewports) {
-    const { context: mCtx, page: mPage } = await getCleanPage({ width: w, height: 850 });
-    await mPage.evaluate(() => {
-      if (typeof window.openBillingModal === 'function') window.openBillingModal();
-    });
-    await mPage.waitForTimeout(600);
+    sidebar.scrollTop = sidebar.scrollHeight;
+    const rect = lastCard.getBoundingClientRect();
+    const sidebarRect = sidebar.getBoundingClientRect();
+    const isReachable = rect.top >= sidebarRect.top && rect.bottom <= (sidebarRect.bottom + 60);
 
-    const vpAudit = await mPage.evaluate(() => {
-      const docW = document.documentElement.scrollWidth;
-      const winW = window.innerWidth;
-      const modal = document.querySelector('.billing-modal-card');
-      const closeBtn = document.getElementById('btn-close-billing');
-      const grid = document.querySelector('.pricing-cards-grid');
-      const computedGrid = grid ? window.getComputedStyle(grid).gridTemplateColumns.split(' ').length : 0;
+    return {
+      success: true,
+      lastCardName: lastCard.querySelector('.theme-name span')?.textContent?.trim(),
+      isReachable,
+      scrollTop: sidebar.scrollTop
+    };
+  });
+  console.log('  All 15 Themes Reachable & Visible via Scroll:', scrollTest.isReachable ? 'YES' : 'NO', `(Reached: ${scrollTest.lastCardName})`);
+  await ctx1.close();
 
-      return {
-        viewportWidth: winW,
-        scrollWidth: docW,
-        noHorizontalOverflow: docW <= winW + 1,
-        modalWidth: modal?.offsetWidth,
-        columnsCount: computedGrid,
-        closeBtnVisible: Boolean(closeBtn && closeBtn.offsetWidth > 0)
-      };
-    });
+  // ─────────────────────────────────────────────────────────────
+  // PART B: REAL INSTAPAY ENDPOINT & SCREEN AUDIT
+  // ─────────────────────────────────────────────────────────────
+  console.log('\nPART B: Auditing Real Production InstaPay Destination & Screen...');
+  const { context: ctx2, page: p2 } = await getCleanPage();
 
-    console.log(`   Viewport ${w}px -> Columns: ${vpAudit.columnsCount} | Overflow: ${vpAudit.noHorizontalOverflow ? 'NONE (PASS)' : 'OVERFLOW FAIL'} | Modal: ${vpAudit.modalWidth}px | Close Btn: ${vpAudit.closeBtnVisible}`);
-    await mCtx.close();
-  }
+  // Fetch API endpoint
+  const apiConfig = await p2.evaluate(async () => {
+    const res = await fetch('/api/billing?action=payment-config');
+    return res.json();
+  });
+  console.log('  Payment Config API Response:', apiConfig);
 
+  // Open InstaPay Screen via Pro checkout
+  await p2.evaluate(() => {
+    if (typeof window.openBillingModal === 'function') window.openBillingModal();
+  });
+  await p2.waitForSelector('.pricing-card', { timeout: 10000 });
+  await p2.click('.btn-trigger-checkout[data-plan="pro"]');
+  await p2.waitForSelector('#btn-back-to-plans', { timeout: 10000 });
+
+  const screenAudit = await p2.evaluate(() => {
+    const card = document.querySelector('.billing-modal-overlay');
+    const text = card?.textContent || '';
+    const hasIPA = text.includes('saleh2005mohamed@instapay');
+    const hasPhone = text.includes('01270024222');
+    const hasName = text.includes('SALEH MOHAMED SALEH');
+    const hasOr = text.includes('OR');
+    const mentionsWallet = /vodafone cash|mobile wallet|wallet transfer|send to wallet/i.test(text.replace('not a mobile wallet transfer', ''));
+    const hasExplicitNote = text.includes('This is an InstaPay transfer, not a mobile wallet transfer.');
+
+    return { hasIPA, hasPhone, hasName, hasOr, mentionsWallet, hasExplicitNote };
+  });
+
+  console.log('  Screen displays Account Name (SALEH MOHAMED SALEH):', screenAudit.hasName ? 'YES' : 'NO');
+  console.log('  Screen displays IPA (saleh2005mohamed@instapay):', screenAudit.hasIPA ? 'YES' : 'NO');
+  console.log('  Screen displays Phone Number (01270024222):', screenAudit.hasPhone ? 'YES' : 'NO');
+  console.log('  Screen displays Phone & IPA as alternatives (OR):', screenAudit.hasOr ? 'YES' : 'NO');
+  console.log('  Screen does not mention unauthorized mobile wallet transfers:', !screenAudit.mentionsWallet ? 'PASS' : 'FAIL');
+  console.log('  Screen has approved InstaPay-only disclaimer:', screenAudit.hasExplicitNote ? 'PASS' : 'FAIL');
+
+  await ctx2.close();
   await browser.close();
-  console.log('\n=== ALL PHASE 8C REDESIGN TESTS EXECUTED SUCCESSFULLY ===');
+  console.log('\n=== ACCEPTANCE SUITE COMPLETE ===');
 }
 
 runLiveProductionTest().catch(console.error);
