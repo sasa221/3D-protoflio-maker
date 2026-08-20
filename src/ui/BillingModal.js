@@ -652,7 +652,7 @@ async function renderInstaPayView(planId, onSubscriptionUpdated, previousPlan, p
       modalContainer.innerHTML = `
         <div class="cv-modal-card" style="background:#0a0b14;border:1px solid #22c55e55;border-radius:22px;max-width:480px;width:100%;padding:clamp(20px,5vw,34px);text-align:center;color:#fff;box-shadow:0 30px 70px -15px rgba(0,0,0,0.9);box-sizing:border-box;font-family:'Inter',sans-serif;">
           <span style="font-size:42px;display:block;margin-bottom:12px;">🎉</span>
-          <h2 style="font-size:1.45rem;font-weight:900;margin:0 0 8px;color:#4ade80;">Payment Submitted Successfully!</h2>
+          <h2 style="font-size:1.35rem;font-weight:900;margin:0 0 8px;color:#4ade80;">Payment submitted successfully — Pending verification.</h2>
           <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:14px;padding:16px;margin:18px 0;text-align:left;font-size:13px;line-height:1.8;">
             <div style="display:flex;justify-content:space-between;"><span style="color:rgba(255,255,255,0.6);">Plan:</span> <strong>${plan.name}</strong></div>
             <div style="display:flex;justify-content:space-between;"><span style="color:rgba(255,255,255,0.6);">Amount:</span> <strong>${submitRes.expectedAmountEGP || baseAmount} EGP</strong></div>

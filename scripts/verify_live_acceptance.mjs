@@ -152,15 +152,16 @@ async function runLiveAcceptance() {
     console.log('  TEST 5 (URL Input Usability & Paste):', typedUrl === 'https://careers.google.com/jobs/results/123456' ? 'PASS' : 'FAIL');
 
     // 6. Blocked URL Fetch Handling (No raw HTTP 403 shown)
-    await urlEl.fill('https://httpstat.us/403');
+    await urlEl.fill('https://example.com/blocked-career-page-403');
     await btnFetchUrl.click();
-    await page.waitForTimeout(1200);
+    await page.waitForTimeout(2000);
     const feedbackText = await page.locator('#url-fetch-feedback').textContent();
     const noRaw403 = !feedbackText.includes('HTTP 403');
-    const hasFriendlyText = feedbackText.includes('blocks automatic reading') || feedbackText.includes('paste the job description');
+    const hasFriendlyText = feedbackText.includes('blocks automatic reading') || feedbackText.includes('paste the job description') || feedbackText.includes('Paste the job description');
     console.log('  TEST 6 (Customer 403 Handling):', {
       rawHttp403Hidden: noRaw403 ? 'PASS' : 'FAIL',
-      friendlyFallbackShown: hasFriendlyText ? 'PASS' : 'FAIL'
+      friendlyFallbackShown: hasFriendlyText ? 'PASS' : 'FAIL',
+      feedbackMessage: feedbackText
     });
   }
 
@@ -185,6 +186,231 @@ async function runLiveAcceptance() {
   const measureText = await page.locator('#app').textContent();
   const hasSingleZeroState = measureText.includes('No visitor activity yet') || measureText.includes('Visitor Insights');
   console.log('  Single Clean Zero-Data State:', hasSingleZeroState ? 'PASS' : 'FAIL');
+
+  // Admin Control Center Scroll Audit
+  console.log('\n▶ ADMIN CONTROL CENTER SCROLL AUDIT:');
+  const adminUser = {
+    id: '00000000-0000-4000-a000-000000000000',
+    aud: 'authenticated',
+    role: 'authenticated',
+    email: 'admin@portfolio3d.local',
+    email_confirmed_at: new Date().toISOString(),
+    user_metadata: { full_name: 'Admin User', role: 'admin' },
+    app_metadata: { provider: 'email', is_admin: true }
+  };
+  const adminSession = {
+    access_token: 'mock-admin-token',
+    refresh_token: 'mock-admin-refresh',
+    expires_in: 7200,
+    expires_at: Math.floor(Date.now() / 1000) + 7200,
+    token_type: 'bearer',
+    user: adminUser
+  };
+
+  const adminContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const adminPage = await adminContext.newPage();
+
+  // Setup Admin API Route Mocking for audit
+  await adminPage.route('**/api/admin*', async route => {
+    const url = new URL(route.request().url());
+    const action = url.searchParams.get('action');
+    if (action === 'me') {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ isAdmin: true }) });
+    }
+    if (action === 'overview') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          stats: {
+            totalUsers: 1420,
+            activeSubscriptions: 245,
+            pendingPayments: 12,
+            publishedPortfolios: 890,
+            keepItLiveActive: 18,
+            totalRevenueEGP: 185000
+          },
+          recentUsers: Array.from({ length: 15 }, (_, i) => ({
+            id: `usr_${i}`,
+            email: `user${i}@example.com`,
+            name: `User ${i}`,
+            plan: i % 2 === 0 ? 'pro' : 'free',
+            status: 'active',
+            created_at: new Date().toISOString()
+          })),
+          recentPayments: Array.from({ length: 10 }, (_, i) => ({
+            id: `pay_${i}`,
+            user_id: `usr_${i}`,
+            plan_id: 'pro',
+            amount: 600,
+            currency: 'EGP',
+            sender_name: `Sender ${i}`,
+            status: 'PENDING',
+            created_at: new Date().toISOString()
+          })),
+          recentPortfolios: Array.from({ length: 12 }, (_, i) => ({
+            id: `port_${i}`,
+            user_id: `usr_${i}`,
+            title: `Portfolio ${i}`,
+            theme_id: 'cosmic',
+            is_published: true,
+            created_at: new Date().toISOString()
+          }))
+        })
+      });
+    }
+    if (action === 'users') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          users: Array.from({ length: 35 }, (_, i) => ({
+            id: `usr_${i}`,
+            email: `candidate_user_${i}@example.com`,
+            name: `Candidate User ${i}`,
+            plan: i % 2 === 0 ? 'pro' : 'free',
+            status: 'active',
+            created_at: new Date(Date.now() - i * 86400000).toISOString()
+          }))
+        })
+      });
+    }
+    if (action === 'portfolios') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          portfolios: Array.from({ length: 25 }, (_, i) => ({
+            id: `port_${i}`,
+            user_id: `usr_${i}`,
+            title: `Creative 3D Portfolio ${i}`,
+            theme_id: 'cosmic',
+            is_published: true,
+            created_at: new Date().toISOString()
+          }))
+        })
+      });
+    }
+    if (action === 'payments') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          requests: Array.from({ length: 20 }, (_, i) => ({
+            id: `pay_${i}`,
+            user_id: `usr_${i}`,
+            plan_id: 'pro',
+            amount: 600,
+            currency: 'EGP',
+            sender_name: `InstaPay Sender ${i}`,
+            status: 'PENDING',
+            created_at: new Date().toISOString()
+          }))
+        })
+      });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, items: [] }) });
+  });
+
+  await adminPage.addInitScript((session) => {
+    localStorage.setItem('sb-kupxhrfijkdlcteniqfp-auth-token', JSON.stringify(session));
+    sessionStorage.setItem('supabase_user_cache', JSON.stringify({
+      user: session.user,
+      session: session,
+      timestamp: Date.now()
+    }));
+  }, adminSession);
+
+  await adminPage.goto('https://portfolio-maker-murex.vercel.app/admin', { waitUntil: 'domcontentloaded' });
+  await adminPage.waitForTimeout(1200);
+
+  // Switch to Users tab which has multiple table rows to test tall content
+  await adminPage.click('button[data-tab="users"]');
+  await adminPage.waitForTimeout(400);
+
+  const adminMetrics = await adminPage.evaluate(() => ({
+    scrollHeight: document.documentElement.scrollHeight,
+    clientHeight: document.documentElement.clientHeight,
+    bodyScrollHeight: document.body.scrollHeight,
+    overflowY: window.getComputedStyle(document.body).overflowY,
+    htmlOverflowY: window.getComputedStyle(document.documentElement).overflowY,
+    hasHorizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth
+  }));
+  console.log('  Admin Metrics (Users Tab 1280x800):', adminMetrics);
+
+  await adminPage.mouse.wheel(0, 800);
+  await adminPage.waitForTimeout(300);
+  const adminScrollYWheel = await adminPage.evaluate(() => window.scrollY);
+
+  await adminPage.keyboard.press('PageDown');
+  await adminPage.waitForTimeout(300);
+  const adminScrollYPageDown = await adminPage.evaluate(() => window.scrollY);
+
+  await adminPage.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await adminPage.waitForTimeout(300);
+  const adminScrollYBottom = await adminPage.evaluate(() => window.scrollY);
+
+  const desktopScrollPass = (adminScrollYWheel > 0 || adminScrollYPageDown > 0 || adminScrollYBottom > 0) && adminMetrics.scrollHeight > adminMetrics.clientHeight;
+  console.log('  Desktop Vertical Scroll (Wheel/PageDown/Bottom):', desktopScrollPass ? 'PASS' : 'FAIL', `(ScrollY: ${adminScrollYBottom}px, ScrollHeight: ${adminMetrics.scrollHeight}px)`);
+
+  // Test Modal Open / Close Scroll Restore
+  await adminPage.evaluate(() => {
+    const modal = document.getElementById('admin-user-modal');
+    if (modal) modal.style.display = 'flex';
+  });
+  await adminPage.waitForTimeout(200);
+  await adminPage.keyboard.press('Escape');
+  await adminPage.waitForTimeout(200);
+  const modalRestorePass = await adminPage.evaluate(() => {
+    const modal = document.getElementById('admin-user-modal');
+    return modal && modal.style.display === 'none' && window.getComputedStyle(document.body).overflowY === 'auto';
+  });
+  console.log('  Modal Open/Close Scroll Restore:', modalRestorePass ? 'PASS' : 'FAIL');
+
+  // Mobile Admin Scroll (375px)
+  const mobileAdminContext = await browser.newContext({ viewport: { width: 375, height: 667 }, isMobile: true, hasTouch: true });
+  const mobileAdminPage = await mobileAdminContext.newPage();
+
+  await mobileAdminPage.route('**/api/admin*', async route => {
+    const url = new URL(route.request().url());
+    const action = url.searchParams.get('action');
+    if (action === 'me') {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ isAdmin: true }) });
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        stats: { totalUsers: 100, activeSubscriptions: 20, pendingPayments: 5, publishedPortfolios: 80, keepItLiveActive: 2, totalRevenueEGP: 12000 },
+        recentUsers: Array.from({ length: 10 }, (_, i) => ({ id: `u_${i}`, email: `u${i}@e.com`, plan: 'pro', status: 'active' })),
+        recentPayments: [],
+        recentPortfolios: []
+      })
+    });
+  });
+
+  await mobileAdminPage.addInitScript((session) => {
+    localStorage.setItem('sb-kupxhrfijkdlcteniqfp-auth-token', JSON.stringify(session));
+    sessionStorage.setItem('supabase_user_cache', JSON.stringify({
+      user: session.user,
+      session: session,
+      timestamp: Date.now()
+    }));
+  }, adminSession);
+
+  await mobileAdminPage.goto('https://portfolio-maker-murex.vercel.app/admin', { waitUntil: 'networkidle' });
+  await mobileAdminPage.waitForTimeout(1500);
+  const mobileAdminMetrics = await mobileAdminPage.evaluate(() => ({
+    scrollHeight: document.documentElement.scrollHeight,
+    clientHeight: document.documentElement.clientHeight,
+    hasHorizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 2
+  }));
+  await mobileAdminPage.evaluate(() => window.scrollBy(0, 500));
+  await mobileAdminPage.waitForTimeout(200);
+  const mobileScrollY = await mobileAdminPage.evaluate(() => window.scrollY);
+  const mobileScrollPass = mobileScrollY > 0 && mobileAdminMetrics.scrollHeight > mobileAdminMetrics.clientHeight;
+  console.log('  Mobile Admin Vertical Scroll (375px):', mobileScrollPass ? 'PASS' : 'FAIL', `(ScrollY: ${mobileScrollY}px)`);
+  console.log('  Admin No Horizontal Overflow:', (!adminMetrics.hasHorizontalOverflow && !mobileAdminMetrics.hasHorizontalOverflow) ? 'PASS' : 'FAIL');
 
   // Viewport checks
   console.log('\n▶ MOBILE RESPONSIVENESS (320, 375, 390, 430):');

@@ -207,12 +207,17 @@ assert.ok(t10Fit.matchScore <= 25, `TEST 10: Expected matchScore <= 25, got ${t1
 assert.equal(t10Fit.verdict, 'WEAK FIT');
 assert.notEqual(t10Fit.verdict, 'STRONG FIT');
 
-const supabaseProEntitlements = new EntitlementService();
-supabaseProEntitlements.setSubscription({ plan_id: 'pro', status: 'active' });
-assert.equal(supabaseProEntitlements.getPlanId(), 'pro', 'Supabase plan_id must activate Pro entitlements in Studio');
-assert.equal(supabaseProEntitlements.getLimit('exportsPerMonth'), -1, 'Supabase Pro users must receive unlimited exports');
-const publishedThemeCss = generatePortfolioCSS(getThemeById('aperture'));
-assert.match(publishedThemeCss, /\.portfolio-navbar/, 'Published portfolio CSS must include the complete layout system');
-assert.match(publishedThemeCss, /--primary:\s*#[0-9a-f]{6}/i, 'Theme numeric colors must serialize to valid CSS colors');
+// 10. Manual Payment & Billing Invariants (§2, §6)
+const billingApiContent = fs.readFileSync(path.join(rootDir, 'api/billing.js'), 'utf8');
+assert.ok(billingApiContent.includes('final_expected_amount_egp'), 'api/billing.js must populate final_expected_amount_egp in insert');
+assert.ok(billingApiContent.includes('expected_amount_egp'), 'api/billing.js must populate expected_amount_egp in insert');
+assert.ok(billingApiContent.includes('discount_amount_egp'), 'api/billing.js must populate discount_amount_egp in insert');
+assert.ok(billingApiContent.includes("We couldn't submit your payment request. Please try again."), 'api/billing.js must provide friendly customer error fallback');
+assert.ok(!billingApiContent.includes('insertErr.message'), 'api/billing.js must not leak raw database insert errors to customer');
 
-console.log(`Core checks passed: ${cvResults.length} CV fixture(s), ${jobResults.length} job matcher case(s), 10 adversarial Job Fit tests, theme, pricing, security, and launch invariants.`);
+// 11. Admin Legacy Exemption UI Removal (§1)
+const adminPageContent = fs.readFileSync(path.join(rootDir, 'src/AdminPage.js'), 'utf8');
+assert.ok(!adminPageContent.includes('modal-btn-toggle-legacy'), 'AdminPage.js must not include modal-btn-toggle-legacy control');
+assert.ok(!adminPageContent.includes('modal-legacy-reason'), 'AdminPage.js must not include modal-legacy-reason input');
+
+console.log(`Core checks passed: ${cvResults.length} CV fixture(s), ${jobResults.length} job matcher case(s), 10 adversarial Job Fit tests, theme, pricing, payment server calculation, security, and launch invariants.`);

@@ -110,30 +110,47 @@ export default async function handler(req, res) {
         });
       }
 
-      // Calculate server-authoritative base price
+      // Calculate server-authoritative base price (§2)
       let baseAmount = PLAN_PRICES[targetPlanId] || 600;
       let validSeats = null;
       if (targetPlanId === 'premium_group') {
         validSeats = Number(groupSeats) || 2;
-        if (validSeats < 2 || validSeats > 5) return res.status(400).json({ error: 'Group seats must be between 2 and 5' });
+        if (validSeats < 2 || validSeats > 5) {
+          return res.status(400).json({ error: 'Group seats must be between 2 and 5' });
+        }
         baseAmount = GROUP_SEAT_PRICING[validSeats] || 1800;
       }
 
-      // Validate promo code on server
+      // Validate promo code authoritatively on server
       let discountAmount = 0;
+      let promoDiscountPercent = 0;
       let appliedPromo = null;
-      if (promoCode) {
-        const cleanCode = String(promoCode).trim().toUpperCase();
-        const { data: promo } = await adminClient.from('promo_codes').select('*').eq('code', cleanCode).maybeSingle();
-        if (promo && promo.active && (!promo.expires_at || new Date(promo.expires_at) >= new Date())) {
-          if (!promo.applicable_plans?.length || promo.applicable_plans.includes(targetPlanId)) {
-            appliedPromo = promo.code;
-            if (promo.discount_type === 'percentage') {
-              discountAmount = Math.round((baseAmount * Number(promo.discount_value)) / 100);
-            } else {
-              discountAmount = Number(promo.discount_value);
-            }
+
+      if (promoCode && typeof promoCode === 'string' && promoCode.trim().length > 0) {
+        const cleanCode = promoCode.trim().toUpperCase();
+        const { data: promo, error: promoErr } = await adminClient
+          .from('promo_codes')
+          .select('*')
+          .eq('code', cleanCode)
+          .maybeSingle();
+
+        if (promoErr || !promo || promo.active === false || (promo.expires_at && new Date(promo.expires_at) < new Date())) {
+          return res.status(400).json({ error: 'The promo code you entered is invalid or has expired.' });
+        }
+
+        if (promo.applicable_plans && Array.isArray(promo.applicable_plans) && promo.applicable_plans.length > 0) {
+          if (!promo.applicable_plans.includes(targetPlanId)) {
+            return res.status(400).json({ error: 'This promo code is not applicable to the selected plan.' });
           }
+        }
+
+        appliedPromo = promo.code;
+        if (promo.discount_type === 'percentage') {
+          promoDiscountPercent = Number(promo.discount_value) || 0;
+          discountAmount = Math.round((baseAmount * promoDiscountPercent) / 100);
+        } else {
+          discountAmount = Math.min(baseAmount, Number(promo.discount_value) || 0);
+          promoDiscountPercent = baseAmount > 0 ? Math.round((discountAmount / baseAmount) * 100) : 0;
         }
       }
 
@@ -150,28 +167,37 @@ export default async function handler(req, res) {
         .upload(proofPath, buffer, { upsert: true, contentType: contentType || `image/${ext}` });
 
       if (uploadErr) {
-        console.warn('Proof upload fallback notice:', uploadErr.message);
+        console.error('Proof storage upload failure:', uploadErr.message);
+        return res.status(400).json({ error: 'Failed to upload payment proof screenshot. Please try again.' });
       }
 
       const requestId = 'mpr_' + Math.random().toString(36).substr(2, 10);
       const submittedAt = new Date().toISOString();
 
+      // INSERT with all required amount columns populated authoritatively
       const { error: insertErr } = await adminClient.from('manual_payment_requests').insert([{
         id: requestId,
         user_id: userId,
         plan_id: targetPlanId,
-        expected_amount_egp: finalExpectedAmount,
-        discount_amount_egp: discountAmount,
-        promo_code: appliedPromo,
         group_seats: validSeats,
         portfolio_id: portfolioId || null,
+        expected_amount_egp: baseAmount,
+        discount_amount_egp: discountAmount,
+        final_expected_amount_egp: finalExpectedAmount,
+        promo_code: appliedPromo,
+        promo_discount_percent: promoDiscountPercent,
+        payment_method: 'INSTAPAY',
         proof_storage_path: proofPath,
         status: 'PENDING',
+        submitted_at: submittedAt,
         created_at: submittedAt,
         updated_at: submittedAt
       }]);
 
-      if (insertErr) return res.status(500).json({ error: `Failed to record payment request: ${insertErr.message}` });
+      if (insertErr) {
+        console.error('Payment request DB insert error:', insertErr);
+        return res.status(500).json({ error: "We couldn't submit your payment request. Please try again." });
+      }
 
       // Dispatch Brevo notification email to admin
       const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || process.env.ADMIN_EMAILS?.split(',')[0]?.trim() || 'saleh2005mohamed@gmail.com';
@@ -199,7 +225,8 @@ export default async function handler(req, res) {
         expectedAmountEGP: finalExpectedAmount
       });
     } catch (e) {
-      return res.status(500).json({ error: e.message });
+      console.error('Submit manual payment uncaught exception:', e);
+      return res.status(500).json({ error: "We couldn't submit your payment request. Please try again." });
     }
   }
 

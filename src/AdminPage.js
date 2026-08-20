@@ -644,18 +644,6 @@ function openUserManagementModal(user) {
         <input type="text" id="modal-override-reason" placeholder="e.g. Approved InstaPay manual override / VIP Customer setup" style="width:100%;background:#141624;border:1px solid rgba(255,255,255,0.2);padding:8px;border-radius:6px;color:#fff;font-size:12px;outline:none;box-sizing:border-box"/>
       </div>
       <button id="modal-btn-save-plan" style="background:#7c3aed;color:#fff;border:none;padding:9px 18px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer">Apply Subscription Override</button>
-    </div>
-
-    <!-- 3. Legacy Access Toggle Section -->
-    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px">
-      <h3 style="margin:0 0 10px;font-size:14px;color:#fff;font-weight:800">Legacy Access Exemption</h3>
-      <p style="margin:0 0 10px;font-size:12px;color:rgba(255,255,255,0.6)">Current: <strong style="color:${user.isLegacy ? '#38bdf8' : 'rgba(255,255,255,0.4)'}">${user.isLegacy ? 'GRANDFATHERED (ALL THEMES)' : 'NONE'}</strong>. Grandfathered accounts retain access to all themes without commercial lockouts.</p>
-      <div style="display:flex;gap:10px;align-items:center">
-        <input type="text" id="modal-legacy-reason" placeholder="Reason for legacy exemption change…" style="flex:1;background:#141624;border:1px solid rgba(255,255,255,0.2);padding:8px;border-radius:6px;color:#fff;font-size:12px;outline:none"/>
-        <button id="modal-btn-toggle-legacy" style="background:rgba(56,189,248,0.2);border:1px solid rgba(56,189,248,0.4);color:#38bdf8;padding:8px 14px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer">
-          ${user.isLegacy ? 'Remove Legacy Access' : 'Grant Legacy Access'}
-        </button>
-      </div>
     </div>`;
 
   modal.style.display = 'flex';
@@ -747,23 +735,6 @@ function openUserManagementModal(user) {
       await loadAllData();
     } catch (err) {
       alert(`Error updating plan: ${err.message}`);
-    }
-  });
-
-  document.getElementById('modal-btn-toggle-legacy').addEventListener('click', async () => {
-    const reason = document.getElementById('modal-legacy-reason').value;
-    if (!reason || reason.trim().length < 3) {
-      alert('A mandatory audit reason is required for legacy status changes.');
-      return;
-    }
-
-    try {
-      await adminOverrideUserLegacy({ userId: user.id, isLegacy: !user.isLegacy, reason: reason.trim() });
-      alert('Legacy access updated successfully.');
-      modal.style.display = 'none';
-      await loadAllData();
-    } catch (err) {
-      alert(`Error updating legacy status: ${err.message}`);
     }
   });
 }
