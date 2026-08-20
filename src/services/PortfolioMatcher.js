@@ -152,7 +152,7 @@ export function matchPortfolioToJob(portfolioData = {}, normalizedJob = {}) {
         message: `Job asks for ${requiredExpYears}+ years; portfolio documents ~${candidateTotalYears} years.`,
         guidance: `Ensure all previous relevant employment and internship positions are listed in your experience section.`
       });
-    } else {
+    } else if (candidateTotalYears === 0) {
       expScore = 0;
       expEvidenceText = '0 years documented of ' + requiredExpYears + ' required';
       importantGaps.push({
@@ -164,14 +164,15 @@ export function matchPortfolioToJob(portfolioData = {}, normalizedJob = {}) {
       });
     }
 
+    const hasVerifiableDuration = candidateTotalYears !== null;
     evaluableCategories.push({
       key: 'relevantExperience',
       category: 'Relevant Experience',
-      baseWeight: 25,
-      score: expScore,
-      scoreDisplay: `${expScore}%`,
-      isApplicable: true,
-      detail: expEvidenceText
+      baseWeight: hasVerifiableDuration ? 25 : 0,
+      score: hasVerifiableDuration ? expScore : null,
+      scoreDisplay: hasVerifiableDuration ? `${expScore}%` : 'N/A',
+      isApplicable: hasVerifiableDuration,
+      detail: hasVerifiableDuration ? expEvidenceText : 'Experience dates are missing; excluded from score'
     });
   } else {
     evaluableCategories.push({
@@ -246,9 +247,10 @@ export function matchPortfolioToJob(portfolioData = {}, normalizedJob = {}) {
   if (normalizedJob.requiredEducation) {
     let educationScore = 0;
     let eduEvidenceText = '';
-    if (candidateEducation.length > 0) {
+    const matchingEducation = candidateEducation.find(entry => educationMeetsRequirement(entry, normalizedJob.requiredEducation));
+    if (matchingEducation) {
       educationScore = 100;
-      eduEvidenceText = candidateEducation[0].degree || candidateEducation[0].institution || 'Documented degree';
+      eduEvidenceText = matchingEducation.degree || matchingEducation.institution || 'Documented degree';
       matchedEvidence.push({
         type: 'education',
         title: 'Education',
@@ -262,8 +264,8 @@ export function matchPortfolioToJob(portfolioData = {}, normalizedJob = {}) {
         skill: 'Education Qualification',
         level: 'IMPORTANT',
         state: 'NOT FOUND',
-        message: `Job asks for ${normalizedJob.requiredEducation}; no education entered.`,
-        guidance: 'Add your degree or academic background if applicable.'
+        message: `Job asks for ${normalizedJob.requiredEducation}; no matching degree is documented.`,
+        guidance: 'Add your real degree or academic background if applicable.'
       });
     }
 
@@ -534,6 +536,7 @@ function isStrictSkillMatch(candidateSkill, targetSkill) {
 function calculateExperienceYears(experienceList) {
   if (!Array.isArray(experienceList) || experienceList.length === 0) return 0;
   let totalMonths = 0;
+  let datedEntries = 0;
 
   experienceList.forEach(exp => {
     const period = exp.period || exp.duration || '';
@@ -544,12 +547,26 @@ function calculateExperienceYears(experienceList) {
       const endYear = /present|current/i.test(yearRangeMatch[2]) ? new Date().getFullYear() : parseInt(yearRangeMatch[2], 10);
       const diffYears = Math.max(0.5, endYear - startYear);
       totalMonths += diffYears * 12;
-    } else {
-      totalMonths += 12; // default 1 year per listed experience entry
+      datedEntries++;
     }
   });
 
+  if (datedEntries === 0) return null;
   return Math.round((totalMonths / 12) * 10) / 10;
+}
+
+function educationMeetsRequirement(entry, requiredEducation) {
+  const text = `${entry?.degree || ''} ${entry?.field || ''}`.toLowerCase();
+  const levels = [
+    ['associate', ['associate', 'diploma']],
+    ['bachelor', ['bachelor', 'b.sc', 'bsc', 'bs ', 'b.s.']],
+    ['master', ['master', 'm.sc', 'msc', 'ms ', 'm.s.']],
+    ['phd', ['phd', 'ph.d', 'doctorate']]
+  ];
+  const candidateLevel = levels.findIndex(([, aliases]) => aliases.some(alias => text.includes(alias)));
+  const required = String(requiredEducation || '').toLowerCase();
+  const requiredLevel = levels.findIndex(([name]) => required.includes(name));
+  return candidateLevel >= 0 && requiredLevel >= 0 && candidateLevel >= requiredLevel;
 }
 
 function generateRecruiterHighlights(portfolioData) {
@@ -567,4 +584,3 @@ function generateRecruiterHighlights(portfolioData) {
 
   return highlights;
 }
-

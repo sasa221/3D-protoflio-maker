@@ -215,10 +215,21 @@ export default async function handler(req, res) {
       const { data: portfolio } = await adminClient.from('portfolios').select('owner_user_id').eq('id', portfolioId).maybeSingle();
       if (!portfolio || portfolio.owner_user_id !== userData.user.id) return res.status(403).json({ error: 'You do not own this portfolio' });
 
+      const { data: subscription } = await adminClient.from('subscriptions').select('plan_id,status').eq('user_id', userData.user.id).maybeSingle();
+      let canUseCustomDomain = subscription?.plan_id === 'premium' && ['active', 'grace', 'canceling'].includes(subscription?.status || 'active');
+      if (!canUseCustomDomain) {
+        const { data: membership } = await adminClient.from('group_members').select('group_id').eq('user_id', userData.user.id).eq('status', 'active').maybeSingle();
+        if (membership) {
+          const { data: group } = await adminClient.from('groups').select('id').eq('id', membership.group_id).eq('status', 'active').maybeSingle();
+          canUseCustomDomain = Boolean(group);
+        }
+      }
+      if (!canUseCustomDomain) return res.status(403).json({ error: 'Custom domains require an active Premium plan.' });
+
       const verificationToken = `verify_cname_${Math.random().toString(36).substr(2, 10)}`;
       await adminClient.from('custom_domains').upsert([{ portfolio_id: portfolioId, hostname: cleanHostname, status: 'pending_verification', verification_token: verificationToken, ssl_status: 'pending' }], { onConflict: 'portfolio_id' });
 
-      return res.status(200).json({ success: true, domain: cleanHostname, verificationToken, cnameRecord: 'cname.3dportfolio.app', status: 'pending_verification' });
+      return res.status(200).json({ success: true, domain: cleanHostname, verificationToken, cnameRecord: 'portfolio-maker-murex.vercel.app', status: 'pending_verification' });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }
@@ -237,6 +248,12 @@ export default async function handler(req, res) {
 
     try {
       const cleanHostname = domain.toLowerCase().trim().replace(/^https?:\/\//, '');
+      const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+      const adminClient = createClient(supabaseUrl, supabaseSecretKey);
+      const { data: userData } = await adminClient.auth.getUser(token);
+      if (!userData?.user?.id) return res.status(401).json({ error: 'Invalid user session' });
+      const { data: portfolio } = await adminClient.from('portfolios').select('owner_user_id').eq('id', portfolioId).maybeSingle();
+      if (!portfolio || portfolio.owner_user_id !== userData.user.id) return res.status(403).json({ error: 'You do not own this portfolio' });
       let verified = false;
       try {
         const records = await resolveCname(cleanHostname);
@@ -245,7 +262,9 @@ export default async function handler(req, res) {
         verified = false;
       }
 
-      return res.status(200).json({ success: verified, verified, status: verified ? 'active' : 'pending_verification' });
+      const status = verified ? 'dns_verified' : 'pending_verification';
+      await adminClient.from('custom_domains').update({ status, ssl_status: 'not_provisioned' }).eq('portfolio_id', portfolioId).eq('hostname', cleanHostname);
+      return res.status(200).json({ success: true, verified, status, sslStatus: 'not_provisioned' });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }

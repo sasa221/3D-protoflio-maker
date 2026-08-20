@@ -79,9 +79,9 @@ export function renderJobTargetPanel(container, portfolioData, onUpdatePortfolio
           <label style="font-size: 0.75rem; font-weight: 700; color: rgba(255,255,255,0.85); display: block; margin-bottom: 4px;">
             1. Job Posting URL (Primary Input)
           </label>
-          <div style="display: flex; gap: 8px;">
-            <input id="jt-url" class="field-input" value="${currentJobTarget.jobUrl || ''}" placeholder="https://www.linkedin.com/jobs/view/... or company career link" style="flex: 1; font-size: 0.8rem; padding: 9px 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; outline: none;"/>
-            <button id="btn-extract-job-url" type="button" class="btn btn-secondary" style="font-size: 0.76rem; font-weight: 700; padding: 0 14px; white-space: nowrap; background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.35); color: #38bdf8; border-radius: 8px; cursor: pointer;">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <input id="jt-url" type="url" inputmode="url" autocomplete="url" class="field-input" value="${currentJobTarget.jobUrl || ''}" placeholder="https://www.linkedin.com/jobs/view/... or company career link" style="min-width: 0; flex: 1 1 260px; font-size: 0.8rem; padding: 10px 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; outline: none;"/>
+            <button id="btn-extract-job-url" type="button" class="btn btn-secondary" style="flex: 0 0 auto; min-height: 40px; font-size: 0.76rem; font-weight: 700; padding: 0 14px; white-space: nowrap; background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.35); color: #38bdf8; border-radius: 8px; cursor: pointer;">
               ⚡ Fetch Posting
             </button>
           </div>
@@ -304,6 +304,14 @@ export function renderJobTargetPanel(container, portfolioData, onUpdatePortfolio
         showFeedback(feedback, 'Please enter a valid job posting URL first.', 'error');
         return;
       }
+      try {
+        const parsed = new URL(url);
+        if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error();
+      } catch {
+        showFeedback(feedback, 'Enter a complete URL starting with https://', 'error');
+        urlInput?.focus();
+        return;
+      }
 
       btnFetchUrl.disabled = true;
       btnFetchUrl.textContent = '⏳ Fetching...';
@@ -335,6 +343,12 @@ export function renderJobTargetPanel(container, portfolioData, onUpdatePortfolio
       }
     });
   }
+  urlInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      btnFetchUrl?.click();
+    }
+  });
 
   // 2. Run Analysis Button Handler
   const btnRun = container.querySelector('#btn-run-job-analysis');
@@ -381,4 +395,3 @@ export function renderJobTargetPanel(container, portfolioData, onUpdatePortfolio
     }
   }
 }
-

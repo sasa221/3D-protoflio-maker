@@ -1957,28 +1957,17 @@ export function renderPublishTab() {
 
       <!-- CARD 3: CUSTOM DOMAIN (PREMIUM ONLY) -->
       ${isPremiumOrGroup ? `
-        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:20px;margin-bottom:16px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-            <h3 style="font-size:0.95rem;font-weight:800;color:#fff;margin:0;display:flex;align-items:center;gap:8px;">
-              <span>🌐</span> Custom Domain
-            </h3>
-            <div style="display:flex;align-items:center;gap:6px;">
-              <span style="font-size:0.68rem;font-weight:800;color:#c084fc;background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);border-radius:10px;padding:2px 8px;">
-                PREMIUM
-              </span>
-              <span style="font-size:0.68rem;font-weight:800;color:#06b6d4;background:rgba(6,182,212,0.15);border:1px solid rgba(6,182,212,0.3);border-radius:10px;padding:2px 8px;">
-                COMING SOON
-              </span>
-            </div>
-          </div>
-          <p style="font-size:0.78rem;color:rgba(255,255,255,0.65);line-height:1.5;margin:0;">
-            Connect your own personalized domain name (e.g. <code>portfolio.yourname.com</code>) when custom domain publishing becomes available.
-          </p>
-        </div>
+        <div id="custom-domain-panel-container"></div>
       ` : ''}
 
     </div>
   `;
+  if (isPremiumOrGroup) {
+    renderCustomDomainPanel(el.querySelector('#custom-domain-panel-container'), portfolioData, (updated) => {
+      portfolioData = updated;
+      autoSave();
+    });
+  }
 }
 
 window.renderPublishTab = renderPublishTab;
@@ -3261,4 +3250,3 @@ window.engineZoomOut = () => engine?.zoomOut();
 
 // ─── START ──────────────────────────────────
 init();
-

@@ -34,16 +34,16 @@ export async function verifyCustomDomainDNS(hostname, portfolioId) {
   if (!token) throw new Error('Please sign in again.');
 
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
-  const connectResponse = await fetch('/api/domain/connect', {
+  const connectResponse = await fetch('/api/portfolio?action=domain-connect', {
     method: 'POST', headers, body: JSON.stringify({ hostname, domain: hostname, portfolioId })
   });
   const connected = await connectResponse.json().catch(() => ({}));
   if (!connectResponse.ok) throw new Error(connected.error || 'Unable to connect domain.');
 
-  const verifyResponse = await fetch('/api/domain/verify', {
+  const verifyResponse = await fetch('/api/portfolio?action=domain-verify', {
     method: 'POST', headers, body: JSON.stringify({ domain: hostname, portfolioId })
   });
   const verified = await verifyResponse.json().catch(() => ({}));
   if (!verifyResponse.ok) throw new Error(verified.error || 'Unable to verify domain.');
-  return { ...connected, ...verified, hostname: connected.domain, sslStatus: verified.sslStatus || 'pending' };
+  return { ...connected, ...verified, hostname: connected.domain, sslStatus: verified.sslStatus || 'not_provisioned' };
 }
