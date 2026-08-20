@@ -1,7 +1,7 @@
 /**
  * PricingPage.js
  * Full pricing page with FREE, PRO, PREMIUM, PREMIUM GROUP plans.
- * All prices from PlanConfig.js. No real checkout in Phase 8A.
+ * All prices from PlanConfig.js.
  */
 
 import { PLANS, GROUP_SEAT_PRICING, GROUP_SEAT_MIN, GROUP_SEAT_MAX, KEEP_IT_LIVE, formatPrice } from '../config/PlanConfig.js';
@@ -188,7 +188,7 @@ function getPlanFeatures(planId) {
         'Shareable online link',
         'Professional themes',
         'Continuous editing',
-        'Job Match',
+        'Job Fit Analyzer',
         'Basic analytics',
         'PDF export',
         'New Pro themes'

@@ -26,9 +26,9 @@ export const WORKSPACE_METADATA = {
     badgeType: 'variant'
   },
   optimize: {
-    title: 'Job Match',
-    sub: 'Check how well your portfolio matches target job roles and get suggestions.',
-    badge: 'JOB MATCH',
+    title: 'Job Fit Analyzer',
+    sub: 'Calculate your evidence-based fit for specific job postings and identify genuine gaps.',
+    badge: 'JOB FIT',
     badgeType: 'optimize'
   },
   publish: {
@@ -82,7 +82,7 @@ export function renderWorkspaceNav(container) {
         <span>🎨</span> <span>2. Style</span>
       </button>
       <button onclick="window.switchWorkspace('optimize')" class="ws-nav-btn ${currentWorkspace === WORKSPACES.OPTIMIZE ? 'active' : ''}" style="white-space: nowrap; flex-shrink: 0; padding: 8px 12px; font-size: 0.78rem;">
-        <span>🎯</span> <span>3. Job Match</span>
+        <span>🎯</span> <span>3. Job Fit</span>
       </button>
       <button onclick="window.switchWorkspace('publish')" class="ws-nav-btn ${currentWorkspace === WORKSPACES.PUBLISH ? 'active' : ''}" style="white-space: nowrap; flex-shrink: 0; padding: 8px 12px; font-size: 0.78rem;">
         <span>🌐</span> <span>4. Publish</span>

@@ -1,7 +1,6 @@
 /**
  * BillingService.js
  * Billing provider abstraction with subscription state machine.
- * Phase 8A: No real payment processing. Stripe endpoints disabled behind feature flags.
  * Server is the sole source of truth for paid entitlements.
  */
 
@@ -59,7 +58,7 @@ export class BillingService {
   }
 
   /**
-   * Create checkout session (placeholder for Phase 8B).
+   * Create checkout session.
    * Currently routes to "Coming Soon" unless MONETIZATION_UI_ENABLED.
    */
   async createCheckoutSession(userId, targetPlanId = 'pro', interval = 'monthly') {
@@ -67,7 +66,7 @@ export class BillingService {
       throw new Error('User authentication required for billing checkout.');
     }
 
-    // Phase 8A: No real checkout
+    // Manual payment mode — no automated checkout
     if (!isFeatureEnabled('MONETIZATION_UI_ENABLED')) {
       return {
         checkoutUrl: null,
@@ -77,7 +76,7 @@ export class BillingService {
       };
     }
 
-    // Future Phase 8B: Real payment provider integration
+    // Future: Automated payment provider integration
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) {
       throw new Error('Please sign in again before upgrading.');

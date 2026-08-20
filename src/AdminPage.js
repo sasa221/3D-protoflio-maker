@@ -239,7 +239,7 @@ function renderOverviewTab(data) {
     <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:12px;padding:14px 18px;margin-bottom:24px;display:flex;align-items:center;gap:12px">
       <span style="font-size:22px">💳</span>
       <div>
-        <strong style="color:#4ade80;font-size:13px;display:block">PAYMENTS: Manual InstaPay Active (Phase 8B)</strong>
+        <strong style="color:#4ade80;font-size:13px;display:block">PAYMENTS: Manual InstaPay Active</strong>
         <span style="color:rgba(255,255,255,0.7);font-size:12px">Users submit transfer proof. Admins review and activate subscriptions with server-authoritative pricing and Brevo notifications.</span>
       </div>
     </div>

@@ -16,7 +16,7 @@ export async function renderProductionReadinessPanel(container) {
     ">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <div style="font-size: 0.75rem; font-weight: 800; color: #a855f7; letter-spacing: 1.5px; text-transform: uppercase;">
-          🌐 CLOUD CUTOVER INFRASTRUCTURE STATUS
+          🌐 SYSTEM STATUS
         </div>
         <span id="health-indicator" style="font-size: 0.7rem; font-weight: 800; color: #ef4444; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); border-radius: 12px; padding: 2px 10px;">
           ⏳ Checking...

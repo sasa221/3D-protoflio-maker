@@ -251,5 +251,101 @@ export default async function handler(req, res) {
     }
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // 5. ACTION: EXTRACT-JOB (SSRF-Protected Job URL Extraction)
+  // ─────────────────────────────────────────────────────────────
+  if (action === 'extract-job') {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+    const { url } = req.body || {};
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ error: 'Valid Job Posting URL is required.' });
+    }
+
+    try {
+      const parsedUrl = new URL(url.trim());
+      if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+        return res.status(400).json({ error: 'Invalid URL protocol. Only HTTP and HTTPS are supported.' });
+      }
+
+      const hostname = parsedUrl.hostname.toLowerCase();
+
+      // Strict SSRF hostname protection
+      const isPrivateOrLocal =
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '0.0.0.0' ||
+        hostname === '::1' ||
+        hostname === '[::1]' ||
+        hostname.endsWith('.localhost') ||
+        hostname.endsWith('.local') ||
+        hostname.endsWith('.internal') ||
+        /^127\./.test(hostname) ||
+        /^10\./.test(hostname) ||
+        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) ||
+        /^192\.168\./.test(hostname) ||
+        /^169\.254\./.test(hostname); // Link-local
+
+      if (isPrivateOrLocal) {
+        return res.status(403).json({ error: 'Access to private or internal addresses is blocked for security.' });
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      const response = await fetch(parsedUrl.toString(), {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8'
+        }
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        return res.status(200).json({
+          success: false,
+          blocked: true,
+          error: `Could not load job URL (HTTP ${response.status}). Please paste the job description text below.`
+        });
+      }
+
+      const rawHtml = await response.text();
+      // Basic HTML text extraction
+      const cleanText = rawHtml
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+        .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, ' ')
+        .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, ' ')
+        .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 15000);
+
+      // Extract title from HTML title tag if available
+      const titleMatch = rawHtml.match(/<title[^>]*>([^<]+)<\/title>/i);
+      const pageTitle = titleMatch ? titleMatch[1].trim().split(/[-|•–—]/)[0].trim() : '';
+
+      return res.status(200).json({
+        success: true,
+        extractedText: cleanText,
+        suggestedTitle: pageTitle
+      });
+    } catch (err) {
+      const isAbort = err.name === 'AbortError';
+      return res.status(200).json({
+        success: false,
+        blocked: true,
+        error: isAbort
+          ? 'Job site request timed out. Please paste the job description directly.'
+          : 'Could not access the job posting automatically. Please paste the job description below.'
+      });
+    }
+  }
+
   return res.status(400).json({ error: `Unknown portfolio action: ${action}` });
 }

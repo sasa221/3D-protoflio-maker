@@ -1161,13 +1161,13 @@ function initEngine() {
 
   initCVImportModal(handleCVImportData);
   window.openCVImportModal = openCVImportModal;
-  window.openBillingModal = async () => {
+  window.openBillingModal = async (arg) => {
     const authUser = await getCurrentAuthUser();
     if (!authUser?.id || authUser.id === 'usr_guest') {
       window.location.href = '/login?next=/studio';
       return;
     }
-    openBillingModal(authUser.id, () => renderAll());
+    openBillingModal(authUser.id, () => renderAll(), arg);
   };
 
   // Only run test suites in browser if explicit debug query flag ?run_tests=true is set
@@ -1775,8 +1775,37 @@ export function renderPublishTab() {
             <div style="display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;font-weight:900;">✓</span> Professional portfolio sharing</div>
           </div>
 
-          <button id="btn-upgrade-pro-publish" class="btn btn-primary" onclick="openBillingModal('pro')" style="width:100%;padding:13px;font-size:0.88rem;font-weight:800;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#fff;border-radius:10px;box-shadow:0 6px 18px rgba(124,58,237,0.35);cursor:pointer;">
+          <button id="btn-upgrade-pro-publish" class="btn btn-primary" onclick="openBillingModal({targetPlan:'pro'})" style="width:100%;padding:13px;font-size:0.88rem;font-weight:800;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#fff;border-radius:10px;box-shadow:0 6px 18px rgba(124,58,237,0.35);cursor:pointer;">
             Upgrade to Pro — 600 EGP/month
+          </button>
+        </div>
+
+        <!-- CARD C: PREMIUM UPGRADE -->
+        <div style="background:linear-gradient(135deg,rgba(6,182,212,0.12),rgba(124,58,237,0.06));border:1px solid rgba(6,182,212,0.3);border-radius:18px;padding:22px;margin-top:16px;box-shadow:0 12px 30px rgba(6,182,212,0.1);position:relative;overflow:hidden;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 style="font-size:1.02rem;font-weight:800;color:#fff;margin:0;display:flex;align-items:center;gap:8px;">
+              <span>💎</span> Unlock the Full Portfolio Experience
+            </h3>
+            <span style="font-size:0.68rem;font-weight:800;color:#06b6d4;background:rgba(6,182,212,0.2);border:1px solid rgba(6,182,212,0.4);border-radius:12px;padding:2px 10px;letter-spacing:0.5px;">
+              PREMIUM
+            </span>
+          </div>
+
+          <p style="font-size:0.8rem;color:rgba(255,255,255,0.75);line-height:1.5;margin:0 0 16px 0;">
+            Maximum control and access to every feature.
+          </p>
+
+          <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:18px;font-size:0.78rem;color:rgba(255,255,255,0.85);">
+            <div style="display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;font-weight:900;">✓</span> Everything in Pro</div>
+            <div style="display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;font-weight:900;">✓</span> All 15 themes</div>
+            <div style="display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;font-weight:900;">✓</span> Premium themes</div>
+            <div style="display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;font-weight:900;">✓</span> Remove branding</div>
+            <div style="display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;font-weight:900;">✓</span> Premium capabilities</div>
+            <div style="display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;font-weight:900;">✓</span> Custom domain support when available</div>
+          </div>
+
+          <button id="btn-upgrade-premium-publish" class="btn btn-primary" onclick="openBillingModal({targetPlan:'premium'})" style="width:100%;padding:13px;font-size:0.88rem;font-weight:800;background:linear-gradient(135deg,#0891b2,#7c3aed);color:#fff;border-radius:10px;box-shadow:0 6px 18px rgba(6,182,212,0.35);cursor:pointer;border:none;">
+            Go Premium — 1,000 EGP/month
           </button>
         </div>
 

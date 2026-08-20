@@ -11,7 +11,7 @@ import { generatePortfolioCSS, generatePortfolioHTMLBody } from '../renderer/Por
 import { installProjectCinemaControls } from '../renderer/ProjectCinema.js';
 import { resolvePortfolioVariant } from '../services/PortfolioVariantService.js';
 import { getCurrentAuthUser } from '../services/AuthService.js';
-import { PLAN_CONFIG } from '../services/EntitlementService.js';
+import { PLANS, GROUP_SEAT_PRICING } from '../config/PlanConfig.js';
 
 let demoEngine = null;
 let currentDemoThemeId = 'code';
@@ -44,6 +44,25 @@ export async function renderLandingPage(container) {
       #landing-auth-actions > a:first-child:not(:only-child) { display: none !important; }
       #landing-auth-actions a { padding: 9px 12px !important; font-size: .76rem !important; white-space: nowrap; }
       #landing-navbar > a span { font-size: .95rem !important; max-width: 92px; line-height: 1.05; }
+      
+      /* Hero: stack to single column */
+      #app section:first-of-type, section:first-of-type { grid-template-columns: 1fr !important; }
+      /* How it works: stack 3 columns */
+      #features > div:last-child { grid-template-columns: 1fr !important; }
+      /* Themes: stack 2 columns */
+      #themes > div { grid-template-columns: 1fr !important; }
+      /* Job targeting: stack */
+      #targeting > div { grid-template-columns: 1fr !important; }
+      /* Recruiter comparison: stack */
+      section:nth-of-type(5) > div > div:last-child { grid-template-columns: 1fr !important; }
+      /* Analytics: stack */
+      section:nth-of-type(6) > div { grid-template-columns: 1fr !important; }
+      /* Pricing: stack to 2 then 1 */
+      #pricing > div:last-child { grid-template-columns: repeat(2, 1fr) !important; }
+    }
+    @media (max-width: 480px) {
+      /* All grids to 1 column */
+      #pricing > div:last-child { grid-template-columns: 1fr !important; }
     }
   `;
 
@@ -528,21 +547,20 @@ export async function renderLandingPage(container) {
           Start free with no credit card required. Upgrade anytime for custom domains and targeted portfolio versions.
         </p>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 28px; text-align: left; max-width: 900px; margin: 0 auto;">
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 28px; text-align: left; max-width: 1200px; margin: 0 auto;">
           <!-- FREE PLAN CARD -->
           <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 32px; display: flex; flex-direction: column; justify-content: space-between;">
             <div>
               <div style="font-size: 1.3rem; font-weight: 800; margin-bottom: 6px;">Free Plan</div>
               <div style="font-size: 2.2rem; font-weight: 900; color: #fff; margin-bottom: 18px; font-family: 'JetBrains Mono', monospace;">
-                $0 <span style="font-size: 0.9rem; color: rgba(255,255,255,0.4); font-weight: normal;">/ forever</span>
+                0 EGP
               </div>
               <ul style="list-style: none; padding: 0; margin: 0 0 28px 0; font-size: 0.88rem; color: rgba(255,255,255,0.75); line-height: 2;">
                 <li>✓ 1 Portfolio</li>
+                <li>✓ 3 Free Themes</li>
                 <li>✓ Cinematic 3D Rendering</li>
+                <li>✓ 1 HTML Export/month</li>
                 <li>✓ Resume PDF Upload</li>
-                <li>✓ Recruiter View Toggle</li>
-                <li>✓ Standard 7-Day Analytics</li>
-                <li>✓ Standalone HTML Export</li>
               </ul>
             </div>
             <a href="${isAuthenticated ? '/studio' : '/start'}" style="
@@ -556,25 +574,65 @@ export async function renderLandingPage(container) {
             <div style="
               position: absolute; top: -14px; right: 24px; background: linear-gradient(135deg, #7c3aed, #06b6d4);
               padding: 4px 14px; border-radius: 20px; font-size: 0.7rem; font-weight: 800; color: #fff; letter-spacing: 1px;
-            ">RECOMMENDED</div>
+            ">MOST POPULAR</div>
             <div>
               <div style="font-size: 1.3rem; font-weight: 800; margin-bottom: 6px;">Pro Plan</div>
               <div style="font-size: 2.2rem; font-weight: 900; color: #10b981; margin-bottom: 18px; font-family: 'JetBrains Mono', monospace;">
-                $${PLAN_CONFIG.pro.priceMonthly} <span style="font-size: 0.9rem; color: rgba(255,255,255,0.4); font-weight: normal;">/ month</span>
+                ${PLANS.pro.priceMonthlyEGP} EGP <span style="font-size: 0.9rem; color: rgba(255,255,255,0.4); font-weight: normal;">/ month</span>
               </div>
               <ul style="list-style: none; padding: 0; margin: 0 0 28px 0; font-size: 0.88rem; color: rgba(255,255,255,0.85); line-height: 2;">
                 <li>✓ Everything in Free</li>
-                <li>✓ <strong>Up to 3 Custom Domain Connections (CNAME)</strong></li>
-                <li>✓ <strong>Up to 5 Targeted Portfolio Versions</strong></li>
-                <li>✓ <strong>Job Match Analysis & Gap Finder</strong></li>
-                <li>✓ <strong>Remove Watermark / Branding</strong></li>
-                <li>✓ <strong>90-Day Analytics Retention</strong></li>
+                <li>✓ 10 Professional Themes</li>
+                <li>✓ Publish Online with /u/username</li>
+                <li>✓ Continuous Editing</li>
+                <li>✓ Unlimited Exports</li>
+                <li>✓ Job Fit Analysis</li>
               </ul>
             </div>
             <a href="${isAuthenticated ? '/studio' : '/start'}" style="
               display: block; width: 100%; padding: 14px; text-align: center; background: linear-gradient(135deg, #7c3aed, #06b6d4);
               border-radius: 10px; color: #fff; font-weight: 800; text-decoration: none; box-shadow: 0 8px 25px rgba(124,58,237,0.4);
             ">Upgrade to Pro</a>
+          </div>
+
+          <!-- PREMIUM PLAN CARD -->
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 32px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="font-size: 1.3rem; font-weight: 800; margin-bottom: 6px;">Premium Plan</div>
+              <div style="font-size: 2.2rem; font-weight: 900; color: #fff; margin-bottom: 18px; font-family: 'JetBrains Mono', monospace;">
+                ${PLANS.premium.priceMonthlyEGP} EGP <span style="font-size: 0.9rem; color: rgba(255,255,255,0.4); font-weight: normal;">/ month</span>
+              </div>
+              <ul style="list-style: none; padding: 0; margin: 0 0 28px 0; font-size: 0.88rem; color: rgba(255,255,255,0.75); line-height: 2;">
+                <li>✓ Everything in Pro</li>
+                <li>✓ All 15 Themes</li>
+                <li>✓ Remove Branding</li>
+                <li>✓ Custom Domain (Coming Soon)</li>
+                <li>✓ Advanced Analytics</li>
+              </ul>
+            </div>
+            <a href="${isAuthenticated ? '/studio' : '/start'}" style="
+              display: block; width: 100%; padding: 14px; text-align: center; background: rgba(255,255,255,0.08);
+              border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; color: #fff; font-weight: 700; text-decoration: none;
+            ">Go Premium</a>
+          </div>
+
+          <!-- PREMIUM GROUP PLAN CARD -->
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 32px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="font-size: 1.3rem; font-weight: 800; margin-bottom: 6px;">Premium Group</div>
+              <div style="font-size: 2.2rem; font-weight: 900; color: #fff; margin-bottom: 18px; font-family: 'JetBrains Mono', monospace;">
+                <span style="font-size: 1rem; color: rgba(255,255,255,0.6);">From</span> ${PLANS.premium_group.priceStartingMonthlyEGP} EGP <span style="font-size: 0.9rem; color: rgba(255,255,255,0.4); font-weight: normal;">/ month</span>
+              </div>
+              <ul style="list-style: none; padding: 0; margin: 0 0 28px 0; font-size: 0.88rem; color: rgba(255,255,255,0.75); line-height: 2;">
+                <li>✓ Premium for 2–5 team members</li>
+                <li>✓ Individual portfolios per member</li>
+                <li>✓ Centralized billing</li>
+              </ul>
+            </div>
+            <a href="${isAuthenticated ? '/studio' : '/start'}" style="
+              display: block; width: 100%; padding: 14px; text-align: center; background: rgba(255,255,255,0.08);
+              border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; color: #fff; font-weight: 700; text-decoration: none;
+            ">Choose Group</a>
           </div>
         </div>
       </section>
@@ -617,7 +675,7 @@ export async function renderLandingPage(container) {
           <details style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; cursor: pointer;">
             <summary style="font-weight: 700; font-size: 1rem; color: #fff;">Can I use my own custom domain?</summary>
             <p style="margin-top: 10px; font-size: 0.9rem; color: rgba(255,255,255,0.65); line-height: 1.6;">
-              Yes. Pro users can connect up to 3 custom domains (e.g. "yourname.com") via standard DNS CNAME records.
+              Custom domains are a Premium feature and currently marked as Coming Soon.
             </p>
           </details>
 

@@ -1,25 +1,43 @@
 /**
  * JobAnalyzerService.js
- * Analyzes target role title and job description text to extract normalized requirements,
- * skills, technologies, responsibilities, and qualifications.
- * Supports semantic alias matching (e.g. JS ≈ JavaScript, HTML ≈ HTML5, PowerBI ≈ Power BI).
+ * Strictly evidence-based job posting parser and requirements extractor.
+ * Extracts explicit requirements: skills (required vs preferred), experience years,
+ * education, certifications, and languages.
+ *
+ * CRITICAL RULE (§12): Job Title alone NEVER generates a match score.
+ * Actual job description text or posting content is required.
  */
 
 const SKILL_ALIASES = {
-  'javascript': ['js', 'ecmascript', 'javascript'],
-  'typescript': ['ts', 'typescript'],
-  'html5': ['html', 'html5'],
-  'css3': ['css', 'css3', 'sass', 'scss'],
-  'react': ['react.js', 'reactjs', 'react'],
-  'vue': ['vue.js', 'vuejs', 'vue'],
-  'node.js': ['node', 'nodejs', 'node.js'],
-  'power bi': ['powerbi', 'power bi', 'power-bi'],
-  'c++': ['cpp', 'c++'],
-  'c#': ['csharp', 'c#'],
-  'python': ['py', 'python'],
-  'sql': ['mysql', 'postgresql', 'postgres', 'sql', 'tsql'],
-  'excel': ['excel', 'microsoft excel', 'ms excel'],
-  'rest api': ['rest', 'restful', 'apis', 'rest api', 'api integration']
+  'javascript': ['javascript', 'js', 'ecmascript'],
+  'typescript': ['typescript', 'ts'],
+  'html5': ['html5', 'html'],
+  'css3': ['css3', 'css', 'sass', 'scss'],
+  'react': ['react', 'react.js', 'reactjs'],
+  'next.js': ['next.js', 'nextjs', 'next'],
+  'vue': ['vue', 'vue.js', 'vuejs'],
+  'angular': ['angular', 'angularjs'],
+  'node.js': ['node.js', 'nodejs', 'node'],
+  'python': ['python', 'py'],
+  'sql': ['sql', 'mysql', 'postgresql', 'postgres', 'tsql'],
+  'power bi': ['power bi', 'powerbi'],
+  'data cleaning': ['data cleaning'],
+  'excel': ['excel', 'ms excel', 'microsoft excel'],
+  'c++': ['c++', 'cpp'],
+  'c#': ['c#', 'csharp'],
+  'java': ['java'],
+  'php': ['php', 'laravel'],
+  'three.js': ['three.js', 'threejs', 'webgl'],
+  'docker': ['docker', 'containerization'],
+  'kubernetes': ['kubernetes', 'k8s'],
+  'aws': ['aws', 'amazon web services'],
+  'git': ['git', 'github', 'gitlab'],
+  'rest apis': ['rest api', 'rest apis', 'restful', 'rest'],
+  'graphql': ['graphql'],
+  'redux': ['redux'],
+  'tailwind css': ['tailwind', 'tailwindcss', 'tailwind css'],
+  'figma': ['figma', 'ui/ux', 'ui design'],
+  'data visualization': ['data visualization', 'data viz', 'tableau']
 };
 
 export class JobAnalyzerService {
@@ -27,119 +45,185 @@ export class JobAnalyzerService {
     const {
       role = '',
       company = '',
-      industry = '',
-      jobDescription = ''
+      location = '',
+      employmentType = '',
+      jobDescription = '',
+      jobUrl = ''
     } = targetInput;
 
-    const fullText = `${role} ${industry} ${jobDescription}`.toLowerCase();
+    const jdText = (jobDescription || '').trim();
+    const fullText = `${role} ${company} ${jdText}`;
 
-    // 1. Identify Seniority
-    let seniority = 'Mid Level';
-    if (fullText.includes('junior') || fullText.includes('trainee') || fullText.includes('intern') || fullText.includes('associate')) {
-      seniority = 'Junior / Entry Level';
-    } else if (fullText.includes('senior') || fullText.includes('lead') || fullText.includes('principal') || fullText.includes('architect')) {
-      seniority = 'Senior / Lead';
+    // Extract structured requirements
+    const { requiredSkills, preferredSkills } = this._extractSkills(jdText);
+    const requiredExperienceYears = this._extractExperienceYears(jdText);
+    const requiredEducation = this._extractEducation(jdText);
+    const requiredCertifications = this._extractCertifications(jdText);
+    const requiredLanguages = this._extractLanguages(jdText);
+    const seniority = this._extractSeniority(fullText);
+    const parsedEmploymentType = employmentType || this._extractEmploymentType(jdText);
+
+    // RULE (§12): Title alone or empty/insufficient text without requirements generates NO score.
+    const hasAnyRequirement =
+      jdText.length > 0 &&
+      (requiredSkills.length > 0 ||
+      preferredSkills.length > 0 ||
+      requiredExperienceYears !== null ||
+      requiredEducation !== null ||
+      requiredCertifications.length > 0 ||
+      jdText.split(/\s+/).filter(Boolean).length >= 20);
+
+    if (!hasAnyRequirement) {
+      return {
+        hasRequirements: false,
+        title: role || 'Target Role',
+        company: company || '',
+        location: location || '',
+        employmentType: employmentType || '',
+        jobUrl: jobUrl || '',
+        requiredSkills: [],
+        preferredSkills: [],
+        requiredExperienceYears: null,
+        requiredEducation: null,
+        requiredCertifications: [],
+        requiredLanguages: [],
+        otherRequirements: [],
+        reason: 'We need the actual job requirements to calculate your fit.',
+        analyzedAt: new Date().toISOString()
+      };
     }
 
-    // 2. Extract Technologies & Skills
-    const { requiredSkills, preferredSkills, technologies } = this._extractSkillsFromText(fullText, role);
-
-    // 3. Extract Soft Skills
-    const softSkills = this._extractSoftSkills(fullText);
-
-    // 4. Extract Qualifications & Domain Keywords
-    const qualifications = this._extractQualifications(fullText);
-    const domainKeywords = this._extractDomainKeywords(fullText, role);
-
     return {
-      title: role || 'Target Role',
+      hasRequirements: hasAnyRequirement,
+      title: role || this._extractTitleFromText(jdText) || 'Target Role',
       company: company || '',
-      industry: industry || '',
+      location: location || '',
+      employmentType: parsedEmploymentType,
+      jobUrl: jobUrl || '',
       seniority,
       requiredSkills,
       preferredSkills,
-      technologies,
-      responsibilities: [],
-      qualifications,
-      softSkills,
-      domainKeywords,
+      requiredExperienceYears,
+      requiredEducation,
+      requiredCertifications,
+      requiredLanguages,
+      otherRequirements: [],
+      reason: hasAnyRequirement ? null : 'We need the actual job requirements to calculate your fit.',
       analyzedAt: new Date().toISOString()
     };
   }
 
-  _extractSkillsFromText(fullText, roleTitle) {
-    const knownSkillsList = [
-      'JavaScript', 'TypeScript', 'HTML5', 'CSS3', 'React', 'Vue', 'Next.js', 'Node.js',
-      'Python', 'C++', 'C', 'Java', 'PHP', 'Laravel', 'Bootstrap', 'Tailwind', 'Three.js',
-      'Power BI', 'Data Cleaning', 'Data Transformation', 'Data Visualization', 'SQL', 'MySQL', 'Excel',
-      'PostgreSQL', 'Docker', 'Kubernetes', 'AWS', 'Git', 'REST APIs', 'GraphQL', 'Redux',
-      'Figma', 'UI/UX', 'Analytical Thinking'
-    ];
+  _extractSkills(text) {
+    const lower = text.toLowerCase();
+    const required = new Set();
+    const preferred = new Set();
 
-    let required = [];
-    let preferred = [];
-    let tech = [];
+    // Segment into preferred vs required sections if explicit headings exist
+    const prefSectionMatch = text.match(/(?:preferred|nice to have|plus|bonus|optional|desired)[\s\S]{1,600}/i);
+    const prefSectionText = prefSectionMatch ? prefSectionMatch[0].toLowerCase() : '';
 
-    knownSkillsList.forEach(skill => {
-      const aliases = SKILL_ALIASES[skill.toLowerCase()] || [skill.toLowerCase()];
-      const matches = aliases.some(alias => {
+    const knownSkills = Object.keys(SKILL_ALIASES);
+
+    knownSkills.forEach(canonical => {
+      const aliases = SKILL_ALIASES[canonical];
+      const matched = aliases.some(alias => {
         const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        return new RegExp(`\\b${escaped}\\b`, 'i').test(fullText);
+        return new RegExp(`(?:^|[^a-zA-Z0-9_#+])${escaped}(?:$|[^a-zA-Z0-9_#+])`, 'i').test(lower);
       });
 
-      if (matches) {
-        tech.push(skill);
-        if (fullText.includes('plus') || fullText.includes('preferred') || fullText.includes('nice to have')) {
-          preferred.push(skill);
+      if (matched) {
+        // Format display name
+        const displayName = canonical.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+          .replace('Javascript', 'JavaScript')
+          .replace('Typescript', 'TypeScript')
+          .replace('Html5', 'HTML5')
+          .replace('Css3', 'CSS3')
+          .replace('Sql', 'SQL')
+          .replace('Aws', 'AWS')
+          .replace('Rest Apis', 'REST APIs')
+          .replace('Ui/ux', 'UI/UX');
+
+        if (prefSectionText && aliases.some(a => prefSectionText.includes(a))) {
+          preferred.add(displayName);
         } else {
-          required.push(skill);
+          required.add(displayName);
         }
       }
     });
 
-    // Default required skills based on role title if description is brief
-    const lowerRole = roleTitle.toLowerCase();
-    if (required.length === 0) {
-      if (lowerRole.includes('front-end') || lowerRole.includes('frontend') || lowerRole.includes('web developer')) {
-        required = ['JavaScript', 'HTML5', 'CSS3', 'React', 'Responsive Design', 'Git', 'REST APIs'];
-        tech = [...required];
-      } else if (lowerRole.includes('data analyst') || lowerRole.includes('data analysis')) {
-        required = ['Power BI', 'SQL', 'Data Cleaning', 'Data Visualization', 'Excel'];
-        tech = [...required];
-      } else if (lowerRole.includes('cyber') || lowerRole.includes('security')) {
-        required = ['Network Security', 'Linux', 'Python', 'Incident Response'];
-        tech = [...required];
-      }
-    }
-
     return {
-      requiredSkills: Array.from(new Set(required)),
-      preferredSkills: Array.from(new Set(preferred)),
-      technologies: Array.from(new Set(tech))
+      requiredSkills: Array.from(required),
+      preferredSkills: Array.from(preferred)
     };
   }
 
-  _extractSoftSkills(fullText) {
-    const softSkillsList = [
-      'Problem Solving', 'Communication', 'Teamwork', 'Time Management',
-      'Management', 'Organization Skills', 'Adaptability', 'Analytical Thinking'
-    ];
-    return softSkillsList.filter(s => fullText.includes(s.toLowerCase()));
+  _extractExperienceYears(text) {
+    const match = text.match(/(\d+)\+?\s*(?:-\s*\d+\s*)?(?:years?|yrs?)(?:\s+of)?(?:\s+relevant|\s+professional|\s+work)?\s+experience/i)
+      || text.match(/experience\s*:\s*(\d+)\+?\s*(?:years?|yrs?)/i)
+      || text.match(/minimum\s*(?:of\s*)?(\d+)\s*(?:years?|yrs?)/i);
+
+    if (match && match[1]) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && num > 0 && num <= 20) {
+        return num;
+      }
+    }
+    return null;
   }
 
-  _extractQualifications(fullText) {
-    let quals = [];
-    if (fullText.includes('bachelor') || fullText.includes('b.sc') || fullText.includes('computer science')) {
-      quals.push("Bachelor's degree in Computer Science or related field");
+  _extractEducation(text) {
+    const lower = text.toLowerCase();
+    if (lower.includes('phd') || lower.includes('doctorate')) return 'PhD';
+    if (lower.includes('master') || lower.includes('m.sc') || lower.includes('ms degree')) return "Master's Degree";
+    if (lower.includes('bachelor') || lower.includes('b.sc') || lower.includes('bs degree') || lower.includes('degree in computer') || lower.includes('degree in engineering')) {
+      return "Bachelor's Degree";
     }
-    if (fullText.includes('certification') || fullText.includes('certificate')) {
-      quals.push("Relevant professional certifications");
-    }
-    return quals;
+    if (lower.includes('diploma') || lower.includes('associate degree')) return 'Associate / Diploma';
+    return null;
   }
 
-  _extractDomainKeywords(fullText, roleTitle) {
-    const keywords = ['Responsive Design', 'UI Components', 'Data Dashboards', 'Database Design', 'Agile'];
-    return keywords.filter(k => fullText.includes(k.toLowerCase()) || roleTitle.toLowerCase().includes('front-end'));
+  _extractCertifications(text) {
+    const certs = [];
+    const lower = text.toLowerCase();
+    if (lower.includes('aws certified') || lower.includes('aws solutions architect')) certs.push('AWS Certification');
+    if (lower.includes('pmp')) certs.push('PMP');
+    if (lower.includes('scrum master') || lower.includes('csm')) certs.push('Scrum Master');
+    if (lower.includes('cissp')) certs.push('CISSP');
+    if (lower.includes('comptia')) certs.push('CompTIA');
+    return certs;
+  }
+
+  _extractLanguages(text) {
+    const langs = [];
+    const lower = text.toLowerCase();
+    if (lower.includes('fluent in english') || lower.includes('english proficiency') || lower.includes('excellent english')) langs.push('English');
+    if (lower.includes('fluent in arabic') || lower.includes('arabic language')) langs.push('Arabic');
+    if (lower.includes('german') || lower.includes('french')) langs.push('Additional European Language');
+    return langs;
+  }
+
+  _extractSeniority(text) {
+    const lower = text.toLowerCase();
+    if (lower.includes('principal') || lower.includes('staff') || lower.includes('lead') || lower.includes('architect')) return 'Senior / Lead';
+    if (lower.includes('senior') || lower.includes('sr.')) return 'Senior';
+    if (lower.includes('junior') || lower.includes('entry') || lower.includes('graduate') || lower.includes('intern') || lower.includes('associate')) return 'Junior / Entry';
+    return 'Mid-Level';
+  }
+
+  _extractEmploymentType(text) {
+    const lower = text.toLowerCase();
+    if (lower.includes('full-time') || lower.includes('full time')) return 'Full-time';
+    if (lower.includes('part-time') || lower.includes('part time')) return 'Part-time';
+    if (lower.includes('contract') || lower.includes('freelance')) return 'Contract';
+    if (lower.includes('remote') || lower.includes('work from home')) return 'Remote';
+    return 'Full-time';
+  }
+
+  _extractTitleFromText(text) {
+    const firstLine = text.trim().split('\n')[0].trim();
+    if (firstLine.length > 3 && firstLine.length < 60 && !firstLine.includes('.')) {
+      return firstLine;
+    }
+    return '';
   }
 }

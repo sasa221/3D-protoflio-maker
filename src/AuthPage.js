@@ -1,7 +1,7 @@
 /**
  * AuthPage.js
  * Comprehensive Authentication & Email OTP Verification for Portfolio Maker.
- * Phase 8B: Server-authoritative email confirmation with 6-digit OTP UI,
+ * Server-authoritative email confirmation with OTP UI,
  * auto-advance, paste support, resend cooldown, and centralized error mapping.
  */
 

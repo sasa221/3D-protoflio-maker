@@ -8,8 +8,8 @@
  */
 
 // ─── NETLIFY CONFIG ─────────────────────────
-// TODO: Replace with your real Netlify Personal Access Token
-const NETLIFY_TOKEN = import.meta.env.VITE_NETLIFY_TOKEN || '';
+// Removed for security: Netlify deployment has been moved to backend via /api/portfolio?action=deploy
+const NETLIFY_TOKEN = '';
 const NETLIFY_API = 'https://api.netlify.com/api/v1';
 
 // ─── DEPLOYED SITES REGISTRY (local) ────────
@@ -30,9 +30,7 @@ function saveSites(sites) {
  * @returns {{ url: string, siteId: string, deployId: string }}
  */
 export async function deployToNetlify(htmlContent, siteName, onProgress) {
-  if (!NETLIFY_TOKEN) {
-    throw new Error('NETLIFY_TOKEN not configured. Please add VITE_NETLIFY_TOKEN to your .env file.');
-  }
+  throw new Error('Legacy client-side deploy is disabled for security. Please use the server API.');
 
   // Clean slug
   const slug = siteName

@@ -1,7 +1,6 @@
 /**
  * PlanConfig.js
- * Single canonical source of truth for all commercial plans, prices, capabilities, and limits.
- * Phase 8A — No real payment processing. All prices in EGP.
+ * Single canonical source of truth for all commercial plans, prices, capabilities, and limits. All prices in EGP.
  */
 
 export const EMAIL_OTP_LENGTH = 8;
@@ -181,7 +180,7 @@ export const KEEP_IT_LIVE = {
   canChangeTheme: false
 };
 
-// Items approved in Phase 8A
+// Approved product configuration
 export const AWAITING_APPROVAL = {};
 export const APPROVED_PRODUCT_CONFIG = {
   FREE_THEMES: ['code', 'creative', 'minimal'],

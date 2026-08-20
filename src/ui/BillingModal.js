@@ -1,6 +1,6 @@
 /**
  * BillingModal.js
- * Premium Plans & Pricing Modal for Portfolio Maker Studio (Phase 8C Redesign).
+ * Premium Plans & Pricing Modal for Portfolio Maker Studio.
  * Coherent SaaS visual hierarchy, equal height 4-card grid, interactive group seat selector,
  * distinct CTAs, concise benefit checkmarks, and seamless single-modal lifecycle.
  */
@@ -128,7 +128,7 @@ function renderBillingMainView(currentPlan, pendingRequests, onSubscriptionUpdat
       currentSelectedGroupSeats = Number(e.target.value) || 2;
       const priceEl = modalContainer.querySelector('#group-card-price-val');
       if (priceEl) {
-        priceEl.textContent = formatEGP(GROUP_SEAT_PRICING[currentSelectedGroupSeats] || 1500);
+        priceEl.textContent = formatEGP(GROUP_SEAT_PRICING[currentSelectedGroupSeats] || 1800);
       }
     });
   }

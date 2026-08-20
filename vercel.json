@@ -47,6 +47,10 @@
       "destination": "/api/portfolio?action=domain-verify"
     },
     {
+      "source": "/api/job/extract",
+      "destination": "/api/portfolio?action=extract-job"
+    },
+    {
       "source": "/api/entitlements/check",
       "destination": "/api/entitlements?action=check"
     },
