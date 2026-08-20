@@ -1,8 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import dns from 'dns';
-import { promisify } from 'util';
-
-const resolveCname = promisify(dns.resolveCname);
 
 export const config = {
   api: {
@@ -14,6 +10,81 @@ export const config = {
 
 const HOSTING_PLANS = new Set(['pro', 'premium', 'premium_group']);
 const PLAN_PORTFOLIO_LIMITS = { free: 1, pro: 1, premium: -1, premium_group: -1 };
+const JOB_FETCH_BLOCKED_MESSAGE = "This job site blocks automatic reading. Paste the job description below and we'll analyze it directly.";
+
+function normalizeHostname(value) {
+  return String(value || '').trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0].replace(/\.$/, '');
+}
+
+function getVercelDomainConfig() {
+  const token = process.env.VERCEL_API_TOKEN;
+  const projectId = process.env.VERCEL_PROJECT_ID;
+  const teamId = process.env.VERCEL_TEAM_ID || '';
+  return { token, projectId, teamId, configured: Boolean(token && projectId) };
+}
+
+async function vercelApi(path, options = {}) {
+  const cfg = getVercelDomainConfig();
+  if (!cfg.configured) {
+    const error = new Error('Custom domain activation is temporarily unavailable.');
+    error.code = 'VERCEL_CONFIG_MISSING';
+    throw error;
+  }
+  const separator = path.includes('?') ? '&' : '?';
+  const scopedPath = cfg.teamId ? `${path}${separator}teamId=${encodeURIComponent(cfg.teamId)}` : path;
+  const response = await fetch(`https://api.vercel.com${scopedPath}`, {
+    ...options,
+    headers: { Authorization: `Bearer ${cfg.token}`, 'Content-Type': 'application/json', ...(options.headers || {}) }
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(data?.error?.message || 'Vercel domain operation failed.');
+    error.status = response.status;
+    error.code = data?.error?.code || 'VERCEL_API_ERROR';
+    throw error;
+  }
+  return data;
+}
+
+function dnsInstructionsFor(hostname, projectDomain = {}) {
+  const verification = Array.isArray(projectDomain.verification) ? projectDomain.verification : [];
+  const txt = verification.find(item => item.type === 'TXT');
+  if (txt) return [{ type: 'TXT', name: txt.domain || '_vercel', value: txt.value }];
+  const labels = hostname.split('.');
+  return labels.length === 2
+    ? [{ type: 'A', name: '@', value: '76.76.21.21' }]
+    : [{ type: 'CNAME', name: labels.slice(0, -2).join('.'), value: 'cname.vercel-dns.com' }];
+}
+
+function decodeHtmlText(value) {
+  return String(value || '').replace(/&nbsp;|&#160;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>').replace(/&quot;|&#34;/gi, '"').replace(/&#39;|&apos;/gi, "'")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)));
+}
+
+function stripJobHtml(html) {
+  return decodeHtmlText(String(html || ''))
+    .replace(/<(script|style|nav|footer|header|aside|noscript|svg)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<(dialog|form)\b[^>]*(?:cookie|consent|newsletter)[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<br\s*\/?\s*>|<\/p>|<\/li>|<\/div>|<\/h[1-6]>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ').replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim();
+}
+
+function extractJobPosting(html) {
+  const jsonLdBlocks = [...String(html || '').matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
+  for (const match of jsonLdBlocks) {
+    try {
+      const parsed = JSON.parse(match[1]);
+      const nodes = Array.isArray(parsed) ? parsed : parsed?.['@graph'] || [parsed];
+      const posting = nodes.find(node => String(node?.['@type'] || '').toLowerCase() === 'jobposting');
+      if (posting?.description) {
+        return { text: stripJobHtml(posting.description), title: stripJobHtml(posting.title || '') };
+      }
+    } catch (_) {}
+  }
+  const semantic = String(html || '').match(/<(main|article)\b[^>]*>([\s\S]*?)<\/\1>/i)?.[2] || html;
+  return { text: stripJobHtml(semantic), title: '' };
+}
 
 function isServerFeatureEnabled(flagName) {
   const val = process.env[`FF_${flagName}`];
@@ -206,7 +277,7 @@ export default async function handler(req, res) {
       const { portfolioId, domain } = req.body || {};
       if (!portfolioId || !domain) return res.status(400).json({ error: 'Missing portfolioId or domain' });
 
-      const cleanHostname = domain.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+      const cleanHostname = normalizeHostname(domain);
       if (!/^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(cleanHostname)) {
         return res.status(400).json({ error: 'Enter a valid hostname such as portfolio.example.com' });
       }
@@ -226,10 +297,40 @@ export default async function handler(req, res) {
       }
       if (!canUseCustomDomain) return res.status(403).json({ error: 'Custom domains require an active Premium plan.' });
 
-      const verificationToken = `verify_cname_${Math.random().toString(36).substr(2, 10)}`;
-      await adminClient.from('custom_domains').upsert([{ portfolio_id: portfolioId, hostname: cleanHostname, status: 'pending_verification', verification_token: verificationToken, ssl_status: 'pending' }], { onConflict: 'portfolio_id' });
+      const { data: claimedDomain } = await adminClient.from('custom_domains').select('portfolio_id,hostname').eq('hostname', cleanHostname).maybeSingle();
+      if (claimedDomain && claimedDomain.portfolio_id !== portfolioId) {
+        return res.status(409).json({ error: 'This domain is already connected to another portfolio.', code: 'DOMAIN_ALREADY_CLAIMED' });
+      }
+      const { data: currentDomain } = await adminClient.from('custom_domains').select('hostname').eq('portfolio_id', portfolioId).maybeSingle();
 
-      return res.status(200).json({ success: true, domain: cleanHostname, verificationToken, cnameRecord: 'portfolio-maker-murex.vercel.app', status: 'pending_verification' });
+      let projectDomain;
+      try {
+        projectDomain = await vercelApi(`/v10/projects/${encodeURIComponent(getVercelDomainConfig().projectId)}/domains`, {
+          method: 'POST', body: JSON.stringify({ name: cleanHostname })
+        });
+      } catch (error) {
+        if (error.code === 'VERCEL_CONFIG_MISSING') {
+          return res.status(503).json({ error: error.message, code: error.code, requiredEnvVars: ['VERCEL_API_TOKEN', 'VERCEL_PROJECT_ID', 'VERCEL_TEAM_ID (optional)'] });
+        }
+        if (error.code !== 'domain_already_in_use' && error.code !== 'DOMAIN_ALREADY_EXISTS') {
+          return res.status(error.status || 502).json({ error: 'Custom domain activation is temporarily unavailable.', code: error.code });
+        }
+        projectDomain = await vercelApi(`/v9/projects/${encodeURIComponent(getVercelDomainConfig().projectId)}/domains/${encodeURIComponent(cleanHostname)}`);
+      }
+
+      if (currentDomain?.hostname && currentDomain.hostname !== cleanHostname) {
+        await vercelApi(`/v9/projects/${encodeURIComponent(getVercelDomainConfig().projectId)}/domains/${encodeURIComponent(currentDomain.hostname)}`, { method: 'DELETE' }).catch(() => null);
+      }
+
+      const dnsInstructions = dnsInstructionsFor(cleanHostname, projectDomain);
+      const verificationToken = projectDomain?.verification?.[0]?.value || null;
+      const { error: domainSaveError } = await adminClient.from('custom_domains').upsert([{
+        portfolio_id: portfolioId, hostname: cleanHostname, status: 'awaiting_dns', verification_token: verificationToken,
+        ssl_status: 'provisioning', connected_at: null
+      }], { onConflict: 'portfolio_id' });
+      if (domainSaveError) return res.status(500).json({ error: 'Unable to save domain state.' });
+
+      return res.status(200).json({ success: true, domain: cleanHostname, status: 'AWAITING_DNS', verified: Boolean(projectDomain.verified), dnsInstructions });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }
@@ -247,24 +348,48 @@ export default async function handler(req, res) {
     if (!portfolioId || !domain) return res.status(400).json({ error: 'Missing portfolioId or domain' });
 
     try {
-      const cleanHostname = domain.toLowerCase().trim().replace(/^https?:\/\//, '');
+      const cleanHostname = normalizeHostname(domain);
       const token = authHeader.replace(/^Bearer\s+/i, '').trim();
       const adminClient = createClient(supabaseUrl, supabaseSecretKey);
       const { data: userData } = await adminClient.auth.getUser(token);
       if (!userData?.user?.id) return res.status(401).json({ error: 'Invalid user session' });
       const { data: portfolio } = await adminClient.from('portfolios').select('owner_user_id').eq('id', portfolioId).maybeSingle();
       if (!portfolio || portfolio.owner_user_id !== userData.user.id) return res.status(403).json({ error: 'You do not own this portfolio' });
-      let verified = false;
+      const { data: storedDomain } = await adminClient.from('custom_domains').select('hostname').eq('portfolio_id', portfolioId).maybeSingle();
+      if (!storedDomain || storedDomain.hostname !== cleanHostname) return res.status(404).json({ error: 'Connect this domain before verifying it.' });
+
+      let projectDomain;
+      let domainConfig;
       try {
-        const records = await resolveCname(cleanHostname);
-        verified = records.some(r => r.includes('3dportfolio.app') || r.includes('vercel.app'));
-      } catch (_) {
-        verified = false;
+        projectDomain = await vercelApi(`/v9/projects/${encodeURIComponent(getVercelDomainConfig().projectId)}/domains/${encodeURIComponent(cleanHostname)}`);
+        if (!projectDomain.verified) {
+          projectDomain = await vercelApi(`/v9/projects/${encodeURIComponent(getVercelDomainConfig().projectId)}/domains/${encodeURIComponent(cleanHostname)}/verify`, { method: 'POST' });
+        }
+        domainConfig = await vercelApi(`/v6/domains/${encodeURIComponent(cleanHostname)}/config`);
+      } catch (error) {
+        if (error.code === 'VERCEL_CONFIG_MISSING') {
+          return res.status(503).json({ error: error.message, code: error.code, requiredEnvVars: ['VERCEL_API_TOKEN', 'VERCEL_PROJECT_ID', 'VERCEL_TEAM_ID (optional)'] });
+        }
+        return res.status(error.status || 502).json({ error: 'Domain verification is temporarily unavailable.', code: error.code });
       }
 
-      const status = verified ? 'dns_verified' : 'pending_verification';
-      await adminClient.from('custom_domains').update({ status, ssl_status: 'not_provisioned' }).eq('portfolio_id', portfolioId).eq('hostname', cleanHostname);
-      return res.status(200).json({ success: true, verified, status, sslStatus: 'not_provisioned' });
+      const verified = Boolean(projectDomain?.verified);
+      const configured = domainConfig?.misconfigured === false;
+      let serving = false;
+      if (verified && configured) {
+        try {
+          const servingResponse = await fetch(`https://${cleanHostname}`, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(6000) });
+          serving = servingResponse.status > 0 && servingResponse.status < 500 && Boolean(servingResponse.headers.get('x-vercel-id') || /vercel/i.test(servingResponse.headers.get('server') || ''));
+        } catch (_) { serving = false; }
+      }
+      const active = verified && configured && serving;
+      const status = active ? 'active' : verified && configured ? 'verified' : 'awaiting_dns';
+      const sslStatus = active ? 'ready' : verified && configured ? 'provisioning' : 'pending';
+      await adminClient.from('custom_domains').update({ status, ssl_status: sslStatus, connected_at: active ? new Date().toISOString() : null }).eq('portfolio_id', portfolioId).eq('hostname', cleanHostname);
+      return res.status(200).json({
+        success: true, domain: cleanHostname, status: status.toUpperCase(), verified, configured, active, serving,
+        sslStatus, dnsInstructions: dnsInstructionsFor(cleanHostname, projectDomain), url: active ? `https://${cleanHostname}` : null
+      });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }
@@ -304,9 +429,7 @@ export default async function handler(req, res) {
         /^192\.168\./.test(hostname) ||
         /^169\.254\./.test(hostname); // Link-local
 
-      if (isPrivateOrLocal) {
-        return res.status(403).json({ error: 'Access to private or internal addresses is blocked for security.' });
-      }
+      if (isPrivateOrLocal) return res.status(200).json({ success: false, blocked: true, code: 'FETCH_BLOCKED', error: JOB_FETCH_BLOCKED_MESSAGE });
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -325,30 +448,24 @@ export default async function handler(req, res) {
           success: false,
           blocked: true,
           code: 'FETCH_BLOCKED',
-          error: "This job site blocks automatic reading. Paste the job description below and we'll analyze it directly."
+          error: JOB_FETCH_BLOCKED_MESSAGE
         });
       }
 
+      const contentType = response.headers.get('content-type') || '';
+      if (!/text\/html|application\/xhtml\+xml|text\/plain/i.test(contentType)) {
+        return res.status(200).json({ success: false, blocked: true, code: 'FETCH_BLOCKED', error: JOB_FETCH_BLOCKED_MESSAGE });
+      }
+
       const rawHtml = await response.text();
-      // Basic HTML text extraction
-      const cleanText = rawHtml
-        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
-        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
-        .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, ' ')
-        .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, ' ')
-        .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, ' ')
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .slice(0, 15000);
+      const extracted = extractJobPosting(rawHtml);
+      const cleanText = extracted.text.slice(0, 15000);
+      const looksBlocked = cleanText.length < 120 || /captcha|access denied|sign in to continue|enable javascript|cloudflare ray id/i.test(cleanText);
+      if (looksBlocked) return res.status(200).json({ success: false, blocked: true, code: 'FETCH_BLOCKED', error: JOB_FETCH_BLOCKED_MESSAGE });
 
       // Extract title from HTML title tag if available
       const titleMatch = rawHtml.match(/<title[^>]*>([^<]+)<\/title>/i);
-      const pageTitle = titleMatch ? titleMatch[1].trim().split(/[-|•–—]/)[0].trim() : '';
+      const pageTitle = extracted.title || (titleMatch ? stripJobHtml(titleMatch[1]).split(/[-|•–—]/)[0].trim() : '');
 
       return res.status(200).json({
         success: true,
@@ -356,12 +473,11 @@ export default async function handler(req, res) {
         suggestedTitle: pageTitle
       });
     } catch (err) {
-      const isAbort = err.name === 'AbortError';
       return res.status(200).json({
         success: false,
         blocked: true,
         code: 'FETCH_BLOCKED',
-        error: "This job site blocks automatic reading. Paste the job description below and we'll analyze it directly."
+        error: JOB_FETCH_BLOCKED_MESSAGE
       });
     }
   }

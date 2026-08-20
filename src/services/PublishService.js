@@ -28,22 +28,29 @@ export function resolvePublishConfig(masterProfile, variant = null) {
   };
 }
 
-export async function verifyCustomDomainDNS(hostname, portfolioId) {
+async function domainRequest(action, hostname, portfolioId) {
   const { data } = await supabase.auth.getSession();
   const token = data?.session?.access_token;
   if (!token) throw new Error('Please sign in again.');
 
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
-  const connectResponse = await fetch('/api/portfolio?action=domain-connect', {
+  const response = await fetch(`/api/portfolio?action=${action}`, {
     method: 'POST', headers, body: JSON.stringify({ hostname, domain: hostname, portfolioId })
   });
-  const connected = await connectResponse.json().catch(() => ({}));
-  if (!connectResponse.ok) throw new Error(connected.error || 'Unable to connect domain.');
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(result.error || 'Unable to manage custom domain.');
+    error.code = result.code;
+    error.requiredEnvVars = result.requiredEnvVars;
+    throw error;
+  }
+  return result;
+}
 
-  const verifyResponse = await fetch('/api/portfolio?action=domain-verify', {
-    method: 'POST', headers, body: JSON.stringify({ domain: hostname, portfolioId })
-  });
-  const verified = await verifyResponse.json().catch(() => ({}));
-  if (!verifyResponse.ok) throw new Error(verified.error || 'Unable to verify domain.');
-  return { ...connected, ...verified, hostname: connected.domain, sslStatus: verified.sslStatus || 'not_provisioned' };
+export function connectCustomDomain(hostname, portfolioId) {
+  return domainRequest('domain-connect', hostname, portfolioId);
+}
+
+export function verifyCustomDomainDNS(hostname, portfolioId) {
+  return domainRequest('domain-verify', hostname, portfolioId);
 }
