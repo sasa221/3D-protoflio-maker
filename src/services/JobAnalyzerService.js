@@ -52,30 +52,13 @@ export class JobAnalyzerService {
     } = targetInput;
 
     const jdText = (jobDescription || '').trim();
-    const fullText = `${role} ${company} ${jdText}`;
+    const fullText = `${role} ${company} ${jdText}`.trim();
 
-    // Extract structured requirements
-    const { requiredSkills, preferredSkills } = this._extractSkills(jdText);
-    const requiredExperienceYears = this._extractExperienceYears(jdText);
-    const requiredEducation = this._extractEducation(jdText);
-    const requiredCertifications = this._extractCertifications(jdText);
-    const requiredLanguages = this._extractLanguages(jdText);
-    const seniority = this._extractSeniority(fullText);
-    const parsedEmploymentType = employmentType || this._extractEmploymentType(jdText);
-
-    // RULE (§12): Title alone or empty/insufficient text without requirements generates NO score.
-    const hasAnyRequirement =
-      jdText.length > 0 &&
-      (requiredSkills.length > 0 ||
-      preferredSkills.length > 0 ||
-      requiredExperienceYears !== null ||
-      requiredEducation !== null ||
-      requiredCertifications.length > 0 ||
-      jdText.split(/\s+/).filter(Boolean).length >= 20);
-
-    if (!hasAnyRequirement) {
+    // Reject short or empty input
+    if (jdText.length < 15 && (!role || role.length < 5)) {
       return {
         hasRequirements: false,
+        confidence: 'INSUFFICIENT',
         title: role || 'Target Role',
         company: company || '',
         location: location || '',
@@ -88,13 +71,65 @@ export class JobAnalyzerService {
         requiredCertifications: [],
         requiredLanguages: [],
         otherRequirements: [],
-        reason: 'We need the actual job requirements to calculate your fit.',
+        reason: "We couldn't identify enough job requirements to calculate a reliable Job Fit score. Please provide the full job description.",
+        analyzedAt: new Date().toISOString()
+      };
+    }
+
+    // Extract structured requirements
+    const { requiredSkills, preferredSkills } = this._extractSkills(jdText || fullText);
+    const requiredExperienceYears = this._extractExperienceYears(jdText || fullText);
+    const requiredEducation = this._extractEducation(jdText || fullText);
+    const requiredCertifications = this._extractCertifications(jdText || fullText);
+    const requiredLanguages = this._extractLanguages(jdText || fullText);
+    const seniority = this._extractSeniority(fullText);
+    const parsedEmploymentType = employmentType || this._extractEmploymentType(jdText);
+
+    // Calculate requirement dimensions
+    let dimensionsCount = 0;
+    if (requiredSkills.length > 0) dimensionsCount++;
+    if (preferredSkills.length > 0) dimensionsCount++;
+    if (requiredExperienceYears !== null) dimensionsCount++;
+    if (requiredEducation !== null) dimensionsCount++;
+    if (requiredCertifications.length > 0) dimensionsCount++;
+    if (requiredLanguages.length > 0) dimensionsCount++;
+
+    const totalRequirementsCount =
+      requiredSkills.length +
+      preferredSkills.length +
+      (requiredExperienceYears !== null ? 1 : 0) +
+      (requiredEducation !== null ? 1 : 0) +
+      requiredCertifications.length +
+      requiredLanguages.length;
+
+    // RELIABILITY GATE (§4):
+    // Requires at least TWO meaningful requirement dimensions OR at least THREE explicit requirements total.
+    const hasSufficientRequirements = dimensionsCount >= 2 || totalRequirementsCount >= 3;
+
+    if (!hasSufficientRequirements) {
+      return {
+        hasRequirements: false,
+        confidence: 'INSUFFICIENT',
+        title: role || 'Target Role',
+        company: company || '',
+        location: location || '',
+        employmentType: employmentType || '',
+        jobUrl: jobUrl || '',
+        requiredSkills,
+        preferredSkills,
+        requiredExperienceYears,
+        requiredEducation,
+        requiredCertifications,
+        requiredLanguages,
+        otherRequirements: [],
+        reason: "We couldn't identify enough job requirements to calculate a reliable Job Fit score. Please provide the full job description.",
         analyzedAt: new Date().toISOString()
       };
     }
 
     return {
-      hasRequirements: hasAnyRequirement,
+      hasRequirements: true,
+      confidence: totalRequirementsCount >= 5 ? 'HIGH' : 'MEDIUM',
       title: role || this._extractTitleFromText(jdText) || 'Target Role',
       company: company || '',
       location: location || '',
@@ -108,7 +143,7 @@ export class JobAnalyzerService {
       requiredCertifications,
       requiredLanguages,
       otherRequirements: [],
-      reason: hasAnyRequirement ? null : 'We need the actual job requirements to calculate your fit.',
+      reason: null,
       analyzedAt: new Date().toISOString()
     };
   }

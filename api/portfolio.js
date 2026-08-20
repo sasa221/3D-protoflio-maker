@@ -305,7 +305,8 @@ export default async function handler(req, res) {
         return res.status(200).json({
           success: false,
           blocked: true,
-          error: `Could not load job URL (HTTP ${response.status}). Please paste the job description text below.`
+          code: 'FETCH_BLOCKED',
+          error: "This job site blocks automatic reading. Paste the job description below and we'll analyze it directly."
         });
       }
 

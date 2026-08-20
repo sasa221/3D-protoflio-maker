@@ -74,8 +74,10 @@ export function matchPortfolioToJob(portfolioData = {}, normalizedJob = {}) {
   const importantGaps = [];
   const niceToHaveGaps = [];
 
+  const evaluableCategories = [];
+
   // ──────────────────────────────────────────────
-  // 1. REQUIRED SKILLS (35%)
+  // 1. REQUIRED SKILLS (Base Weight: 35)
   // ──────────────────────────────────────────────
   let reqSkillsMatched = 0;
   reqSkills.forEach(reqSkill => {
@@ -98,17 +100,39 @@ export function matchPortfolioToJob(portfolioData = {}, normalizedJob = {}) {
       });
     }
   });
-  const reqSkillsScore = reqSkills.length > 0 ? (reqSkillsMatched / reqSkills.length) * 100 : 100;
+
+  if (reqSkills.length > 0) {
+    const reqSkillsScore = Math.round((reqSkillsMatched / reqSkills.length) * 100);
+    evaluableCategories.push({
+      key: 'requiredSkills',
+      category: 'Required Skills',
+      baseWeight: 35,
+      score: reqSkillsScore,
+      scoreDisplay: `${reqSkillsScore}%`,
+      isApplicable: true,
+      detail: `${reqSkillsMatched} of ${reqSkills.length} required skills matched`
+    });
+  } else {
+    evaluableCategories.push({
+      key: 'requiredSkills',
+      category: 'Required Skills',
+      baseWeight: 0,
+      score: null,
+      scoreDisplay: 'N/A',
+      isApplicable: false,
+      detail: 'Not specified by employer'
+    });
+  }
 
   // ──────────────────────────────────────────────
-  // 2. RELEVANT EXPERIENCE (25%)
+  // 2. RELEVANT EXPERIENCE (Base Weight: 25)
   // ──────────────────────────────────────────────
   const requiredExpYears = normalizedJob.requiredExperienceYears;
-  let candidateTotalYears = calculateExperienceYears(candidateExperience);
-  let expScore = 100;
-  let expEvidenceText = '';
+  const candidateTotalYears = calculateExperienceYears(candidateExperience);
 
   if (requiredExpYears !== null && requiredExpYears > 0) {
+    let expScore = 0;
+    let expEvidenceText = '';
     if (candidateTotalYears >= requiredExpYears) {
       expScore = 100;
       expEvidenceText = `${candidateTotalYears} years documented (Required: ${requiredExpYears}+ years)`;
@@ -129,66 +153,99 @@ export function matchPortfolioToJob(portfolioData = {}, normalizedJob = {}) {
         guidance: `Ensure all previous relevant employment and internship positions are listed in your experience section.`
       });
     } else {
-      expScore = candidateExperience.length > 0 ? 60 : 20;
-      expEvidenceText = candidateExperience.length > 0 ? `${candidateExperience.length} positions documented` : 'No experience documented';
-      if (candidateExperience.length === 0) {
-        importantGaps.push({
-          skill: 'Work Experience',
-          level: 'IMPORTANT',
-          state: 'NOT FOUND',
-          message: 'No professional experience entries documented in portfolio.',
-          guidance: 'Add your relevant work history, internships, or freelance roles to demonstrate practical background.'
-        });
-      }
-    }
-  } else {
-    // No specific year requirement in JD
-    expScore = candidateExperience.length > 0 ? 100 : 70;
-    expEvidenceText = candidateExperience.length > 0 ? `${candidateExperience.length} experience roles documented` : 'Not explicitly required';
-  }
-
-  // ──────────────────────────────────────────────
-  // 3. PROJECTS / EVIDENCE (15%)
-  // ──────────────────────────────────────────────
-  let projectsWithReqSkills = 0;
-  candidateProjects.forEach(p => {
-    const pText = `${p.name || ''} ${p.description || ''} ${p.tech || ''}`.toLowerCase();
-    const hasMatch = reqSkills.some(rs => pText.includes(rs.toLowerCase()));
-    if (hasMatch) projectsWithReqSkills++;
-  });
-
-  let projectsScore = 0;
-  if (candidateProjects.length > 0) {
-    if (reqSkills.length === 0) {
-      projectsScore = 100;
-    } else {
-      projectsScore = projectsWithReqSkills > 0 ? Math.min(100, Math.round((projectsWithReqSkills / Math.min(3, candidateProjects.length)) * 100)) : 40;
-    }
-    if (projectsWithReqSkills > 0) {
-      matchedEvidence.push({
-        type: 'project',
-        title: 'Project Proof',
-        state: 'MATCHED',
-        evidence: `${projectsWithReqSkills} project(s) demonstrate practical application of required skills`
+      expScore = 0;
+      expEvidenceText = '0 years documented of ' + requiredExpYears + ' required';
+      importantGaps.push({
+        skill: 'Work Experience',
+        level: 'IMPORTANT',
+        state: 'NOT FOUND',
+        message: 'No professional experience entries documented in portfolio.',
+        guidance: 'Add your relevant work history, internships, or freelance roles to demonstrate practical background.'
       });
     }
+
+    evaluableCategories.push({
+      key: 'relevantExperience',
+      category: 'Relevant Experience',
+      baseWeight: 25,
+      score: expScore,
+      scoreDisplay: `${expScore}%`,
+      isApplicable: true,
+      detail: expEvidenceText
+    });
   } else {
-    projectsScore = 0;
-    importantGaps.push({
-      skill: 'Portfolio Projects',
-      level: 'IMPORTANT',
-      state: 'NOT FOUND',
-      message: 'No projects added to your portfolio.',
-      guidance: 'Add real-world projects or case studies demonstrating your skills.'
+    evaluableCategories.push({
+      key: 'relevantExperience',
+      category: 'Relevant Experience',
+      baseWeight: 0,
+      score: null,
+      scoreDisplay: 'N/A',
+      isApplicable: false,
+      detail: 'Not specified by employer'
     });
   }
 
   // ──────────────────────────────────────────────
-  // 4. EDUCATION (10%)
+  // 3. PROJECTS & EVIDENCE (Base Weight: 15)
   // ──────────────────────────────────────────────
-  let educationScore = 100;
-  let eduEvidenceText = '';
+  if (reqSkills.length > 0) {
+    let projectsWithReqSkills = 0;
+    candidateProjects.forEach(p => {
+      const pText = `${p.name || ''} ${p.description || ''} ${p.tech || ''}`.toLowerCase();
+      const hasMatch = reqSkills.some(rs => pText.includes(rs.toLowerCase()));
+      if (hasMatch) projectsWithReqSkills++;
+    });
+
+    let projectsScore = 0;
+    if (candidateProjects.length > 0) {
+      // Direct ratio: matched projects / total projects
+      projectsScore = Math.round((projectsWithReqSkills / candidateProjects.length) * 100);
+      if (projectsWithReqSkills > 0) {
+        matchedEvidence.push({
+          type: 'project',
+          title: 'Project Evidence',
+          state: 'MATCHED',
+          evidence: `${projectsWithReqSkills} of ${candidateProjects.length} project(s) demonstrate required skills`
+        });
+      }
+    } else {
+      projectsScore = 0;
+      importantGaps.push({
+        skill: 'Portfolio Projects',
+        level: 'IMPORTANT',
+        state: 'NOT FOUND',
+        message: 'No projects added to your portfolio.',
+        guidance: 'Add real-world projects or case studies demonstrating your skills.'
+      });
+    }
+
+    evaluableCategories.push({
+      key: 'projectsEvidence',
+      category: 'Projects & Evidence',
+      baseWeight: 15,
+      score: projectsScore,
+      scoreDisplay: `${projectsScore}%`,
+      isApplicable: true,
+      detail: candidateProjects.length > 0 ? `${projectsWithReqSkills} of ${candidateProjects.length} projects demonstrate required skills` : '0 projects documented'
+    });
+  } else {
+    evaluableCategories.push({
+      key: 'projectsEvidence',
+      category: 'Projects & Evidence',
+      baseWeight: 0,
+      score: null,
+      scoreDisplay: 'N/A',
+      isApplicable: false,
+      detail: 'Not specified by employer'
+    });
+  }
+
+  // ──────────────────────────────────────────────
+  // 4. EDUCATION (Base Weight: 10)
+  // ──────────────────────────────────────────────
   if (normalizedJob.requiredEducation) {
+    let educationScore = 0;
+    let eduEvidenceText = '';
     if (candidateEducation.length > 0) {
       educationScore = 100;
       eduEvidenceText = candidateEducation[0].degree || candidateEducation[0].institution || 'Documented degree';
@@ -199,7 +256,8 @@ export function matchPortfolioToJob(portfolioData = {}, normalizedJob = {}) {
         evidence: `${eduEvidenceText} (Matches required: ${normalizedJob.requiredEducation})`
       });
     } else {
-      educationScore = 30;
+      educationScore = 0;
+      eduEvidenceText = '0 education entries documented';
       importantGaps.push({
         skill: 'Education Qualification',
         level: 'IMPORTANT',
@@ -208,28 +266,46 @@ export function matchPortfolioToJob(portfolioData = {}, normalizedJob = {}) {
         guidance: 'Add your degree or academic background if applicable.'
       });
     }
+
+    evaluableCategories.push({
+      key: 'education',
+      category: 'Education',
+      baseWeight: 10,
+      score: educationScore,
+      scoreDisplay: `${educationScore}%`,
+      isApplicable: true,
+      detail: eduEvidenceText
+    });
   } else {
-    educationScore = candidateEducation.length > 0 ? 100 : 80;
-    eduEvidenceText = candidateEducation.length > 0 ? `${candidateEducation[0].degree || 'Documented'}` : 'Not strictly specified in posting';
+    evaluableCategories.push({
+      key: 'education',
+      category: 'Education',
+      baseWeight: 0,
+      score: null,
+      scoreDisplay: 'N/A',
+      isApplicable: false,
+      detail: 'Not specified by employer'
+    });
   }
 
   // ──────────────────────────────────────────────
-  // 5. CERTIFICATIONS (5%)
+  // 5. CERTIFICATIONS (Base Weight: 5)
   // ──────────────────────────────────────────────
-  let certsScore = 100;
   if (normalizedJob.requiredCertifications && normalizedJob.requiredCertifications.length > 0) {
     const certNames = candidateCerts.map(c => (c.name || c.title || '').toLowerCase());
     const matchedCerts = normalizedJob.requiredCertifications.filter(rc => certNames.some(cn => cn.includes(rc.toLowerCase())));
+    const certsScore = Math.round((matchedCerts.length / normalizedJob.requiredCertifications.length) * 100);
+
     if (matchedCerts.length > 0) {
-      certsScore = 100;
       matchedEvidence.push({
         type: 'certification',
         title: 'Certifications',
         state: 'MATCHED',
         evidence: `Matching: ${matchedCerts.join(', ')}`
       });
-    } else {
-      certsScore = 0;
+    }
+
+    if (matchedCerts.length < normalizedJob.requiredCertifications.length) {
       importantGaps.push({
         skill: 'Certifications',
         level: 'IMPORTANT',
@@ -238,67 +314,126 @@ export function matchPortfolioToJob(portfolioData = {}, normalizedJob = {}) {
         guidance: 'If you hold these certifications, add them under the Certifications section.'
       });
     }
+
+    evaluableCategories.push({
+      key: 'certifications',
+      category: 'Certifications',
+      baseWeight: 5,
+      score: certsScore,
+      scoreDisplay: `${certsScore}%`,
+      isApplicable: true,
+      detail: `${matchedCerts.length} of ${normalizedJob.requiredCertifications.length} required certs matched`
+    });
   } else {
-    certsScore = candidateCerts.length > 0 ? 100 : 80;
+    evaluableCategories.push({
+      key: 'certifications',
+      category: 'Certifications',
+      baseWeight: 0,
+      score: null,
+      scoreDisplay: 'N/A',
+      isApplicable: false,
+      detail: 'Not specified by employer'
+    });
   }
 
   // ──────────────────────────────────────────────
-  // 6. PREFERRED SKILLS (5%)
+  // 6. PREFERRED SKILLS (Base Weight: 5)
   // ──────────────────────────────────────────────
-  let prefSkillsMatched = 0;
-  prefSkills.forEach(prefSkill => {
-    const matched = candidateSkills.find(cs => isStrictSkillMatch(cs, prefSkill));
-    if (matched) {
-      prefSkillsMatched++;
-      matchedEvidence.push({
-        type: 'preferred_skill',
-        title: `Preferred: ${prefSkill}`,
-        state: 'MATCHED',
-        evidence: `Bonus skill: "${matched}"`
-      });
-    } else {
-      niceToHaveGaps.push({
-        skill: prefSkill,
-        level: 'NICE_TO_HAVE',
-        state: 'NOT FOUND',
-        message: `Preferred by job, not listed in portfolio.`,
-        guidance: `If you have familiarity with ${prefSkill}, consider mentioning it in project descriptions.`
-      });
-    }
-  });
-  const prefSkillsScore = prefSkills.length > 0 ? (prefSkillsMatched / prefSkills.length) * 100 : 100;
+  if (prefSkills.length > 0) {
+    let prefSkillsMatched = 0;
+    prefSkills.forEach(prefSkill => {
+      const matched = candidateSkills.find(cs => isStrictSkillMatch(cs, prefSkill));
+      if (matched) {
+        prefSkillsMatched++;
+        matchedEvidence.push({
+          type: 'preferred_skill',
+          title: `Preferred: ${prefSkill}`,
+          state: 'MATCHED',
+          evidence: `Bonus skill: "${matched}"`
+        });
+      } else {
+        niceToHaveGaps.push({
+          skill: prefSkill,
+          level: 'NICE_TO_HAVE',
+          state: 'NOT FOUND',
+          message: `Preferred by job, not listed in portfolio.`,
+          guidance: `If you have familiarity with ${prefSkill}, consider mentioning it in project descriptions.`
+        });
+      }
+    });
+
+    const prefSkillsScore = Math.round((prefSkillsMatched / prefSkills.length) * 100);
+    evaluableCategories.push({
+      key: 'preferredSkills',
+      category: 'Preferred Skills',
+      baseWeight: 5,
+      score: prefSkillsScore,
+      scoreDisplay: `${prefSkillsScore}%`,
+      isApplicable: true,
+      detail: `${prefSkillsMatched} of ${prefSkills.length} bonus skills matched`
+    });
+  } else {
+    evaluableCategories.push({
+      key: 'preferredSkills',
+      category: 'Preferred Skills',
+      baseWeight: 0,
+      score: null,
+      scoreDisplay: 'N/A',
+      isApplicable: false,
+      detail: 'Not specified by employer'
+    });
+  }
 
   // ──────────────────────────────────────────────
-  // 7. WEIGHTED OVERALL SCORE CALCULATION (§16)
+  // 7. DYNAMIC WEIGHT NORMALIZATION & SCORING (§2)
   // ──────────────────────────────────────────────
-  const finalScore = Math.min(100, Math.max(0, Math.round(
-    reqSkillsScore * WEIGHTS.requiredSkills +
-    expScore * WEIGHTS.relevantExperience +
-    projectsScore * WEIGHTS.projectsEvidence +
-    educationScore * WEIGHTS.education +
-    certsScore * WEIGHTS.certifications +
-    prefSkillsScore * WEIGHTS.preferredSkills +
-    100 * WEIGHTS.otherRequirements
-  )));
+  const activeCategories = evaluableCategories.filter(c => c.isApplicable && c.score !== null);
+  const totalActiveWeight = activeCategories.reduce((sum, c) => sum + c.baseWeight, 0);
+
+  let rawScore = 0;
+  if (totalActiveWeight > 0) {
+    const weightedSum = activeCategories.reduce((sum, c) => sum + (c.score * c.baseWeight), 0);
+    rawScore = Math.round(weightedSum / totalActiveWeight);
+  }
 
   // ──────────────────────────────────────────────
-  // 8. VERDICT & APPLY RECOMMENDATION (§17)
+  // 8. CONSERVATIVE SCORE CAPS & GUARDS (§10)
+  // ──────────────────────────────────────────────
+  let finalScore = rawScore;
+
+  // CAP 1: If required skills exist and 0 were matched, max score is 40%
+  if (reqSkills.length > 0 && reqSkillsMatched === 0) {
+    finalScore = Math.min(finalScore, 40);
+  }
+
+  // CAP 2: If NO direct evidence matched across entire portfolio, max score is 25%
+  if (matchedEvidence.length === 0) {
+    finalScore = Math.min(finalScore, 25);
+  }
+
+  // CAP 3: If mandatory hard requirements are missing, max score is 75%
+  if (criticalGaps.length > 0) {
+    finalScore = Math.min(finalScore, 75);
+  }
+
+  // ──────────────────────────────────────────────
+  // 9. VERDICT & APPLY RECOMMENDATION (§11)
   // ──────────────────────────────────────────────
   let verdict = 'WEAK FIT';
   let applyAdvice = 'LOW PRIORITY — Major mandatory qualifications missing';
   let applyAdviceType = 'low_priority';
 
-  if (finalScore >= 80 && criticalGaps.length === 0) {
+  if (finalScore >= 85 && criticalGaps.length === 0 && matchedEvidence.length >= 2) {
     verdict = 'STRONG FIT';
-    applyAdvice = 'YES — Strong candidate for this role';
+    applyAdvice = 'YES — Strong candidate with verified matching qualifications';
     applyAdviceType = 'yes_strong';
-  } else if (finalScore >= 65 && criticalGaps.length <= 2) {
+  } else if (finalScore >= 70 && criticalGaps.length <= 1 && matchedEvidence.length >= 1) {
     verdict = 'GOOD FIT';
-    applyAdvice = 'YES — But address critical gaps before applying';
+    applyAdvice = 'YES — Good fit, but address minor gaps in your portfolio';
     applyAdviceType = 'yes_with_gaps';
-  } else if (finalScore >= 50) {
+  } else if (finalScore >= 50 && matchedEvidence.length >= 1) {
     verdict = 'POSSIBLE FIT';
-    applyAdvice = 'POSSIBLY — Important job requirements are missing from your portfolio';
+    applyAdvice = 'CONSIDER — Meets some requirements, but notable qualification gaps exist';
     applyAdviceType = 'possibly';
   } else {
     verdict = 'WEAK FIT';
@@ -306,43 +441,17 @@ export function matchPortfolioToJob(portfolioData = {}, normalizedJob = {}) {
     applyAdviceType = 'low_priority';
   }
 
-  // ──────────────────────────────────────────────
-  // 9. AUDITABLE CATEGORY BREAKDOWN (§19)
-  // ──────────────────────────────────────────────
-  const breakdown = [
-    {
-      category: 'Required Skills',
-      weight: '35%',
-      score: Math.round(reqSkillsScore),
-      detail: reqSkills.length > 0 ? `${reqSkillsMatched} of ${reqSkills.length} required skills matched` : 'No explicit skills listed in job'
-    },
-    {
-      category: 'Relevant Experience',
-      weight: '25%',
-      score: Math.round(expScore),
-      detail: expEvidenceText || `${candidateExperience.length} positions documented`
-    },
-    {
-      category: 'Projects & Evidence',
-      weight: '15%',
-      score: Math.round(projectsScore),
-      detail: candidateProjects.length > 0 ? `${projectsWithReqSkills} of ${candidateProjects.length} projects demonstrate required skills` : '0 projects documented'
-    },
-    {
-      category: 'Education',
-      weight: '10%',
-      score: Math.round(educationScore),
-      detail: eduEvidenceText || 'Documented'
-    },
-    {
-      category: 'Preferred Skills',
-      weight: '5%',
-      score: Math.round(prefSkillsScore),
-      detail: prefSkills.length > 0 ? `${prefSkillsMatched} of ${prefSkills.length} bonus skills matched` : 'None specified'
-    }
-  ];
+  // Auditable breakdown table with dynamic normalized weights
+  const breakdown = evaluableCategories.map(c => ({
+    category: c.category,
+    weight: c.isApplicable && totalActiveWeight > 0 ? `${Math.round((c.baseWeight / totalActiveWeight) * 100)}%` : 'Excluded (N/A)',
+    score: c.score,
+    scoreDisplay: c.scoreDisplay,
+    isApplicable: c.isApplicable,
+    detail: c.detail
+  }));
 
-  // Backward compatibility aliases for existing tests
+  // Backward compatibility aliases
   const strengths = matchedEvidence.map(e => e.evidence ? `${e.title}: ${e.evidence}` : e.title);
   const gaps = [...criticalGaps, ...importantGaps, ...niceToHaveGaps];
   const recommendedProjectOrder = rankProjects(candidateProjects, reqSkills);
@@ -350,11 +459,14 @@ export function matchPortfolioToJob(portfolioData = {}, normalizedJob = {}) {
 
   return {
     hasRequirements: true,
+    confidence: normalizedJob.confidence || 'MEDIUM',
     matchScore: finalScore,
     verdict,
     applyAdvice,
     applyAdviceType,
     breakdown,
+    evaluableCategories,
+    totalActiveWeight,
     matchedEvidence,
     criticalGaps,
     importantGaps,
@@ -364,10 +476,10 @@ export function matchPortfolioToJob(portfolioData = {}, normalizedJob = {}) {
     recommendedProjectOrder,
     recommendedSkillOrder,
     scoreBreakdown: {
-      skills: Math.round(reqSkillsScore),
-      projects: Math.round(projectsScore),
-      experience: Math.round(expScore),
-      educationCerts: Math.round(educationScore)
+      skills: activeCategories.find(c => c.key === 'requiredSkills')?.score || 0,
+      projects: activeCategories.find(c => c.key === 'projectsEvidence')?.score || 0,
+      experience: activeCategories.find(c => c.key === 'relevantExperience')?.score || 0,
+      educationCerts: activeCategories.find(c => c.key === 'education')?.score || 0
     },
     suggestedCopy: {
       suggestedHeadline: portfolioData.profession || normalizedJob.title || 'Front-End Developer',

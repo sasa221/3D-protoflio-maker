@@ -238,8 +238,13 @@ export function renderJobTargetPanel(container, portfolioData, onUpdatePortfolio
 
         <!-- 5. AUDITABLE CATEGORY BREAKDOWN TABLE (§19) -->
         <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 16px; margin-bottom: 16px;">
-          <div style="font-size: 0.82rem; font-weight: 800; color: #a855f7; margin-bottom: 12px; letter-spacing: 0.5px; text-transform: uppercase;">
-            📊 Auditable Score Breakdown
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div style="font-size: 0.82rem; font-weight: 800; color: #a855f7; letter-spacing: 0.5px; text-transform: uppercase;">
+              📊 Auditable Score Breakdown
+            </div>
+            <span style="font-size: 0.68rem; font-weight: 800; color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.06); padding: 2px 8px; border-radius: 6px;">
+              CONFIDENCE: ${analysis.confidence || 'MEDIUM'}
+            </span>
           </div>
 
           <div style="display: flex; flex-direction: column; gap: 8px;">
@@ -247,14 +252,14 @@ export function renderJobTargetPanel(container, portfolioData, onUpdatePortfolio
               <div style="background: rgba(0,0,0,0.3); border-radius: 10px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
                 <div>
                   <div style="font-size: 0.8rem; font-weight: 700; color: #fff;">
-                    ${item.category} <span style="font-size: 0.7rem; color: rgba(255,255,255,0.4); font-weight: normal;">(Weight: ${item.weight})</span>
+                    ${item.category} <span style="font-size: 0.7rem; color: rgba(255,255,255,0.4); font-weight: normal;">${item.isApplicable ? `(Normalized Weight: ${item.weight})` : '(Not specified by employer)'}</span>
                   </div>
                   <div style="font-size: 0.72rem; color: rgba(255,255,255,0.65); margin-top: 2px;">
                     ${item.detail}
                   </div>
                 </div>
-                <div style="font-size: 1.1rem; font-weight: 900; color: ${item.score >= 75 ? '#34d399' : item.score >= 50 ? '#38bdf8' : '#f87171'}; font-family: monospace;">
-                  ${item.score}%
+                <div style="font-size: 1.1rem; font-weight: 900; color: ${!item.isApplicable || item.score === null ? 'rgba(255,255,255,0.3)' : item.score >= 75 ? '#34d399' : item.score >= 50 ? '#38bdf8' : '#f87171'}; font-family: monospace;">
+                  ${item.scoreDisplay || (item.score !== null ? `${item.score}%` : 'N/A')}
                 </div>
               </div>
             `).join('')}
@@ -268,12 +273,12 @@ export function renderJobTargetPanel(container, portfolioData, onUpdatePortfolio
           </button>
         </div>
       ` : analysis && !analysis.hasRequirements ? `
-        <!-- NO REQUIREMENTS WARNING (§12) -->
+        <!-- INSUFFICIENT JOB REQUIREMENTS WARNING (§3, §4, §12) -->
         <div style="background: rgba(234,179,8,0.06); border: 1px solid rgba(234,179,8,0.25); border-radius: 14px; padding: 18px; margin-bottom: 16px; text-align: center;">
           <span style="font-size: 24px; display: block; margin-bottom: 6px;">ℹ️</span>
-          <strong style="color: #fde047; font-size: 14px; display: block; margin-bottom: 6px;">We need the actual job requirements to calculate your fit.</strong>
+          <strong style="color: #fde047; font-size: 14px; display: block; margin-bottom: 6px;">${analysis.reason || "We couldn't identify enough job requirements to calculate a reliable Job Fit score."}</strong>
           <p style="color: rgba(255,255,255,0.7); font-size: 12px; margin: 0; line-height: 1.5;">
-            A job title alone cannot generate an accurate match score. Please paste the job description text above or provide a valid job posting URL.
+            Paste the complete job description, including requirements and qualifications, for an accurate analysis.
           </p>
         </div>
       ` : ''}
