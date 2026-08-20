@@ -325,10 +325,10 @@ export function renderJobTargetPanel(container, portfolioData, onUpdatePortfolio
           }
           showFeedback(feedback, '✓ Job requirements extracted successfully. Click "Calculate Evidence-Based Job Fit" below.', 'success');
         } else {
-          showFeedback(feedback, result.error || 'Could not load job URL. Please paste the job description text directly.', 'error');
+          showFeedback(feedback, result.error || "This job site blocks automatic reading. Paste the job description below and we'll analyze it directly.", 'error');
         }
       } catch (err) {
-        showFeedback(feedback, 'Could not access job site automatically. Please paste the job description below.', 'error');
+        showFeedback(feedback, "This job site blocks automatic reading. Paste the job description below and we'll analyze it directly.", 'error');
       } finally {
         btnFetchUrl.disabled = false;
         btnFetchUrl.textContent = '⚡ Fetch Posting';

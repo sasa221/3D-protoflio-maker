@@ -92,35 +92,76 @@ async function runLiveAcceptance() {
   console.log('  Rendered Theme Cards:', themeCardCount || 15);
 
   // Optimize - Job Fit Analyzer
-  console.log('\n▶ JOB FIT ANALYZER LIVE AUDIT (§12, §16, §17):');
+  console.log('\n▶ JOB FIT ANALYZER LIVE AUDIT (§12, §16, §17, §18):');
   await page.evaluate(() => window.switchWorkspace && window.switchWorkspace('optimize'));
   await page.waitForTimeout(800);
 
-  // Test A: Title alone
   const roleEl = page.locator('#jt-role');
   const jdEl = page.locator('#jt-jd');
   const btnRun = page.locator('#btn-run-job-analysis');
+  const urlEl = page.locator('#jt-url');
+  const btnFetchUrl = page.locator('#btn-extract-job-url');
+  const panel = page.locator('.job-target-panel');
 
   if (await roleEl.count() > 0) {
+    // 1. Nonsense Arabic input ("بحبك")
+    await roleEl.fill('');
+    await jdEl.fill('بحبك');
+    await btnRun.click();
+    await page.waitForTimeout(400);
+    const t1 = await panel.textContent();
+    const t1Pass = !t1.includes('% Job Fit') && t1.includes("We couldn't identify enough job requirements");
+    console.log('  TEST 1 ("بحبك"): No fake score, notice present =', t1Pass ? 'PASS' : 'FAIL');
+
+    // 2. Generic title alone ("sales")
     await roleEl.fill('sales');
     await jdEl.fill('');
     await btnRun.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(400);
+    const t2 = await panel.textContent();
+    const t2Pass = !t2.includes('% Job Fit') && t2.includes("We couldn't identify enough job requirements");
+    console.log('  TEST 2 ("sales"): No fake score, notice present =', t2Pass ? 'PASS' : 'FAIL');
 
-    const testAText = await page.locator('.job-target-panel').textContent();
-    const hasZeroScoreNotice = testAText.includes('We need the actual job requirements to calculate your fit');
-    console.log('  TEST A (Title alone): No fake score notice =', hasZeroScoreNotice ? 'PASS' : 'FAIL');
+    // 3. Vague sentence ("Need someone to create a simple landing page")
+    await roleEl.fill('Web Builder');
+    await jdEl.fill('Need someone to create a simple landing page for my business.');
+    await btnRun.click();
+    await page.waitForTimeout(400);
+    const t3 = await panel.textContent();
+    const t3Pass = !t3.includes('% Job Fit') && t3.includes("We couldn't identify enough job requirements");
+    console.log('  TEST 3 (Vague sentence): No fake score, notice present =', t3Pass ? 'PASS' : 'FAIL');
 
-    // Test B: Pasted JD
-    await jdEl.fill('Required: JavaScript, HTML5, CSS3, React, Node.js, SQL. Minimum 2 years of experience. Bachelor degree in Computer Science.');
+    // 4. Controlled Realistic JD (React, TypeScript, Git, 3 yrs)
+    await roleEl.fill('Frontend Developer');
+    await jdEl.fill('Required: React, TypeScript, Git. Minimum 3 years frontend development.');
     await btnRun.click();
     await page.waitForTimeout(500);
+    const t4 = await panel.textContent();
+    const hasJobFitScore = t4.includes('Job Fit');
+    const hasCriticalGaps = t4.includes('CRITICAL GAPS');
+    const hasNAEdu = t4.includes('Education') && (t4.includes('Not specified by employer') || t4.includes('N/A'));
+    console.log('  TEST 4 (Realistic JD with Gaps):', {
+      fitScoreCalculated: hasJobFitScore ? 'PASS' : 'FAIL',
+      criticalGapsFlagged: hasCriticalGaps ? 'PASS' : 'FAIL',
+      emptyEducationIsNA: hasNAEdu ? 'PASS' : 'FAIL'
+    });
 
-    const testBText = await page.locator('.job-target-panel').textContent();
-    const hasJobFitScore = testBText.includes('Job Fit');
-    const hasEvidence = testBText.includes('WHAT YOU MATCH');
-    const hasGaps = testBText.includes('CRITICAL GAPS');
-    console.log('  TEST B (Pasted JD): Fit calculated =', hasJobFitScore && hasEvidence && hasGaps ? 'PASS' : 'FAIL');
+    // 5. URL Input Usability & Paste
+    await urlEl.fill('https://careers.google.com/jobs/results/123456');
+    const typedUrl = await urlEl.inputValue();
+    console.log('  TEST 5 (URL Input Usability & Paste):', typedUrl === 'https://careers.google.com/jobs/results/123456' ? 'PASS' : 'FAIL');
+
+    // 6. Blocked URL Fetch Handling (No raw HTTP 403 shown)
+    await urlEl.fill('https://httpstat.us/403');
+    await btnFetchUrl.click();
+    await page.waitForTimeout(1200);
+    const feedbackText = await page.locator('#url-fetch-feedback').textContent();
+    const noRaw403 = !feedbackText.includes('HTTP 403');
+    const hasFriendlyText = feedbackText.includes('blocks automatic reading') || feedbackText.includes('paste the job description');
+    console.log('  TEST 6 (Customer 403 Handling):', {
+      rawHttp403Hidden: noRaw403 ? 'PASS' : 'FAIL',
+      friendlyFallbackShown: hasFriendlyText ? 'PASS' : 'FAIL'
+    });
   }
 
   // Publish - Free user dual upsell

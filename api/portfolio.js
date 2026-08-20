@@ -341,9 +341,8 @@ export default async function handler(req, res) {
       return res.status(200).json({
         success: false,
         blocked: true,
-        error: isAbort
-          ? 'Job site request timed out. Please paste the job description directly.'
-          : 'Could not access the job posting automatically. Please paste the job description below.'
+        code: 'FETCH_BLOCKED',
+        error: "This job site blocks automatic reading. Paste the job description below and we'll analyze it directly."
       });
     }
   }
