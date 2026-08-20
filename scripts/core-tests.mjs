@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { runCVParserTestSuite } from '../src/tests/CVParserFixtures.js';
 import { runJobTargetingTestSuite } from '../src/tests/JobMatcherFixtures.js';
+import { runThemeCatalogIntegrityTestSuite } from '../src/tests/ThemeCatalogIntegrityTestSuite.mjs';
 import { getThemeById } from '../src/three/ProceduralTheme.js';
 import { EntitlementService, PLAN_CONFIG } from '../src/services/EntitlementService.js';
 import { PRODUCT_CONFIG } from '../src/config/ProductConfig.js';
@@ -12,6 +13,8 @@ assert.ok(cvResults.every(result => result.passed), 'CV parser acceptance suite 
 
 const jobResults = runJobTargetingTestSuite();
 assert.ok(jobResults.every(result => result.passed), 'Job targeting acceptance suite failed');
+
+runThemeCatalogIntegrityTestSuite();
 
 assert.equal(getThemeById('cyber').id, 'hacker', 'Legacy cyber theme alias must resolve to Cyber Command');
 assert.equal(getThemeById('hacker').name, 'Cyber Command');
