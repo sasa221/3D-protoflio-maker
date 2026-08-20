@@ -4,7 +4,7 @@
  * All prices from PlanConfig.js.
  */
 
-import { PLANS, GROUP_SEAT_PRICING, GROUP_SEAT_MIN, GROUP_SEAT_MAX, KEEP_IT_LIVE, formatPrice } from '../config/PlanConfig.js';
+import { PLANS, GROUP_SEAT_PRICING, GROUP_SEAT_MIN, GROUP_SEAT_MAX, KEEP_IT_LIVE, formatPrice, formatEGP } from '../config/PlanConfig.js';
 import { isFeatureEnabled } from '../config/FeatureFlags.js';
 
 /**
