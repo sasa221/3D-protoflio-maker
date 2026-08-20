@@ -1820,7 +1820,7 @@ export function renderPublishTab() {
             <div style="display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;font-weight:900;">✓</span> Premium themes</div>
             <div style="display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;font-weight:900;">✓</span> Remove branding</div>
             <div style="display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;font-weight:900;">✓</span> Premium capabilities</div>
-            <div style="display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;font-weight:900;">✓</span> Custom domain support when available</div>
+            <div style="display:flex;align-items:center;gap:6px;"><span style="color:#4ade80;font-weight:900;">✓</span> Custom domain connection</div>
           </div>
 
           <button id="btn-upgrade-premium-publish" class="btn btn-primary" onclick="openBillingModal({targetPlan:'premium'})" style="width:100%;padding:13px;font-size:0.88rem;font-weight:800;background:linear-gradient(135deg,#0891b2,#7c3aed);color:#fff;border-radius:10px;box-shadow:0 6px 18px rgba(6,182,212,0.35);cursor:pointer;border:none;">

@@ -606,7 +606,7 @@ export async function renderLandingPage(container) {
                 <li>✓ Everything in Pro</li>
                 <li>✓ All 15 Themes</li>
                 <li>✓ Remove Branding</li>
-                <li>✓ Custom Domain (Coming Soon)</li>
+                <li>✓ Custom Domain connection</li>
                 <li>✓ Advanced Analytics</li>
               </ul>
             </div>
@@ -675,7 +675,7 @@ export async function renderLandingPage(container) {
           <details style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; cursor: pointer;">
             <summary style="font-weight: 700; font-size: 1rem; color: #fff;">Can I use my own custom domain?</summary>
             <p style="margin-top: 10px; font-size: 0.9rem; color: rgba(255,255,255,0.65); line-height: 1.6;">
-              Custom domains are a Premium feature and currently marked as Coming Soon.
+              Custom domains are a Premium feature. Vercel provides the required DNS record and activates the domain only after verification and secure serving are ready.
             </p>
           </details>
 

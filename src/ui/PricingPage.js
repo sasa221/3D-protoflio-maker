@@ -200,7 +200,7 @@ function getPlanFeatures(planId) {
         'All themes',
         'Premium themes',
         'Advanced analytics',
-        'Custom Domain (coming soon)',
+        'Custom Domain connection',
         'Remove branding',
         'Hosting included'
       ];
