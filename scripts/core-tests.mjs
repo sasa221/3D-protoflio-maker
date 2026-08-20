@@ -71,6 +71,19 @@ assert.ok(indexHtml.includes('"priceCurrency":"EGP"'), 'index.html structured da
 // 9. Job Fit Title-Alone No Score Rule & 10 Adversarial Truthfulness Tests (§18)
 const jobAnalyzer = new JobAnalyzerService();
 
+for (const [phrase, expectedYears] of [
+  ['Minimum 2 years', 2],
+  ['2+ years', 2],
+  ['at least 3 years', 3],
+  ['3 years of frontend development experience', 3]
+]) {
+  assert.equal(
+    jobAnalyzer._extractExperienceYears(phrase),
+    expectedYears,
+    `Job Fit experience parser must extract ${expectedYears} from "${phrase}"`
+  );
+}
+
 // TEST 1: Nonsense Arabic input ("بحبك")
 const t1Job = jobAnalyzer.analyzeJobTarget({ role: '', jobDescription: 'بحبك' });
 assert.equal(t1Job.hasRequirements, false, 'TEST 1: "بحبك" must not produce requirements');

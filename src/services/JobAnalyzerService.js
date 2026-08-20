@@ -193,9 +193,11 @@ export class JobAnalyzerService {
   }
 
   _extractExperienceYears(text) {
-    const match = text.match(/(\d+)\+?\s*(?:-\s*\d+\s*)?(?:years?|yrs?)(?:\s+of)?(?:\s+relevant|\s+professional|\s+work)?\s+experience/i)
-      || text.match(/experience\s*:\s*(\d+)\+?\s*(?:years?|yrs?)/i)
-      || text.match(/minimum\s*(?:of\s*)?(\d+)\s*(?:years?|yrs?)/i);
+    const match = text.match(/(?:minimum(?:\s+of)?|at\s+least)\s+(\d+)\+?\s*(?:years?|yrs?)/i)
+      || text.match(/(\d+)\+\s*(?:years?|yrs?)/i)
+      || text.match(/(\d+)\s*(?:years?|yrs?)\s+of\s+(?:[a-z][\w+./-]*\s+){0,6}experience/i)
+      || text.match(/(\d+)\+?\s*(?:-\s*\d+\s*)?(?:years?|yrs?)(?:\s+of)?(?:\s+relevant|\s+professional|\s+work)?\s+experience/i)
+      || text.match(/experience\s*:\s*(\d+)\+?\s*(?:years?|yrs?)/i);
 
     if (match && match[1]) {
       const num = parseInt(match[1], 10);
