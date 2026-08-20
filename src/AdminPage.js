@@ -37,6 +37,15 @@ let cachedData = {
 };
 
 export async function renderAdminPage() {
+  document.documentElement.style.overflowY = 'auto';
+  document.documentElement.style.overflowX = 'hidden';
+  document.documentElement.style.height = 'auto';
+  document.body.style.overflowY = 'auto';
+  document.body.style.overflowX = 'hidden';
+  document.body.style.height = 'auto';
+  document.body.style.width = '100%';
+  document.body.style.minHeight = '100vh';
+
   document.body.innerHTML = `
     <main class="admin-shell">
       <nav class="admin-nav">
@@ -100,6 +109,30 @@ export async function renderAdminPage() {
       currentTab = btn.dataset.tab;
       renderCurrentTab();
     });
+  });
+
+  // Modal backdrop click handlers
+  ['admin-user-modal', 'admin-payment-modal'].forEach(id => {
+    const modal = document.getElementById(id);
+    if (modal) {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.style.display = 'none';
+          document.body.style.overflowY = 'auto';
+        }
+      });
+    }
+  });
+
+  // Escape key handler
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const userModal = document.getElementById('admin-user-modal');
+      const payModal = document.getElementById('admin-payment-modal');
+      if (userModal && userModal.style.display !== 'none') userModal.style.display = 'none';
+      if (payModal && payModal.style.display !== 'none') payModal.style.display = 'none';
+      document.body.style.overflowY = 'auto';
+    }
   });
 
   document.getElementById('admin-refresh').addEventListener('click', loadAllData);

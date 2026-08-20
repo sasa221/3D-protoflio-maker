@@ -351,6 +351,9 @@ async function router() {
 }
 
 function renderAdminForbidden() {
+  document.documentElement.style.overflowY = 'auto';
+  document.body.style.overflowY = 'auto';
+  document.body.style.height = 'auto';
   document.body.innerHTML = `<main class="admin-forbidden"><div><span>🔒</span><h1>Admin access required</h1><p>This signed-in account does not have administrator permissions.</p><a href="/studio">Back to Studio</a></div></main>`;
 }
 
