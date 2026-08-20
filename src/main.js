@@ -44,7 +44,7 @@ import { isFeatureEnabled } from './config/FeatureFlags.js';
 import { PLANS } from './config/PlanConfig.js';
 import { renderCustomDomainPanel } from './ui/CustomDomainPanel.js';
 import { renderProductionReadinessPanel } from './ui/ProductionReadinessPanel.js';
-import { renderPricingPage } from './ui/PricingPage.js';
+import { renderPricingPage, getPricingStyles } from './ui/PricingPage.js';
 import confetti from 'canvas-confetti';
 
 // ─── STATE ─────────────────────────────────
@@ -276,6 +276,12 @@ async function router() {
   // 5. Public Pricing Route
   if (path === '/pricing') {
     setPageTitle('Pricing');
+    if (!document.getElementById('pricing-page-styles')) {
+      const style = document.createElement('style');
+      style.id = 'pricing-page-styles';
+      style.textContent = getPricingStyles();
+      document.head.appendChild(style);
+    }
     renderPricingPage(getAppContainer(), {
       currentPlan: globalEntitlements.getEffectivePlanId(),
       onSelectPlan: (planId) => planId === 'free'

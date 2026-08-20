@@ -121,7 +121,7 @@ function renderPlanCard(plan, currentPlan, planId) {
       <div class="pricing-card-cta">
         ${isCurrent
           ? '<button class="btn-plan btn-plan--current" disabled>Current Plan</button>'
-          : \`<button class="btn-plan ${isPopular ? 'btn-plan--primary' : ''}" data-plan-select="${planId}">${plan.cta}</button>\`
+          : `<button class="btn-plan ${isPopular ? 'btn-plan--primary' : ''}" data-plan-select="${planId}">${plan.cta}</button>`
         }
       </div>
     </div>
@@ -149,7 +149,7 @@ function renderGroupCard(currentPlan) {
         <label for="group-seats">Team size:</label>
         <select id="group-seats" class="group-seat-selector">
           ${Object.entries(GROUP_SEAT_PRICING).map(([seats, price]) =>
-            \`<option value="${seats}">${seats} users — ${formatPrice(price, '/month')}</option>\`
+            `<option value="${seats}">${seats} users — ${formatPrice(price, '/month')}</option>`
           ).join('')}
         </select>
       </div>
@@ -164,7 +164,7 @@ function renderGroupCard(currentPlan) {
       <div class="pricing-card-cta">
         ${isCurrent
           ? '<button class="btn-plan btn-plan--current" disabled>Current Plan</button>'
-          : \`<button class="btn-plan" data-plan-select="premium_group">${plan.cta}</button>\`
+          : `<button class="btn-plan" data-plan-select="premium_group">${plan.cta}</button>`
         }
       </div>
     </div>
@@ -652,5 +652,5 @@ export function getPricingStyles() {
         text-align: center;
       }
     }
-  \`;
+  `;
 }
