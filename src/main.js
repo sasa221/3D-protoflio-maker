@@ -44,6 +44,7 @@ import { isFeatureEnabled } from './config/FeatureFlags.js';
 import { PLANS } from './config/PlanConfig.js';
 import { renderCustomDomainPanel } from './ui/CustomDomainPanel.js';
 import { renderProductionReadinessPanel } from './ui/ProductionReadinessPanel.js';
+import { renderPricingPage } from './ui/PricingPage.js';
 import confetti from 'canvas-confetti';
 
 // ─── STATE ─────────────────────────────────
@@ -272,7 +273,19 @@ async function router() {
     return;
   }
 
-  // 5. Start Onboarding Route
+  // 5. Public Pricing Route
+  if (path === '/pricing') {
+    setPageTitle('Pricing');
+    renderPricingPage(getAppContainer(), {
+      currentPlan: globalEntitlements.getEffectivePlanId(),
+      onSelectPlan: (planId) => planId === 'free'
+        ? (window.location.href = '/start')
+        : openBillingModal({ targetPlan: planId })
+    });
+    return;
+  }
+
+  // 6. Start Onboarding Route
   if (path === '/start') {
     setPageTitle('Build My Portfolio');
     renderOnboardingWizard(getAppContainer());
