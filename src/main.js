@@ -902,9 +902,9 @@ function buildHTML() {
 
       <!-- PREVIEW MODE SWITCHER -->
       <div class="preview-mode-switch">
-        <button class="mode-btn active" id="mode-btn-desktop" onclick="setPreviewMode('desktop')">💻 Desktop (1440×900)</button>
-        <button class="mode-btn" id="mode-btn-tablet" onclick="setPreviewMode('tablet')">📱 Tablet (768×1024)</button>
-        <button class="mode-btn" id="mode-btn-mobile" onclick="setPreviewMode('mobile')">📱 Mobile (375×812)</button>
+        <button class="mode-btn active" id="mode-btn-desktop" onclick="setPreviewMode('desktop')"><span aria-hidden="true">💻</span> <span>Desktop</span> <span class="mode-dimensions">(1440×900)</span></button>
+        <button class="mode-btn" id="mode-btn-tablet" onclick="setPreviewMode('tablet')"><span aria-hidden="true">📱</span> <span>Tablet</span> <span class="mode-dimensions">(768×1024)</span></button>
+        <button class="mode-btn" id="mode-btn-mobile" onclick="setPreviewMode('mobile')"><span aria-hidden="true">📱</span> <span>Mobile</span> <span class="mode-dimensions">(375×812)</span></button>
       </div>
 
       <div class="preview-controls">
@@ -1007,6 +1007,12 @@ const MODE_DIMENSIONS = {
   tablet:  { width: 768,  height: 1024 },
   mobile:  { width: 375,  height: 812 }
 };
+
+function getRecommendedPreviewMode() {
+  if (window.innerWidth <= 640) return 'mobile';
+  if (window.innerWidth <= 1100) return 'tablet';
+  return 'desktop';
+}
 
 window.setPreviewMode = function(mode) {
   if (!MODE_DIMENSIONS[mode]) return;
@@ -1129,8 +1135,9 @@ function initEngine() {
   // Setup ResizeObserver for responsive preview scaling
   setupPreviewResizeObserver();
 
-  // Set default Desktop (1440x900) Virtual Viewport mode & scale
-  setPreviewMode('desktop');
+  // Start with the preview that best matches the device running Studio.
+  // Users can still switch to any viewport from the preview toolbar.
+  setPreviewMode(getRecommendedPreviewMode());
   requestAnimationFrame(updatePreviewScale);
   setTimeout(updatePreviewScale, 60);
   setTimeout(updatePreviewScale, 250);

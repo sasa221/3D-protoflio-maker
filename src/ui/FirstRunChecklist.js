@@ -13,6 +13,7 @@ export function renderFirstRunChecklist(container, portfolioData = {}) {
 
   const checklistEl = document.createElement('div');
   checklistEl.id = 'first-run-checklist-overlay';
+  checklistEl.className = 'first-run-checklist';
   checklistEl.style.cssText = `
     position: fixed; bottom: 24px; right: 24px; z-index: 900; width: 320px;
     background: rgba(5,5,12,0.92); border: 1px solid rgba(124,58,237,0.3); border-radius: 16px;

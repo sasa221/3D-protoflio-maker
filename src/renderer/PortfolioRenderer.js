@@ -912,12 +912,26 @@ export function generatePortfolioCSS(colors) {
     }
 
     [data-device="mobile"] .hero-name {
-      font-size: clamp(2.2rem, 8vw, 3.8rem) !important;
-      line-height: 1.05 !important;
+      font-size: clamp(1.8rem, 8.5vw, 2.65rem) !important;
+      line-height: 1.02 !important;
       text-wrap: balance !important;
       margin-bottom: 8px !important;
-      word-break: break-word !important;
-      max-width: 95% !important;
+      word-break: normal !important;
+      overflow-wrap: normal !important;
+      hyphens: none !important;
+      letter-spacing: -0.04em !important;
+      max-width: 100% !important;
+    }
+
+    [data-device="tablet"] .navbar-links { display: none !important; }
+    [data-device="tablet"] .mobile-menu-btn { display: flex !important; }
+    [data-device="tablet"] .hero-name {
+      font-size: clamp(2.5rem, 7vw, 4rem) !important;
+      max-width: min(92%, 680px) !important;
+      text-wrap: balance !important;
+      word-break: normal !important;
+      overflow-wrap: normal !important;
+      hyphens: none !important;
     }
 
     [data-device="mobile"] .hero-profession {
@@ -1001,12 +1015,15 @@ export function generatePortfolioCSS(colors) {
         margin-bottom: 18px;
       }
       .hero-name {
-        font-size: clamp(2.2rem, 8vw, 3.8rem);
-        line-height: 1.05;
+        font-size: clamp(1.8rem, 8.5vw, 2.65rem);
+        line-height: 1.02;
         text-wrap: balance;
         margin-bottom: 8px;
-        word-break: break-word;
-        max-width: 95%;
+        word-break: normal;
+        overflow-wrap: normal;
+        hyphens: none;
+        letter-spacing: -0.04em;
+        max-width: 100%;
       }
       .hero-profession {
         font-size: clamp(0.9rem, 3.8vw, 1.15rem);

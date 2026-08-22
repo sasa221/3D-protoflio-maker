@@ -787,11 +787,65 @@ body {
 }
 
 /* ─── RESPONSIVE ─── */
+@media (min-width: 901px) and (max-width: 1180px) {
+  :root { --sidebar-w: 360px; }
+  .sidebar-header { padding-inline: 16px; }
+  .preview-header { padding-inline: 14px; gap: 10px; }
+  .preview-label { display: none; }
+  .preview-controls .ctrl-btn:nth-child(2),
+  .preview-controls .ctrl-btn:nth-child(3),
+  .preview-controls .ctrl-btn:nth-child(4) { display: none; }
+  .mode-btn { padding-inline: 10px; }
+}
+
 @media (max-width: 900px) {
   :root { --sidebar-w: 100vw; }
-  #app { flex-direction: column; }
-  #sidebar { width: 100%; min-width: unset; height: 50vh; }
-  #preview-panel { height: 50vh; }
+  body { min-height: 100dvh; }
+  #app { flex-direction: column; height: 100dvh; }
+  #sidebar {
+    width: 100%;
+    min-width: 0;
+    height: 56dvh;
+    min-height: 360px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  #preview-panel { height: 44dvh; min-height: 280px; }
+  .sidebar-header { padding: 12px 16px; gap: 10px; }
+  .logo-name { white-space: nowrap; }
+  .logo-sub { display: none; }
+  .sidebar-content { padding: 16px; }
+  .sidebar-footer { padding: 10px 16px; }
+  .preview-header {
+    padding: 8px 10px;
+    gap: 8px;
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+  .preview-label, .preview-controls { display: none; }
+  .preview-mode-switch {
+    width: max-content;
+    min-width: 100%;
+    justify-content: center;
+    border-radius: 14px;
+  }
+  .mode-btn { min-height: 38px; padding: 6px 12px; white-space: nowrap; }
+  #preview-stage { padding-top: 54px; }
+  .first-run-checklist { display: none !important; }
+}
+
+@media (max-width: 560px) {
+  #sidebar { height: 60dvh; min-height: 390px; }
+  #preview-panel { height: 40dvh; min-height: 250px; }
+  .sidebar-header { padding-inline: 12px; }
+  .logo-icon { width: 34px; height: 34px; }
+  .logo-name { font-size: 0.86rem; }
+  .tier-chip { padding-inline: 8px; font-size: 0.62rem; }
+  .admin-btn { width: 34px; height: 34px; }
+  .sidebar-tabs { overflow-x: auto; justify-content: flex-start; }
+  .tab-btn { min-width: 64px; flex: 0 0 auto; }
+  .mode-btn { min-width: 92px; padding-inline: 8px; }
+  .mode-dimensions { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -1110,5 +1164,3 @@ html:has(.admin-forbidden) {
     max-height: 95vh !important;
   }
 }
-
-
