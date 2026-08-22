@@ -1031,6 +1031,9 @@ window.setPreviewMode = function(mode) {
     virtualViewport.dataset.device = mode;
   }
 
+  const previewPanel = document.getElementById('preview-panel');
+  if (previewPanel) previewPanel.dataset.device = mode;
+
   const scrollContainer = document.getElementById('portfolio-scroll-container');
   if (scrollContainer) {
     scrollContainer.dataset.device = mode;
@@ -1099,13 +1102,25 @@ function updatePreviewScale() {
 
   const scaleX = availableW / dim.width;
   const scaleY = availableH / dim.height;
-  const scale = Math.min(scaleX, scaleY);
+  const compactStudio = window.matchMedia('(max-width: 900px)').matches;
+  const scale = compactStudio && currentPreviewMode === 'desktop'
+    ? Math.min(scaleY, Math.max(scaleX, 0.5))
+    : Math.min(scaleX, scaleY);
 
   scaler.style.width = `${dim.width}px`;
   scaler.style.height = `${dim.height}px`;
   scaler.style.flexShrink = '0';
-  scaler.style.transformOrigin = 'center center';
-  scaler.style.transform = `scale(${scale.toFixed(4)})`;
+  if (compactStudio) {
+    // CSS zoom participates in scrollable layout, so a readable desktop
+    // preview can be panned naturally on a phone instead of becoming tiny.
+    scaler.style.zoom = scale.toFixed(4);
+    scaler.style.transform = 'none';
+    scaler.style.transformOrigin = 'top left';
+  } else {
+    scaler.style.zoom = '1';
+    scaler.style.transformOrigin = 'center center';
+    scaler.style.transform = `scale(${scale.toFixed(4)})`;
+  }
 }
 
 window.updatePreviewScale = updatePreviewScale;
