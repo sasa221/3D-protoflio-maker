@@ -896,13 +896,39 @@ body {
 }
 
 @media (max-width: 560px) {
-  .sidebar-header { padding-inline: 12px; }
-  .logo-icon { width: 34px; height: 34px; }
-  .logo-name { font-size: 0.86rem; }
-  .tier-chip { padding-inline: 8px; font-size: 0.62rem; }
-  .admin-btn { width: 34px; height: 34px; }
-  .sidebar-tabs { overflow-x: auto; justify-content: flex-start; }
-  .tab-btn { min-width: 64px; flex: 0 0 auto; }
+  .sidebar-header { display: none; }
+  .workspace-nav-shell { padding: 7px 10px !important; }
+  .workspace-nav-list .ws-btn { padding: 7px 11px !important; font-size: 0.72rem; }
+  #workspace-header-area > div { min-height: 52px; align-items: center !important; }
+  #workspace-header-area > div > div:first-child > div:last-child { display: none; }
+  #create-subnav-bar { padding: 5px 8px !important; gap: 3px; }
+  .sidebar-tabs { overflow-x: auto; justify-content: flex-start; min-height: 58px; }
+  .tab-btn { min-width: 60px; padding: 6px 5px; flex: 0 0 auto; gap: 2px; }
+  .tab-btn .tab-icon { font-size: 15px; }
+  .sidebar-content { padding: 12px; gap: 14px; }
+  .sidebar-footer {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px calc(9px + env(safe-area-inset-bottom, 0px));
+    background: rgba(5,5,12,0.97);
+  }
+  .sidebar-footer > .btn-primary {
+    flex: 1.25;
+    width: auto !important;
+    min-height: 44px;
+    padding: 8px 10px !important;
+    font-size: 0.75rem !important;
+    white-space: nowrap;
+  }
+  .sidebar-footer > div:nth-child(2) { flex: 0.75; }
+  .sidebar-footer > div:nth-child(2) .btn-secondary {
+    min-height: 44px;
+    padding: 8px !important;
+    font-size: 0.75rem !important;
+  }
+  .sidebar-footer > div:nth-child(2) > button:last-child,
+  .sidebar-footer > div:nth-child(n+3) { display: none !important; }
   .mode-btn { min-width: 92px; padding-inline: 8px; }
   .mode-dimensions { display: none; }
 }

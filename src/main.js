@@ -2249,7 +2249,6 @@ function renderSkills() {
   el.innerHTML = portfolioData.skills.map((s, i) => `
     <div class="skill-row" id="skill-${i}" style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
       <input class="field-input" value="${s.name || ''}" placeholder="Skill name (e.g. JavaScript, React)..." oninput="updateSkill(${i},'name',this.value)" style="flex:1"/>
-      <input class="skill-level-input field-input" type="number" min="0" max="100" value="${s.level || 80}" oninput="updateSkill(${i},'level',parseInt(this.value)||0)" style="width:58px;text-align:center"/>
       <div style="display:flex;gap:2px">
         <button onclick="moveSkill(${i},-1)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:0.7rem;display:flex;align-items:center;justify-content:center" title="Move Up" ${i === 0 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>↑</button>
         <button onclick="moveSkill(${i},1)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:0.7rem;display:flex;align-items:center;justify-content:center" title="Move Down" ${i === portfolioData.skills.length - 1 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>↓</button>
@@ -2261,7 +2260,7 @@ function renderSkills() {
 
 window.addSkill = function() {
   if (!Array.isArray(portfolioData.skills)) portfolioData.skills = [];
-  portfolioData.skills.push({ name: '', level: 80 });
+  portfolioData.skills.push({ name: '' });
   renderSkills();
   updateHUD();
   flyToSection('skills');

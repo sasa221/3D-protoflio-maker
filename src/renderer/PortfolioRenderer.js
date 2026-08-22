@@ -1638,28 +1638,12 @@ function renderSkillsHTML(skills) {
   if (!skills || skills.length === 0) {
     return '<div class="glass-card" style="padding: 24px; text-align: center; color: rgba(255,255,255,0.6);">No skills added yet.</div>';
   }
-  return skills.map(s => {
-    const hasNumericLevel = typeof s.level === 'number' && !isNaN(s.level) && s.level > 0;
-    if (hasNumericLevel) {
-      return `
-        <div class="glass-card skill-card">
-          <div class="skill-header">
-            <span>${escapeHTML(s.name || 'Skill')}</span>
-            <span class="skill-level-val">${s.level}%</span>
-          </div>
-          <div class="skill-bar-track">
-            <div class="skill-bar-fill" style="width: ${s.level}%;"></div>
-          </div>
-        </div>
-      `;
-    }
-    return `
+  return skills.map(s => `
       <div class="glass-card skill-card skill-pill-card" style="padding: 12px 18px; display: flex; align-items: center; justify-content: space-between;">
         <span style="font-weight: 700; font-size: 0.9rem; color: #fff;">${escapeHTML(s.name || 'Skill')}</span>
         ${s.category ? `<span style="font-size: 0.7rem; color: #7c3aed; background: rgba(124,58,237,0.15); border: 1px solid rgba(124,58,237,0.3); border-radius: 12px; padding: 2px 10px; font-weight: 700;">${escapeHTML(s.category)}</span>` : '<span style="font-size: 0.75rem; color: rgba(255,255,255,0.5);">✦ Skill</span>'}
       </div>
-    `;
-  }).join('');
+    `).join('');
 }
 
 function generateVolunteeringHTML(volList) {
