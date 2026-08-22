@@ -29,7 +29,7 @@ export function setPageTitle(pageName) {
     if (pageName) {
       document.title = `${pageName} — ${PRODUCT_CONFIG.productName}`;
     } else {
-      document.title = `${PRODUCT_CONFIG.productName} — ${PRODUCT_CONFIG.productTagline}`;
+      document.title = `${PRODUCT_CONFIG.productName} | Build a 3D Portfolio`;
     }
   }
 }
