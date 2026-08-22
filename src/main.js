@@ -648,7 +648,11 @@ function buildHTML() {
 <div id="toast-container"></div>
 
 <!-- STUDIO APP -->
-<div id="app">
+<div id="app" data-studio-surface="edit">
+  <div class="mobile-studio-switch" role="tablist" aria-label="Studio view">
+    <button type="button" id="studio-edit-btn" class="mobile-studio-switch__btn active" role="tab" aria-selected="true" onclick="setStudioSurface('edit')">✏️ Edit</button>
+    <button type="button" id="studio-preview-btn" class="mobile-studio-switch__btn" role="tab" aria-selected="false" onclick="setStudioSurface('preview')">✨ Preview</button>
+  </div>
   <!-- SIDEBAR -->
   <aside id="sidebar">
     <!-- HEADER -->
@@ -665,9 +669,9 @@ function buildHTML() {
     </div>
 
     <!-- 5 PRIMARY WORKSPACES NAV BAR -->
-    <div style="padding: 10px 14px; background: rgba(5,5,12,0.9); border-bottom: 1px solid rgba(255,255,255,0.08);">
+    <div class="workspace-nav-shell" style="padding: 10px 14px; background: rgba(5,5,12,0.9); border-bottom: 1px solid rgba(255,255,255,0.08);">
       <div style="font-size: 0.65rem; font-weight: 800; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px;">WORKSPACES</div>
-      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+      <div class="workspace-nav-list" style="display: flex; gap: 6px; flex-wrap: wrap;">
         <button onclick="switchWorkspaceNav('create')" class="preset-chip ws-btn active" id="ws-btn-create" style="padding: 6px 12px; font-weight: 700;">✏️ 1. Create</button>
         <button onclick="switchWorkspaceNav('customize')" class="preset-chip ws-btn" id="ws-btn-customize" style="padding: 6px 12px; font-weight: 700;">🎨 2. Customize</button>
         <button onclick="switchWorkspaceNav('optimize')" class="preset-chip ws-btn" id="ws-btn-optimize" style="padding: 6px 12px; font-weight: 700;">🎯 3. Optimize</button>
@@ -1049,6 +1053,25 @@ window.setPreviewMode = function(mode) {
   if (scrollDirector) {
     scrollDirector.updateSectionBounds();
     scrollDirector._calculateProgress();
+  }
+};
+
+window.setStudioSurface = function(surface) {
+  const app = document.getElementById('app');
+  if (!app || !['edit', 'preview'].includes(surface)) return;
+  app.dataset.studioSurface = surface;
+
+  const editBtn = document.getElementById('studio-edit-btn');
+  const previewBtn = document.getElementById('studio-preview-btn');
+  const isEdit = surface === 'edit';
+  editBtn?.classList.toggle('active', isEdit);
+  previewBtn?.classList.toggle('active', !isEdit);
+  editBtn?.setAttribute('aria-selected', String(isEdit));
+  previewBtn?.setAttribute('aria-selected', String(!isEdit));
+
+  if (!isEdit) {
+    requestAnimationFrame(updatePreviewScale);
+    setTimeout(updatePreviewScale, 80);
   }
 };
 
