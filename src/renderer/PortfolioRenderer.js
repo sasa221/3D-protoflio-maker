@@ -1320,7 +1320,7 @@ export function generatePortfolioHTMLBody(portfolioData, theme, options = {}) {
 
   const avatarSrc = typeof portfolioData.avatar === 'object' ? portfolioData.avatar.publicUrl : (portfolioData.avatar || '');
   const avatarImgTag = avatarSrc ? `
-    <img src="${escapeHTML(avatarSrc)}" style="transform: scale(${portfolioData.avatarZoom || 1}) translate(${portfolioData.avatarPosX || 0}px, ${portfolioData.avatarPosY || 0}px);"/>
+    <img src="${escapeHTML(avatarSrc)}" alt="${escapeHTML(portfolioData.name || 'Portfolio owner')}" style="transform: scale(${portfolioData.avatarZoom || 1}) translate(${portfolioData.avatarPosX || 0}px, ${portfolioData.avatarPosY || 0}px);"/>
   ` : '';
 
   const hasExperience = Array.isArray(portfolioData.experience) && portfolioData.experience.length > 0;
@@ -1358,7 +1358,7 @@ export function generatePortfolioHTMLBody(portfolioData, theme, options = {}) {
       <!-- TOP STICKY NAVBAR -->
       <header class="portfolio-navbar">
         <a href="#sec-hero" class="navbar-brand">
-          ${avatarSrc ? `<img class="brand-avatar" src="${escapeHTML(avatarSrc)}" style="transform: scale(${portfolioData.avatarZoom || 1}) translate(${portfolioData.avatarPosX || 0}px, ${portfolioData.avatarPosY || 0}px);"/>` : '<span class="brand-icon">✦</span>'}
+          ${avatarSrc ? `<img class="brand-avatar" src="${escapeHTML(avatarSrc)}" alt="${escapeHTML(portfolioData.name || 'Portfolio owner')}" style="transform: scale(${portfolioData.avatarZoom || 1}) translate(${portfolioData.avatarPosX || 0}px, ${portfolioData.avatarPosY || 0}px);"/>` : '<span class="brand-icon">✦</span>'}
           <span class="brand-name">${escapeHTML(portfolioData.name || 'Portfolio')}</span>
         </a>
         <nav class="navbar-links">

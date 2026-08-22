@@ -19,6 +19,10 @@ let currentDemoThemeId = 'code';
 export async function renderLandingPage(container) {
   if (!container) return;
 
+  // The static H1 is for non-JavaScript crawlers. Once the landing page mounts,
+  // retain the visible hero heading as the document's single H1.
+  document.querySelector('.seo-fallback')?.remove();
+
   container.style.display = 'block';
   container.style.height = 'auto';
   container.style.minHeight = '100vh';
@@ -433,7 +437,7 @@ export async function renderLandingPage(container) {
                   padding: 18px; margin-bottom: 16px; backdrop-filter: blur(15px); text-align: center;
                 ">
                   <div style="width: 48px; height: 48px; border-radius: 50%; border: 2px solid #7c3aed; margin: 0 auto 10px auto; background: #000; overflow: hidden;">
-                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" style="width:100%;height:100%;object-fit:cover;" />
+                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" alt="Portfolio creator" style="width:100%;height:100%;object-fit:cover;" />
                   </div>
                   <div style="font-size: 1.1rem; font-weight: 900; color: #fff;">Alex Morgan</div>
                   <div style="font-size: 0.78rem; color: #a855f7; font-weight: 700; margin-bottom: 10px;">Frontend Developer</div>
@@ -759,6 +763,13 @@ function renderScaledDemoHTML(viewport, html) {
     </div>
   `;
   viewport.scrollTop = 0;
+  const demoHeroHeading = viewport.querySelector('.hero-name');
+  if (demoHeroHeading?.tagName === 'H1') {
+    const replacement = document.createElement('h2');
+    for (const attribute of demoHeroHeading.attributes) replacement.setAttribute(attribute.name, attribute.value);
+    replacement.innerHTML = demoHeroHeading.innerHTML;
+    demoHeroHeading.replaceWith(replacement);
+  }
   installProjectCinemaControls();
   updateLandingDemoScale();
 }
