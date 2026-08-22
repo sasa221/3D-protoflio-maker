@@ -1018,6 +1018,13 @@ function getRecommendedPreviewMode() {
   return 'desktop';
 }
 
+function centerCompactDesktopPreview() {
+  if (window.innerWidth > 900 || currentPreviewMode !== 'desktop') return;
+  const stage = document.getElementById('preview-stage');
+  if (!stage) return;
+  stage.scrollLeft = Math.max(0, (stage.scrollWidth - stage.clientWidth) / 2);
+}
+
 window.setPreviewMode = function(mode) {
   if (!MODE_DIMENSIONS[mode]) return;
   currentPreviewMode = mode;
@@ -1044,6 +1051,7 @@ window.setPreviewMode = function(mode) {
   }
 
   updatePreviewScale();
+  requestAnimationFrame(() => requestAnimationFrame(centerCompactDesktopPreview));
 
   // Sync Three.js camera aspect ratio & renderer resolution to exact logical viewport dimensions!
   if (engine && engine.camera && engine.renderer) {
@@ -1074,7 +1082,10 @@ window.setStudioSurface = function(surface) {
 
   if (!isEdit) {
     requestAnimationFrame(updatePreviewScale);
-    setTimeout(updatePreviewScale, 80);
+    setTimeout(() => {
+      updatePreviewScale();
+      centerCompactDesktopPreview();
+    }, 80);
   }
 };
 
