@@ -25,7 +25,24 @@
     </script>
   </head>
   <body>
+    <main class="seo-fallback" aria-label="3D Portfolio Maker">
+      <h1>3D Portfolio Maker — Create a cinematic portfolio from your CV</h1>
+      <p>Build, publish, and share a recruiter-ready interactive 3D portfolio with no coding required.</p>
+    </main>
     <div id="app"></div>
+    <style>
+      .seo-fallback {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+    </style>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
