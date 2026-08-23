@@ -262,13 +262,16 @@ export default async function handler(req, res) {
           const { data: ownerSub } = await adminClient.from('subscriptions').select('plan_id,status,current_period_end').eq('user_id', userId).maybeSingle();
           const ownerActive = ownerSub?.plan_id === 'premium_group' && ['active', 'grace', 'canceling'].includes(ownerSub.status || '') && (!ownerSub.current_period_end || new Date(ownerSub.current_period_end).getTime() > Date.now());
           if (!ownerActive) return res.status(403).json({ error: 'Your Premium Group subscription is inactive or expired.' });
-          // Pending invitations do not reserve a seat. The purchased group
-          // size is the number of teammates the owner can activate.
-          const occupiedSeats = (group.group_members || []).filter(member => member.status === 'active').length;
-          if (occupiedSeats >= group.seat_limit) return res.status(400).json({ error: `Group seat limit of ${group.seat_limit} reached.` });
-
           const existingMember = (group.group_members || []).find(member => member.user_id === targetProfile.id);
           if (existingMember?.status === 'active') return res.status(409).json({ error: 'This user is already an active group member.' });
+
+          // Active and pending teammates both reserve a purchased seat. A
+          // pending invitation may be resent/replaced, but a new email cannot
+          // be invited beyond the paid seat count.
+          const reservedSeats = (group.group_members || []).filter(member => ['active', 'pending'].includes(member.status)).length;
+          if (!existingMember || existingMember.status !== 'pending') {
+            if (reservedSeats >= group.seat_limit) return res.status(400).json({ error: `Group seat limit of ${group.seat_limit} reached.` });
+          }
 
           const invitedAt = new Date().toISOString();
           const { error: insErr } = existingMember

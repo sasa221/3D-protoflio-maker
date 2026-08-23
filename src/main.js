@@ -277,6 +277,8 @@ async function router() {
   // 5. Public Pricing Route
   if (path === '/pricing') {
     setPageTitle('Pricing');
+    const pricingUser = await getCurrentAuthUser().catch(() => null);
+    if (pricingUser) await fetchUserProfileAndEntitlements(pricingUser).catch(() => null);
     if (!document.getElementById('pricing-page-styles')) {
       const style = document.createElement('style');
       style.id = 'pricing-page-styles';
@@ -293,7 +295,15 @@ async function router() {
           : openBillingModal({ targetPlan: planId })
     });
     if (['pro', 'premium', 'premium_group'].includes(requestedPlan)) {
-      setTimeout(() => openBillingModal({ targetPlan: requestedPlan }), 0);
+      setTimeout(() => {
+        // A paid Premium Group owner already has the subscription. Open the
+        // invitation manager instead of presenting the payment request again.
+        if (requestedPlan === 'premium_group' && globalEntitlements.getEffectivePlanId() === 'premium_group') {
+          openGroupManagementModal();
+        } else {
+          openBillingModal({ targetPlan: requestedPlan });
+        }
+      }, 0);
     }
     return;
   }
@@ -3233,9 +3243,11 @@ window.handleLogout = function() {
 window.handleUpgradeClick = async function(targetPlanId = null) {
   const user = await getCurrentAuthUser().catch(() => null);
   const effectivePlan = globalEntitlements.getEffectivePlanId();
-  // Keep Studio's plan chip on the same pricing surface as Home. The
-  // current Premium Group card still exposes Manage Team, so billing and
-  // team administration remain available without an unexpected overlay.
+  if (effectivePlan === 'premium_group') {
+    openGroupManagementModal();
+    return;
+  }
+  // Non-group accounts use the shared pricing and billing surface.
   const requestedPlan = targetPlanId || (effectivePlan === 'premium_group' ? 'premium_group' : null);
   openBillingModal({
     currentUserId: user?.id,

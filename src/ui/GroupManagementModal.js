@@ -39,7 +39,7 @@ async function renderGroupManagement(feedback = '') {
       return;
     }
     const members = data.members || [];
-    const activeCount = members.filter(member => member.status === 'active').length;
+    const reservedCount = members.filter(member => ['active', 'pending'].includes(member.status)).length;
     const rows = members.length ? members.map(member => {
       const profile = member.profile || {};
       const label = profile.display_name || profile.email || member.user_id;
@@ -53,7 +53,7 @@ async function renderGroupManagement(feedback = '') {
       <button data-close style="float:right;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:50%;width:32px;height:32px;font-size:20px;cursor:pointer">×</button>
       <div style="text-align:center;color:#c084fc;font-weight:800;letter-spacing:1px;font-size:12px">PREMIUM GROUP</div>
       <h2 style="margin:8px 0 6px;text-align:center">Manage your team</h2>
-      <p style="margin:0 0 20px;text-align:center;color:rgba(255,255,255,.62);font-size:13px">${activeCount} of ${group.seat_limit} teammate seats used · the owner manages billing separately.</p>
+      <p style="margin:0 0 20px;text-align:center;color:rgba(255,255,255,.62);font-size:13px">${reservedCount} of ${group.seat_limit} teammate seats reserved · pending invites count until replaced or removed.</p>
       ${feedback ? `<div style="margin-bottom:14px;padding:10px 12px;border-radius:9px;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);color:#86efac;font-size:12px">${escapeHtml(feedback)}</div>` : ''}
       <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:0 14px;margin-bottom:20px"><div style="padding:14px 0;border-bottom:1px solid rgba(255,255,255,.08)"><strong>${escapeHtml(data.owner?.email || 'You')}</strong><span style="display:block;color:#4ade80;font-size:11px;margin-top:3px">OWNER · ACTIVE</span></div>${rows}</div>
       <form id=group-invite-form style="display:flex;gap:8px;margin-top:10px"><input id=group-invite-email type=email required placeholder="teammate@email.com" style="flex:1;min-width:0;background:#141624;border:1px solid rgba(255,255,255,.18);padding:11px 12px;border-radius:10px;color:#fff;outline:none"><button type=submit style="background:linear-gradient(135deg,#059669,#0891b2);border:0;border-radius:10px;padding:0 16px;color:#fff;font-weight:800;cursor:pointer">Invite</button></form>

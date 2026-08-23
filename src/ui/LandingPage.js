@@ -11,6 +11,8 @@ import { generatePortfolioCSS, generatePortfolioHTMLBody } from '../renderer/Por
 import { installProjectCinemaControls } from '../renderer/ProjectCinema.js';
 import { resolvePortfolioVariant } from '../services/PortfolioVariantService.js';
 import { getCurrentAuthUser } from '../services/AuthService.js';
+import { fetchUserProfileAndEntitlements } from '../services/DBService.js';
+import { globalEntitlements } from '../services/EntitlementService.js';
 import { PLANS, GROUP_SEAT_PRICING } from '../config/PlanConfig.js';
 
 let demoEngine = null;
@@ -33,6 +35,13 @@ export async function renderLandingPage(container) {
 
   const authUser = await getCurrentAuthUser().catch(() => null);
   const isAuthenticated = Boolean(authUser && authUser.id && authUser.id !== 'usr_guest');
+  // Load the authoritative subscription before rendering the CTA. A paid
+  // Premium Group owner should manage invitations, not submit payment again.
+  let isPremiumGroupOwner = false;
+  if (isAuthenticated) {
+    await fetchUserProfileAndEntitlements(authUser).catch(() => null);
+    isPremiumGroupOwner = globalEntitlements.getPlanId() === 'premium_group';
+  }
 
   let responsiveStyle = document.getElementById('landing-responsive-style');
   if (!responsiveStyle) {
@@ -633,10 +642,10 @@ export async function renderLandingPage(container) {
                 <li>✓ Centralized billing</li>
               </ul>
             </div>
-            <a href="${isAuthenticated ? '/pricing?plan=premium_group' : '/login?next=%2Fpricing%3Fplan%3Dpremium_group'}" style="
+            <a href="${isPremiumGroupOwner ? '/studio?manage_group=1' : isAuthenticated ? '/pricing?plan=premium_group' : '/login?next=%2Fpricing%3Fplan%3Dpremium_group'}" style="
               display: block; width: 100%; padding: 14px; text-align: center; background: rgba(255,255,255,0.08);
               border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; color: #fff; font-weight: 700; text-decoration: none;
-            ">Choose Group</a>
+            ">${isPremiumGroupOwner ? 'Invite Teammates' : 'Choose Group'}</a>
           </div>
         </div>
       </section>
