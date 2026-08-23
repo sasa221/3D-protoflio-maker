@@ -46,6 +46,7 @@ import { PLANS } from './config/PlanConfig.js';
 import { renderCustomDomainPanel } from './ui/CustomDomainPanel.js';
 import { renderProductionReadinessPanel } from './ui/ProductionReadinessPanel.js';
 import { renderPricingPage, getPricingStyles } from './ui/PricingPage.js';
+import { renderPortfolioQualityScore, getPortfolioQualityScoreStyles } from './ui/PortfolioQualityScore.js';
 import confetti from 'canvas-confetti';
 
 // ─── STATE ─────────────────────────────────
@@ -1825,6 +1826,13 @@ export function renderPublishTab() {
   const el = document.getElementById('publish-panel-content');
   if (!el) return;
 
+  if (!document.getElementById('portfolio-quality-score-styles')) {
+    const style = document.createElement('style');
+    style.id = 'portfolio-quality-score-styles';
+    style.textContent = getPortfolioQualityScoreStyles();
+    document.head.appendChild(style);
+  }
+
   const effectivePlan = globalEntitlements.getEffectivePlanId();
   const isGrandfathered = Boolean(portfolioData.isLegacy || portfolioData.is_legacy);
   const isKeepItLive = globalEntitlements.isKeepItLive() || Boolean(portfolioData.hasKIL || portfolioData.has_kil);
@@ -1832,6 +1840,7 @@ export function renderPublishTab() {
   const hasHostedPublishRights = effectivePlan === 'pro' || effectivePlan === 'premium' || effectivePlan === 'premium_group' || isGrandfathered;
   const isPremiumOrGroup = effectivePlan === 'premium' || effectivePlan === 'premium_group';
   const isPublished = Boolean(portfolioData.publishedAt || portfolioData.published_at);
+  const qualityScoreMarkup = renderPortfolioQualityScore(portfolioData);
 
   const slug = portfolioData.slug || (portfolioData.name ? portfolioData.name.toLowerCase().replace(/[^a-z0-9]/g, '-') : 'portfolio');
   const publicUrl = `${window.location.origin}/u/${slug}`;
@@ -1861,6 +1870,8 @@ export function renderPublishTab() {
             Your portfolio is ready. Export it for free, or upgrade when you're ready to publish it online.
           </p>
         </div>
+
+        ${qualityScoreMarkup}
 
         <!-- CARD A: FREE EXPORT -->
         <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:18px;padding:20px;margin-bottom:16px;box-shadow:0 8px 24px rgba(0,0,0,0.2);">
@@ -1975,6 +1986,8 @@ export function renderPublishTab() {
           </p>
         </div>
 
+        ${qualityScoreMarkup}
+
         <div style="background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.3);border-radius:18px;padding:20px;margin-bottom:16px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
             <span style="font-size:0.75rem;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#06b6d4;">
@@ -2025,6 +2038,8 @@ export function renderPublishTab() {
           Manage your live 3D portfolio, public web link, and export options.
         </p>
       </div>
+
+      ${qualityScoreMarkup}
 
       <!-- CARD 1: LIVE PUBLISHING DASHBOARD -->
       <div style="background:${isPublished ? 'rgba(16,185,129,0.05)' : 'rgba(245,158,11,0.05)'};border:1px solid ${isPublished ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'};border-radius:18px;padding:20px;margin-bottom:16px;box-shadow:0 8px 24px rgba(0,0,0,0.2);">
@@ -2117,6 +2132,17 @@ export function renderPublishTab() {
     });
   }
 }
+
+window.handlePortfolioQualityAction = function(section) {
+  if (section === 'publish') {
+    document.getElementById('f-publish-slug')?.focus();
+    return;
+  }
+  const targetSection = section === 'design' || section === 'experience' || section === 'education' ? 'profile' : section;
+  window.switchWorkspaceNav?.('create');
+  window.switchCreateSubSection?.(targetSection);
+  document.getElementById(`tab-${targetSection}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
 
 window.renderPublishTab = renderPublishTab;
 

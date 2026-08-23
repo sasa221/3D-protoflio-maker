@@ -12,6 +12,8 @@ import { getThemeById } from '../three/ProceduralTheme.js';
 import { HyperEngine } from '../three/HyperEngine.js';
 import { generatePortfolioCSS, generatePortfolioHTMLBody } from '../renderer/PortfolioRenderer.js';
 import { installProjectCinemaControls } from '../renderer/ProjectCinema.js';
+import { globalEntitlements } from '../services/EntitlementService.js';
+import { getThemeTier } from '../config/ThemeTierConfig.js';
 
 let onboardingEngine = null;
 
@@ -32,7 +34,7 @@ export async function renderOnboardingWizard(container) {
     <style>
       .ob-header { padding: 18px 40px; }
       .ob-progress { display:flex; gap:24px; }
-      .ob-method-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+      .ob-method-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
       .ob-theme-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:18px; }
       .ob-form-card { padding:36px; }
       @media (max-width: 760px) {
@@ -42,6 +44,7 @@ export async function renderOnboardingWizard(container) {
         .ob-form-card { padding:22px 16px !important; }
         #onboarding-step-view { align-items:flex-start !important; padding:28px 14px !important; }
       }
+      @media (min-width: 761px) and (max-width: 980px) { .ob-method-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
     </style>
     <div style="min-height: 100vh; background: #050508; color: #fff; font-family: 'Inter', sans-serif; display: flex; flex-direction: column;">
       
@@ -88,6 +91,8 @@ function renderCurrentStep() {
       renderStep1ChooseMethod(stepView);
     } else if (state.startingMethod === 'cv') {
       renderStep1CVUpload(stepView);
+    } else if (state.startingMethod === 'example') {
+      renderStep1ManualForm(stepView, { isExample: true });
     } else {
       renderStep1ManualForm(stepView);
     }
@@ -140,11 +145,33 @@ function renderStep1ChooseMethod(container) {
             Enter your name, professional title, short bio, and key skills step-by-step.
           </p>
         </div>
+
+        <!-- OPTION C: START FROM A SAFE FICTIONAL EXAMPLE -->
+        <div role="button" tabindex="0" aria-label="Start from an example" onclick="selectMethod('example')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectMethod('example')}" style="
+          background: rgba(6,182,212,0.06); border: 1px solid rgba(6,182,212,0.32); border-radius: 20px; padding: 36px 24px;
+          cursor: pointer; text-align: left; transition: transform 0.2s;
+        " onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='none'">
+          <div style="font-size: 2.5rem; margin-bottom: 16px;">✨</div>
+          <h3 style="font-size: 1.3rem; font-weight: 800; margin-bottom: 8px;">Start from an Example</h3>
+          <p style="font-size: 0.88rem; color: rgba(255,255,255,0.65); line-height: 1.6;">
+            See a complete fictional portfolio first, then replace every example with your own details. Nothing is copied to your profile.
+          </p>
+        </div>
       </div>
     </div>
   `;
 
   window.selectMethod = (method) => {
+    if (method === 'example') {
+      onboardingController.updateProfileDraft({
+        name: 'Your Name',
+        profession: 'Your Professional Title',
+        tagline: 'Building meaningful digital experiences',
+        bio: 'Add a short introduction about your work, strengths, and the problems you love solving.',
+        skills: [{ name: 'Your first skill', level: 85 }, { name: 'Your second skill', level: 85 }, { name: 'Your third skill', level: 85 }],
+        experience: [], projects: [], education: [], social: { github: '', linkedin: '', email: '' }
+      });
+    }
     onboardingController.setStartingMethod(method);
     renderCurrentStep();
   };
@@ -223,7 +250,7 @@ function renderStep1CVUpload(container) {
 }
 
 /** STEP 1: MANUAL FORM */
-function renderStep1ManualForm(container) {
+function renderStep1ManualForm(container, { isExample = false } = {}) {
   const currentState = onboardingController.getState();
   const draft = currentState.profileDraft;
   const isCVReview = Boolean(currentState.importedFromCV);
@@ -231,10 +258,10 @@ function renderStep1ManualForm(container) {
   container.innerHTML = `
     <div class="ob-form-card" style="max-width: 600px; width: 100%; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 36px;">
       <h2 style="font-family: 'Outfit', sans-serif; font-size: 2rem; font-weight: 900; margin-bottom: 8px;">
-        ${isCVReview ? 'Review your extracted CV details' : 'Tell us about yourself'}
+        ${isCVReview ? 'Review your extracted CV details' : isExample ? 'Make this example yours' : 'Tell us about yourself'}
       </h2>
       <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-bottom: 24px;">
-        ${isCVReview ? 'Check and edit the information before choosing your 3D style.' : 'Enter your core details to build your first 3D portfolio.'}
+        ${isCVReview ? 'Check and edit the information before choosing your 3D style.' : isExample ? 'These are placeholders only. Replace them before saving your portfolio.' : 'Enter your core details to build your first 3D portfolio.'}
       </p>
 
       <form id="onboarding-manual-form" onsubmit="handleManualSubmit(event)" style="display: flex; flex-direction: column; gap: 16px;">
@@ -288,6 +315,22 @@ function renderStep1ManualForm(container) {
 function renderStep2ChooseStyle(container) {
   const state = onboardingController.getState();
   const selectedTheme = state.selectedTheme || 'code';
+  const canUseTheme = themeId => globalEntitlements.canUseTheme(themeId);
+  const themeCard = (themeId, emoji, title, subtitle) => {
+    const available = canUseTheme(themeId);
+    const tier = getThemeTier(themeId);
+    const badge = tier === 'free' ? 'FREE' : tier.toUpperCase();
+    return `
+      <div role="button" tabindex="0" aria-disabled="${!available}" aria-pressed="${selectedTheme === themeId}" aria-label="${available ? `Select ${title} theme` : `${title} theme requires ${tier}`}" onclick="selectTheme('${themeId}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectTheme('${themeId}')}" style="
+        background: ${selectedTheme === themeId ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.03)'}; opacity:${available ? '1' : '.62'};
+        border: 2px solid ${selectedTheme === themeId ? '#7c3aed' : 'rgba(255,255,255,0.1)'}; border-radius: 16px; padding: 20px; cursor: pointer; text-align: center; transition: all 0.2s;
+      ">
+        <div style="font-size: 2rem; margin-bottom: 10px;">${emoji}</div>
+        <div style="font-weight: 800; font-size: 1rem; margin-bottom: 4px;">${title}</div>
+        <div style="font-size: 0.72rem; color: rgba(255,255,255,0.5); margin-bottom: 12px;">${subtitle}</div>
+        <span style="padding: 2px 8px; background: ${tier === 'free' ? 'rgba(16,185,129,0.2)' : 'rgba(124,58,237,0.3)'}; color: ${tier === 'free' ? '#10b981' : '#c084fc'}; border-radius: 4px; font-size: 0.68rem; font-weight: 800;">${badge}${available ? '' : ' · UPGRADE'}</span>
+      </div>`;
+  };
 
   container.innerHTML = `
     <div style="max-width: 960px; width: 100%;">
@@ -301,53 +344,10 @@ function renderStep2ChooseStyle(container) {
       </div>
 
       <div class="ob-theme-grid" style="margin-bottom: 36px;">
-        <!-- CODE MATRIX -->
-        <div role="button" tabindex="0" aria-pressed="${selectedTheme === 'code'}" aria-label="Select Code Matrix theme" onclick="selectTheme('code')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectTheme('code')}" style="
-          background: ${selectedTheme === 'code' ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.03)'};
-          border: 2px solid ${selectedTheme === 'code' ? '#7c3aed' : 'rgba(255,255,255,0.1)'};
-          border-radius: 16px; padding: 20px; cursor: pointer; text-align: center; transition: all 0.2s;
-        ">
-          <div style="font-size: 2rem; margin-bottom: 10px;">💻</div>
-          <div style="font-weight: 800; font-size: 1rem; margin-bottom: 4px;">Code Matrix</div>
-          <div style="font-size: 0.72rem; color: rgba(255,255,255,0.5); margin-bottom: 12px;">Web & Software</div>
-          <span style="padding: 2px 8px; background: rgba(16,185,129,0.2); color: #10b981; border-radius: 4px; font-size: 0.68rem; font-weight: 800;">FREE</span>
-        </div>
-
-        <!-- DATA GALAXY -->
-        <div role="button" tabindex="0" aria-pressed="${selectedTheme === 'data'}" aria-label="Select Data Galaxy theme" onclick="selectTheme('data')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectTheme('data')}" style="
-          background: ${selectedTheme === 'data' ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.03)'};
-          border: 2px solid ${selectedTheme === 'data' ? '#7c3aed' : 'rgba(255,255,255,0.1)'};
-          border-radius: 16px; padding: 20px; cursor: pointer; text-align: center; transition: all 0.2s;
-        ">
-          <div style="font-size: 2rem; margin-bottom: 10px;">📊</div>
-          <div style="font-weight: 800; font-size: 1rem; margin-bottom: 4px;">Data Galaxy</div>
-          <div style="font-size: 0.72rem; color: rgba(255,255,255,0.5); margin-bottom: 12px;">BI & Data Science</div>
-          <span style="padding: 2px 8px; background: rgba(16,185,129,0.2); color: #10b981; border-radius: 4px; font-size: 0.68rem; font-weight: 800;">FREE</span>
-        </div>
-
-        <!-- CYBER COMMAND -->
-        <div role="button" tabindex="0" aria-pressed="${selectedTheme === 'hacker'}" aria-label="Select Cyber Command theme" onclick="selectTheme('hacker')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectTheme('hacker')}" style="
-          background: ${selectedTheme === 'hacker' ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.03)'};
-          border: 2px solid ${selectedTheme === 'hacker' ? '#7c3aed' : 'rgba(255,255,255,0.1)'};
-          border-radius: 16px; padding: 20px; cursor: pointer; text-align: center; transition: all 0.2s;
-        ">
-          <div style="font-size: 2rem; margin-bottom: 10px;">🛡️</div>
-          <div style="font-weight: 800; font-size: 1rem; margin-bottom: 4px;">Cyber Command</div>
-          <div style="font-size: 0.72rem; color: rgba(255,255,255,0.5); margin-bottom: 12px;">Security & Infra</div>
-          <span style="padding: 2px 8px; background: rgba(124,58,237,0.3); color: #a855f7; border-radius: 4px; font-size: 0.68rem; font-weight: 800;">PRO</span>
-        </div>
-
-        <!-- COSMIC ELITE -->
-        <div role="button" tabindex="0" aria-pressed="${selectedTheme === 'cosmic'}" aria-label="Select Cosmic Elite theme" onclick="selectTheme('cosmic')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectTheme('cosmic')}" style="
-          background: ${selectedTheme === 'cosmic' ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.03)'};
-          border: 2px solid ${selectedTheme === 'cosmic' ? '#7c3aed' : 'rgba(255,255,255,0.1)'};
-          border-radius: 16px; padding: 20px; cursor: pointer; text-align: center; transition: all 0.2s;
-        ">
-          <div style="font-size: 2rem; margin-bottom: 10px;">🌌</div>
-          <div style="font-weight: 800; font-size: 1rem; margin-bottom: 4px;">Cosmic Elite</div>
-          <div style="font-size: 0.72rem; color: rgba(255,255,255,0.5); margin-bottom: 12px;">Executive & General</div>
-          <span style="padding: 2px 8px; background: rgba(124,58,237,0.3); color: #a855f7; border-radius: 4px; font-size: 0.68rem; font-weight: 800;">PRO</span>
-        </div>
+        ${themeCard('code', '💻', 'Code Matrix', 'Web & Software')}
+        ${themeCard('data', '📊', 'Data Galaxy', 'BI & Data Science')}
+        ${themeCard('hacker', '🛡️', 'Cyber Command', 'Security & Infra')}
+        ${themeCard('cosmic', '🌌', 'Cosmic Elite', 'Executive & General')}
       </div>
 
       <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -362,6 +362,11 @@ function renderStep2ChooseStyle(container) {
   `;
 
   window.selectTheme = (themeId) => {
+    if (!globalEntitlements.canUseTheme(themeId)) {
+      const targetPlan = getThemeTier(themeId) === 'premium' ? 'premium' : 'pro';
+      window.openBillingModal?.({ targetPlan });
+      return;
+    }
     onboardingController.setSelectedTheme(themeId);
     renderCurrentStep();
   };

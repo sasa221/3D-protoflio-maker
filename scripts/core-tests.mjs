@@ -13,6 +13,7 @@ import { PRODUCT_CONFIG } from '../src/config/ProductConfig.js';
 import { generatePortfolioCSS } from '../src/renderer/PortfolioRenderer.js';
 import { JobAnalyzerService } from '../src/services/JobAnalyzerService.js';
 import { matchPortfolioToJob } from '../src/services/PortfolioMatcher.js';
+import { calculatePortfolioQualityScore } from '../src/ui/PortfolioQualityScore.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,6 +30,14 @@ assert.ok(jobResults.every(result => result.passed), 'Job targeting acceptance s
 
 // 3. 15-Theme catalog integrity
 runThemeCatalogIntegrityTestSuite();
+
+// 3b. Portfolio readiness checklist invariants (plan-neutral)
+assert.equal(calculatePortfolioQualityScore({}).score, 0);
+assert.equal(calculatePortfolioQualityScore({
+  name: 'Alex', profession: 'Engineer', bio: 'Builds useful products', avatar: 'avatar.webp',
+  skills: ['JavaScript', 'React', 'CSS'], projects: [{ name: 'Site' }], experience: [{ role: 'Engineer' }],
+  social: { email: 'alex@example.com' }, resume: { url: 'resume.pdf' }, theme: 'code', slug: 'alex'
+}).score, 100);
 
 // 4. Invariants
 assert.equal(getThemeById('cyber').id, 'hacker', 'Legacy cyber theme alias must resolve to Cyber Command');

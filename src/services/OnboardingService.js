@@ -14,7 +14,7 @@ const SESSION_KEY = 'portfolio_onboarding_session_v3';
 
 export const INITIAL_ONBOARDING_STATE = {
   step: 1, // 1: Method, 2: Profile Review / Form, 3: Style, 4: Preview
-  startingMethod: null, // 'cv' | 'manual'
+  startingMethod: null, // 'cv' | 'manual' | 'example'
   profileDraft: {
     name: '',
     profession: '',
@@ -61,7 +61,7 @@ export class OnboardingService {
     state.profileDraft = { ...this.freshState().profileDraft, ...(candidate?.profileDraft || {}) };
     state.step = Number(state.step);
     if (![1, 2, 3].includes(state.step)) state.step = 1;
-    if (!['cv', 'manual'].includes(state.startingMethod)) {
+    if (!['cv', 'manual', 'example'].includes(state.startingMethod)) {
       state.startingMethod = null;
       state.step = 1;
     }
