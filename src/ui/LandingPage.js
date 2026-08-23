@@ -87,7 +87,7 @@ export async function renderLandingPage(container) {
       padding: 16px 36px; background: rgba(5, 5, 12, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
       border-bottom: 1px solid rgba(255, 255, 255, 0.08); font-family: 'Inter', sans-serif;
     ">
-      <a href="/" style="display: flex; align-items: center; gap: 10px; text-decoration: none;">
+      <a href="/" style="display: flex; align-items: center; gap: 10px; text-decoration: none; min-height: 44px;">
         <div style="
           width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #7c3aed, #06b6d4);
           display: flex; align-items: center; justify-content: center; font-size: 1.2rem; box-shadow: 0 0 20px rgba(124,58,237,0.4);
@@ -107,13 +107,13 @@ export async function renderLandingPage(container) {
       <div id="landing-auth-actions" style="display: flex; align-items: center; gap: 14px;">
         ${isAuthenticated ? `
           <a href="/studio" style="
-            padding: 10px 20px; background: linear-gradient(135deg, #7c3aed, #06b6d4); border-radius: 10px;
+            padding: 10px 20px; min-height: 44px; display: inline-flex; align-items: center; background: linear-gradient(135deg, #7c3aed, #06b6d4); border-radius: 10px;
             color: #fff; font-size: 0.85rem; font-weight: 700; text-decoration: none; box-shadow: 0 4px 15px rgba(124,58,237,0.3);
           ">⚡ Open Studio</a>
         ` : `
-          <a href="/login" style="color: rgba(255,255,255,0.85); font-size: 0.85rem; font-weight: 600; text-decoration: none; margin-right: 6px;">Sign In</a>
+          <a href="/login" style="color: rgba(255,255,255,0.85); min-height: 44px; display: inline-flex; align-items: center; font-size: 0.85rem; font-weight: 600; text-decoration: none; margin-right: 6px;">Sign In</a>
           <a href="/login?next=%2Fstart" style="
-            padding: 10px 20px; background: linear-gradient(135deg, #7c3aed, #06b6d4); border-radius: 10px;
+            padding: 10px 20px; min-height: 44px; display: inline-flex; align-items: center; background: linear-gradient(135deg, #7c3aed, #06b6d4); border-radius: 10px;
             color: #fff; font-size: 0.85rem; font-weight: 700; text-decoration: none; box-shadow: 0 4px 15px rgba(124,58,237,0.3);
           ">Build My Portfolio</a>
         `}
@@ -205,7 +205,7 @@ export async function renderLandingPage(container) {
 
           <div style="position: relative; flex: 1; overflow: hidden;">
             <canvas id="landing-hero-canvas" style="position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0;"></canvas>
-            <div id="landing-hero-viewport" style="position: absolute; inset: 0; z-index: 10; overflow: hidden;">
+            <div id="landing-hero-viewport" aria-hidden="true" inert style="position: absolute; inset: 0; z-index: 10; overflow: hidden;">
               <!-- Rendered dynamically by PortfolioRenderer -->
             </div>
           </div>
@@ -734,9 +734,9 @@ export async function renderLandingPage(container) {
       ">
         <div>© ${new Date().getFullYear()} 3D Portfolio Maker. Built for ambitious careers.</div>
         <div style="display: flex; gap: 20px;">
-          <a href="/privacy" style="color: rgba(255,255,255,0.72); text-decoration: none;">Privacy</a>
-          <a href="/terms" style="color: rgba(255,255,255,0.72); text-decoration: none;">Terms</a>
-          <a href="mailto:support@3dportfolio.app" style="color: rgba(255,255,255,0.72); text-decoration: none;">Support</a>
+          <a href="/privacy" style="color: rgba(255,255,255,0.72); min-height: 44px; display: inline-flex; align-items: center; text-decoration: none;">Privacy</a>
+          <a href="/terms" style="color: rgba(255,255,255,0.72); min-height: 44px; display: inline-flex; align-items: center; text-decoration: none;">Terms</a>
+          <a href="mailto:support@3dportfolio.app" style="color: rgba(255,255,255,0.72); min-height: 44px; display: inline-flex; align-items: center; text-decoration: none;">Support</a>
         </div>
       </footer>
     </div>
@@ -779,7 +779,7 @@ function renderScaledDemoHTML(viewport, html) {
   viewport.innerHTML = `
     <div id="landing-demo-scale-wrapper" style="
       width: 1280px; height: 800px; position: absolute; top: 0; left: 0;
-      transform-origin: top left; pointer-events: auto; box-sizing: border-box; overflow: hidden;
+      transform-origin: top left; pointer-events: none; box-sizing: border-box; overflow: hidden;
     ">
       ${html}
     </div>
