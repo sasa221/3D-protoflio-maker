@@ -123,37 +123,62 @@ export async function uploadAvatar(file, userId, portfolioId) {
 export async function uploadResume(file, userId, portfolioId) {
   validateFile(file, ALLOWED_RESUME_TYPES, MAX_RESUME_SIZE);
 
-  const { data: authData } = await supabase.auth.getUser();
-  const activeUser = authData?.user;
-
-  const canonicalUserId = activeUser?.id || (userId && userId !== 'usr_guest' ? userId : null);
-  if (!canonicalUserId) {
-    throw new Error('You must be signed in to upload a resume.');
+  let { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+  let session = sessionData?.session;
+  if (sessionErr || !session?.access_token) {
+    const { data: refreshedData, error: refreshErr } = await supabase.auth.refreshSession().catch(() => ({ data: null, error: true }));
+    if (refreshErr || !refreshedData?.session?.access_token) {
+      throw new Error('Session expired. Please sign in again before uploading a resume.');
+    }
+    session = refreshedData.session;
   }
 
-  const sanitizedFileName = file.name ? file.name.replace(/[^a-zA-Z0-9._-]/g, '_') : 'resume.pdf';
-  const safePortfolioId = portfolioId || 'default';
-  const storagePath = `${canonicalUserId}/${safePortfolioId}/resume.pdf`;
+  const activeUser = session.user;
+  const canonicalUserId = activeUser?.id || (userId && userId !== 'usr_guest' ? userId : null);
+  if (!canonicalUserId) throw new Error('You must be signed in to upload a resume.');
 
+  const makeUploadRequest = (token) => fetch('/api/storage/upload-resume', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      fileName: file.name || 'resume.pdf',
+      portfolioId: portfolioId || 'default'
+    })
+  });
+
+  let apiRes = await makeUploadRequest(session.access_token);
+  if (apiRes.status === 401) {
+    const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession().catch(() => ({ data: null, error: true }));
+    if (refreshErr || !refreshed?.session?.access_token) throw new Error('Session expired. Please sign in again.');
+    session = refreshed.session;
+    apiRes = await makeUploadRequest(session.access_token);
+  }
+  if (!apiRes.ok) {
+    const errJson = await apiRes.json().catch(() => ({}));
+    throw new Error(errJson.error || `Resume upload failed with HTTP ${apiRes.status}`);
+  }
+
+  const json = await apiRes.json();
   const { error: uploadErr } = await supabase.storage
     .from('resumes')
-    .upload(storagePath, file, {
-      upsert: true,
+    .uploadToSignedUrl(json.storagePath, json.uploadToken, file, {
       contentType: 'application/pdf'
     });
-
   if (uploadErr) {
-    console.error('Supabase resume upload error:', uploadErr);
+    console.error('Supabase signed resume upload error:', uploadErr);
     throw new Error(`Resume upload failed: ${uploadErr.message}`);
   }
 
   return {
     storageBucket: 'resumes',
-    storagePath,
-    fileName: sanitizedFileName,
+    storagePath: json.storagePath,
+    fileName: json.fileName || (file.name ? file.name.replace(/[^a-zA-Z0-9._-]/g, '_') : 'resume.pdf'),
     mimeType: 'application/pdf',
     size: file.size,
-    updatedAt: new Date().toISOString()
+    updatedAt: json.updatedAt || new Date().toISOString()
   };
 }
 

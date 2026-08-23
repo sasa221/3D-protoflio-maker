@@ -89,6 +89,11 @@ console.log('\n3. Testing Unauthenticated Access Restrictions...');
 }
 {
   const res = mockRes();
+  await portfolioHandler({ method: 'POST', query: { action: 'upload-resume' }, headers: {}, body: {} }, res);
+  assert(res.statusCode === 401, 'portfolio upload-resume without auth returns 401');
+}
+{
+  const res = mockRes();
   await analyticsHandler({ method: 'GET', query: { action: 'dashboard' }, headers: {} }, res);
   assert(res.statusCode === 401, 'analytics dashboard without auth returns 401');
 }

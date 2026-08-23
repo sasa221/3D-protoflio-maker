@@ -66,6 +66,10 @@
       "destination": "/api/portfolio?action=upload-avatar"
     },
     {
+      "source": "/api/storage/upload-resume",
+      "destination": "/api/portfolio?action=upload-resume"
+    },
+    {
       "source": "/api/domain/connect",
       "destination": "/api/portfolio?action=domain-connect"
     },

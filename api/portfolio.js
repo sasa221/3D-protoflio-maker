@@ -263,7 +263,57 @@ export default async function handler(req, res) {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // 3. ACTION: DOMAIN-CONNECT
+  // 3. ACTION: UPLOAD-RESUME
+  // ─────────────────────────────────────────────────────────────
+  // Resume files stay private in Supabase Storage. The server issues a
+  // one-time signed upload token, so large PDFs never pass through Vercel
+  // and the browser never needs direct INSERT permissions on storage.objects.
+  if (action === 'upload-resume') {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+    const authHeader = req.headers.authorization || req.headers.Authorization;
+    if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized — Auth Bearer token required' });
+    }
+    const token = authHeader.replace(/^bearer\s+/i, '').trim();
+
+    try {
+      const adminClient = createClient(supabaseUrl, supabaseSecretKey, { auth: { autoRefreshToken: false, persistSession: false } });
+      const { data: userData, error: userErr } = await adminClient.auth.getUser(token);
+      if (userErr || !userData?.user?.id) return res.status(401).json({ error: 'Unauthorized user session' });
+
+      if (!userData.user.email_confirmed_at && !userData.user.confirmed_at && !userData.user.user_metadata?.email_verified) {
+        return res.status(403).json({ error: 'Email verification required before uploading media assets' });
+      }
+
+      const { portfolioId, fileName } = req.body || {};
+      const safePortfolioId = String(portfolioId || 'default').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80) || 'default';
+      const sanitizedFileName = String(fileName || 'resume.pdf').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 160) || 'resume.pdf';
+      const userId = userData.user.id;
+      const storagePath = `${userId}/${safePortfolioId}/resume.pdf`;
+
+      const { data: signedData, error: signedErr } = await adminClient.storage
+        .from('resumes')
+        .createSignedUploadUrl(storagePath, { upsert: true });
+      if (signedErr || !signedData?.token) {
+        return res.status(500).json({ error: `Storage upload preparation failed: ${signedErr?.message || 'Unable to create signed upload URL'}` });
+      }
+
+      return res.status(200).json({
+        success: true,
+        storageBucket: 'resumes',
+        storagePath,
+        uploadToken: signedData.token,
+        fileName: sanitizedFileName,
+        mimeType: 'application/pdf',
+        updatedAt: new Date().toISOString()
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 4. ACTION: DOMAIN-CONNECT
   // ─────────────────────────────────────────────────────────────
   if (action === 'domain-connect') {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
