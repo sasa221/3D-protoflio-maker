@@ -6,7 +6,7 @@ import './index.css';
 import { renderAuthPage, renderResetPasswordPage } from './AuthPage.js';
 import { renderAdminPage } from './AdminPage.js';
 import { supabase } from './services/SupabaseClient.js';
-import { isLoggedIn, getCurrentUser, getCurrentAuthUser, isPro, logout, upgradeToPro, isAdmin, redeemPromoCode, subscribeToAuthStateChange, isEmailVerified } from './services/AuthService.js';
+import { isLoggedIn, getCurrentUser, getCurrentAuthUser, isPro, logout, upgradeToPro, isAdmin, redeemPromoCode, subscribeToAuthStateChange, isEmailVerified, acceptGroupInvitation, getGroupManagement } from './services/AuthService.js';
 
 window.supabase = supabase;
 window.getCurrentAuthUser = getCurrentAuthUser;
@@ -37,6 +37,7 @@ import { renderPortfolioVariantManager } from './ui/PortfolioVariantManager.js';
 import { renderAnalyticsDashboard } from './ui/AnalyticsDashboard.js';
 import { initPublicPortfolioAnalytics } from './services/AnalyticsService.js';
 import { openBillingModal } from './ui/BillingModal.js';
+import { openGroupManagementModal, showPendingGroupInvitations } from './ui/GroupManagementModal.js';
 import { globalEntitlements } from './services/EntitlementService.js';
 window.globalEntitlements = globalEntitlements;
 import { canAccessTheme, getThemeTier, getThemeBadge } from './config/ThemeTierConfig.js';
@@ -284,9 +285,11 @@ async function router() {
     }
     renderPricingPage(getAppContainer(), {
       currentPlan: globalEntitlements.getEffectivePlanId(),
-      onSelectPlan: (planId) => planId === 'free'
+        onSelectPlan: (planId) => planId === 'free'
         ? (window.location.href = '/start')
-        : openBillingModal({ targetPlan: planId })
+        : planId === 'premium_group' && globalEntitlements.getEffectivePlanId() === 'premium_group'
+          ? openGroupManagementModal()
+          : openBillingModal({ targetPlan: planId })
     });
     return;
   }
@@ -316,12 +319,13 @@ async function router() {
     setPageTitle('Creator Studio');
     const authUser = await getCurrentAuthUser();
     if (!authUser) {
-      window.location.href = '/login';
+      const nextStudioUrl = `${path}${window.location.search}`;
+      window.location.href = `/login?next=${encodeURIComponent(nextStudioUrl)}`;
       return;
     }
     if (!isEmailVerified(authUser)) {
       renderAuthPage(() => {
-        window.location.href = '/studio';
+        window.location.href = `/studio${window.location.search}`;
       });
       return;
     }
@@ -504,10 +508,24 @@ export function resetStudioState() {
 
 async function initStudio() {
   resetStudioState();
+  let pendingGroupInvites = [];
   try {
     const authUser = await getCurrentAuthUser();
     if (authUser) {
       const { profile } = await fetchUserProfileAndEntitlements(authUser);
+      const inviteGroupId = new URLSearchParams(window.location.search).get('group_invite');
+      if (inviteGroupId) {
+        try {
+          await acceptGroupInvitation(inviteGroupId);
+          await fetchUserProfileAndEntitlements(authUser);
+          window.history.replaceState({}, '', '/studio');
+          setTimeout(() => showToast('success', '👥', 'You joined the Premium Group. Your Premium limits are active.'), 250);
+        } catch (inviteError) {
+          setTimeout(() => showToast('error', '👥', inviteError.message || 'This group invitation could not be accepted.'), 250);
+        }
+      }
+      const groupState = await getGroupManagement().catch(() => null);
+      pendingGroupInvites = groupState?.pendingInvitations || [];
       const cloudPortfolio = await loadUserPortfoliosFromSupabase(authUser);
 
       // Deterministic Identity Priority:
@@ -563,6 +581,10 @@ async function initStudio() {
   installEntitlementRefresh();
   window.initStudio = initStudio;
   showToast('info', '⚡', 'Studio Ready! Synced with Supabase Postgres.');
+  if (new URLSearchParams(window.location.search).get('manage_group') === '1' && globalEntitlements.getEffectivePlanId() === 'premium_group') {
+    setTimeout(() => openGroupManagementModal(), 500);
+  }
+  if (pendingGroupInvites.length) setTimeout(() => showPendingGroupInvitations(pendingGroupInvites), 500);
 }
 
 async function refreshStudioEntitlements({ notify = false } = {}) {
@@ -3197,6 +3219,12 @@ window.handleLogout = function() {
 
 window.handleUpgradeClick = async function(targetPlanId = null) {
   const user = await getCurrentAuthUser().catch(() => null);
+  const effectivePlan = globalEntitlements.getEffectivePlanId();
+  const rawPlan = globalEntitlements.getPlanId();
+  if (!targetPlanId && (effectivePlan === 'premium_group' || (effectivePlan === 'premium' && rawPlan === 'free'))) {
+    await openGroupManagementModal();
+    return;
+  }
   openBillingModal({
     currentUserId: user?.id,
     targetPlan: targetPlanId,

@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
+import { sendBrevoEmail } from '../src/services/BrevoDispatcher.js';
+import { generateGroupInvitationEmail, generateGroupMemberActivatedEmail, generateGroupMemberJoinedEmail } from '../src/services/EmailTemplates.js';
 
 // Feature flags helper
 function isServerFeatureEnabled(flagName) {
@@ -60,7 +62,11 @@ export default async function handler(req, res) {
       // Check group membership
       if (effectivePlan === 'free') {
         const { data: groupMember } = await adminClient.from('group_members').select('*, groups(*)').eq('user_id', userId).eq('status', 'active').maybeSingle();
-        if (groupMember && groupMember.groups?.status === 'active') effectivePlan = 'premium';
+        if (groupMember && groupMember.groups?.status === 'active') {
+          const { data: ownerSub } = await adminClient.from('subscriptions').select('status,current_period_end').eq('user_id', groupMember.groups.owner_user_id).maybeSingle();
+          const ownerActive = ['active', 'grace', 'canceling'].includes(ownerSub?.status || '') && (!ownerSub?.current_period_end || new Date(ownerSub.current_period_end).getTime() > Date.now());
+          if (ownerActive) effectivePlan = 'premium';
+        }
       }
 
       // Action: use_theme
@@ -181,24 +187,131 @@ export default async function handler(req, res) {
       const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
       if (req.method === 'GET') {
-        const { data: group } = await adminClient.from('groups').select('*, group_members(*)').eq('owner_user_id', userId).maybeSingle();
-        return res.status(200).json({ group });
+        const { data: group, error: groupErr } = await adminClient.from('groups').select('*').eq('owner_user_id', userId).maybeSingle();
+        if (groupErr) return res.status(500).json({ error: groupErr.message });
+        if (group) {
+          const { data: ownerSub } = await adminClient.from('subscriptions').select('plan_id,status,current_period_end').eq('user_id', userId).maybeSingle();
+          const groupActive = ownerSub?.plan_id === 'premium_group' && ['active', 'grace', 'canceling'].includes(ownerSub.status || '') && (!ownerSub.current_period_end || new Date(ownerSub.current_period_end).getTime() > Date.now());
+          if (!groupActive) return res.status(200).json({ group, groupExpired: true, members: [], pendingInvitations: [], owner: { id: userId, email: userData.user.email || '' } });
+        }
+        if (!group) {
+          const { data: pendingInvitations } = await adminClient
+            .from('group_members')
+            .select('id,group_id,role,status,invited_at,groups(id,seat_limit,status,owner_user_id)')
+            .eq('user_id', userId)
+            .eq('status', 'pending');
+          const { data: membership } = await adminClient.from('group_members').select('id,group_id,role,status,joined_at,groups(id,seat_limit,status,owner_user_id)').eq('user_id', userId).eq('status', 'active').maybeSingle();
+          let membershipOwner = null;
+          const membershipGroup = Array.isArray(membership?.groups) ? membership.groups[0] : membership?.groups;
+          if (membershipGroup?.owner_user_id) {
+            membershipOwner = (await adminClient.from('profiles').select('email,display_name').eq('id', membershipGroup.owner_user_id).maybeSingle()).data || null;
+          }
+          return res.status(200).json({ group: null, members: [], membership: membership || null, membershipGroup: membershipGroup || null, membershipOwner, pendingInvitations: pendingInvitations || [], owner: { id: userId, email: userData.user.email || '' } });
+        }
+        const { data: members, error: membersErr } = await adminClient.from('group_members').select('*').eq('group_id', group.id).order('invited_at', { ascending: true });
+        if (membersErr) return res.status(500).json({ error: membersErr.message });
+        const memberIds = (members || []).map(member => member.user_id).filter(Boolean);
+        const { data: profiles } = memberIds.length
+          ? await adminClient.from('profiles').select('id,email,display_name').in('id', memberIds)
+          : { data: [] };
+        const profileById = new Map((profiles || []).map(profile => [profile.id, profile]));
+        return res.status(200).json({
+          group,
+          owner: { id: userId, email: userData.user.email || '' },
+          members: (members || []).map(member => ({ ...member, profile: profileById.get(member.user_id) || null }))
+        });
       }
 
       if (req.method === 'POST') {
         const { subAction, memberEmail, groupId } = req.body || {};
         if (subAction === 'invite_member') {
           if (!memberEmail) return res.status(400).json({ error: 'memberEmail required' });
-          const { data: targetProfile } = await adminClient.from('profiles').select('id').eq('email', memberEmail.trim().toLowerCase()).maybeSingle();
+          const cleanEmail = memberEmail.trim().toLowerCase();
+          const { data: targetProfile } = await adminClient.from('profiles').select('id,email,display_name').eq('email', cleanEmail).maybeSingle();
           if (!targetProfile) return res.status(404).json({ error: 'User with this email was not found' });
+          if (targetProfile.id === userId) return res.status(400).json({ error: 'The group owner cannot be invited as a member.' });
 
           const { data: group } = await adminClient.from('groups').select('*, group_members(*)').eq('owner_user_id', userId).maybeSingle();
           if (!group) return res.status(404).json({ error: 'You do not own an active Premium Group' });
-          if ((group.group_members?.length || 0) >= group.seat_limit) return res.status(400).json({ error: `Group seat limit of ${group.seat_limit} reached.` });
+          if (group.status !== 'active') return res.status(400).json({ error: 'This Premium Group is not active.' });
+          const { data: ownerSub } = await adminClient.from('subscriptions').select('plan_id,status,current_period_end').eq('user_id', userId).maybeSingle();
+          const ownerActive = ownerSub?.plan_id === 'premium_group' && ['active', 'grace', 'canceling'].includes(ownerSub.status || '') && (!ownerSub.current_period_end || new Date(ownerSub.current_period_end).getTime() > Date.now());
+          if (!ownerActive) return res.status(403).json({ error: 'Your Premium Group subscription is inactive or expired.' });
+          // Pending invitations do not reserve a seat. The purchased group
+          // size is the number of teammates the owner can activate.
+          const occupiedSeats = (group.group_members || []).filter(member => member.status === 'active').length;
+          if (occupiedSeats >= group.seat_limit) return res.status(400).json({ error: `Group seat limit of ${group.seat_limit} reached.` });
 
-          const { error: insErr } = await adminClient.from('group_members').insert({ group_id: group.id, user_id: targetProfile.id, role: 'member', status: 'active', joined_at: new Date().toISOString() });
+          const existingMember = (group.group_members || []).find(member => member.user_id === targetProfile.id);
+          if (existingMember?.status === 'active') return res.status(409).json({ error: 'This user is already an active group member.' });
+
+          const invitedAt = new Date().toISOString();
+          const { error: insErr } = existingMember
+            ? await adminClient.from('group_members').update({ role: 'member', status: 'pending', invited_at: invitedAt, joined_at: null }).eq('id', existingMember.id)
+            : await adminClient.from('group_members').insert({ group_id: group.id, user_id: targetProfile.id, role: 'member', status: 'pending', invited_at: invitedAt, joined_at: null });
           if (insErr) return res.status(500).json({ error: insErr.message });
-          return res.status(200).json({ success: true, memberEmail });
+
+          const ownerName = userData.user.user_metadata?.full_name || userData.user.email?.split('@')[0] || 'Your teammate';
+          const invitationUrl = `https://portfolio-maker-murex.vercel.app/studio?group_invite=${encodeURIComponent(group.id)}`;
+          const emailResult = await sendBrevoEmail({
+            to: cleanEmail,
+            subject: `${ownerName} invited you to a Premium Portfolio Group`,
+            htmlContent: generateGroupInvitationEmail({ ownerName, invitationUrl, seatLimit: group.seat_limit })
+          });
+          return res.status(200).json({ success: true, memberEmail: cleanEmail, status: 'pending', resent: Boolean(existingMember), emailSent: emailResult.success, emailError: emailResult.success ? null : emailResult.error });
+        }
+
+        if (subAction === 'remove_member') {
+          if (!groupId) return res.status(400).json({ error: 'groupId required' });
+          const { data: ownedGroup } = await adminClient.from('groups').select('id').eq('id', groupId).eq('owner_user_id', userId).maybeSingle();
+          if (!ownedGroup) return res.status(403).json({ error: 'Only the group owner can manage members.' });
+          const memberId = String(req.body.memberId || '');
+          if (!memberId) return res.status(400).json({ error: 'memberId required' });
+          const { error: removeErr } = await adminClient.from('group_members').update({ status: 'removed' }).eq('id', memberId).eq('group_id', groupId);
+          if (removeErr) return res.status(500).json({ error: removeErr.message });
+          return res.status(200).json({ success: true, status: 'removed' });
+        }
+
+        if (subAction === 'accept_invitation') {
+          if (!groupId) return res.status(400).json({ error: 'groupId required' });
+          const { data: group } = await adminClient.from('groups').select('*').eq('id', groupId).eq('status', 'active').maybeSingle();
+          if (!group) return res.status(404).json({ error: 'This group invitation is no longer active.' });
+          const { data: ownerSub } = await adminClient.from('subscriptions').select('plan_id,status,current_period_end').eq('user_id', group.owner_user_id).maybeSingle();
+          const ownerActive = ownerSub?.plan_id === 'premium_group' && ['active', 'grace', 'canceling'].includes(ownerSub.status || '') && (!ownerSub.current_period_end || new Date(ownerSub.current_period_end).getTime() > Date.now());
+          if (!ownerActive) return res.status(410).json({ error: 'This Premium Group subscription has expired.' });
+          const { data: invitation } = await adminClient.from('group_members').select('*').eq('group_id', groupId).eq('user_id', userId).eq('status', 'pending').maybeSingle();
+          if (!invitation) return res.status(404).json({ error: 'No pending invitation was found for this account.' });
+          const { count: activeMemberCount } = await adminClient.from('group_members').select('id', { count: 'exact', head: true }).eq('group_id', groupId).eq('status', 'active');
+          if ((activeMemberCount || 0) >= group.seat_limit) return res.status(400).json({ error: 'This group has no available seat.' });
+          const { error: acceptErr } = await adminClient.from('group_members').update({ status: 'active', joined_at: new Date().toISOString() }).eq('id', invitation.id);
+          if (acceptErr) return res.status(500).json({ error: acceptErr.message });
+          const [{ data: ownerProfile }, { data: memberProfile }] = await Promise.all([
+            adminClient.from('profiles').select('email,display_name').eq('id', group.owner_user_id).maybeSingle(),
+            adminClient.from('profiles').select('email,display_name').eq('id', userId).maybeSingle()
+          ]);
+          const ownerName = ownerProfile?.display_name || ownerProfile?.email?.split('@')[0] || 'Your teammate';
+          const memberName = memberProfile?.display_name || userData.user.email?.split('@')[0] || 'there';
+          const activeUntil = (await adminClient.from('subscriptions').select('current_period_end').eq('user_id', group.owner_user_id).maybeSingle()).data?.current_period_end;
+          await Promise.all([
+            sendBrevoEmail({
+              to: userData.user.email,
+              subject: 'Your Premium Group access is active',
+              htmlContent: generateGroupMemberActivatedEmail({ memberName, ownerName, activeUntil })
+            }),
+            ownerProfile?.email ? sendBrevoEmail({
+              to: ownerProfile.email,
+              subject: `${memberName} joined your Premium Group`,
+              htmlContent: generateGroupMemberJoinedEmail({ ownerName, memberEmail: userData.user.email })
+            }) : Promise.resolve(null)
+          ]);
+          return res.status(200).json({ success: true, status: 'active', groupId });
+        }
+
+        if (subAction === 'decline_invitation') {
+          if (!groupId) return res.status(400).json({ error: 'groupId required' });
+          const { error: declineErr } = await adminClient.from('group_members').update({ status: 'declined' }).eq('group_id', groupId).eq('user_id', userId).eq('status', 'pending');
+          if (declineErr) return res.status(500).json({ error: declineErr.message });
+          return res.status(200).json({ success: true, status: 'declined', groupId });
         }
       }
       return res.status(400).json({ error: 'Invalid group action' });

@@ -53,6 +53,11 @@ CREATE TABLE IF NOT EXISTS public.groups (
 CREATE INDEX IF NOT EXISTS idx_groups_owner
   ON public.groups(owner_user_id);
 
+-- One active Premium Group per owner. This also makes the owner upserts
+-- used by admin approval and subscription activation deterministic.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_groups_owner_unique
+  ON public.groups(owner_user_id);
+
 -- Group members
 CREATE TABLE IF NOT EXISTS public.group_members (
   id TEXT PRIMARY KEY DEFAULT 'gm_' || md5(random()::text),

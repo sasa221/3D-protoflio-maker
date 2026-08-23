@@ -54,6 +54,43 @@ function baseLayout(content, footerNote = 'Portfolio Maker — Professional 3D P
 </html>`;
 }
 
+export function generateGroupInvitationEmail({ ownerName = 'A teammate', invitationUrl, seatLimit = 2 }) {
+  const safeOwner = String(ownerName).replace(/[<>&"']/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#039;' }[char]));
+  const safeUrl = String(invitationUrl || 'https://portfolio-maker-murex.vercel.app/studio').replace(/"/g, '&quot;');
+  const content = `
+    <div style="background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.35);border-radius:10px;padding:12px 16px;margin-bottom:20px;text-align:center;">
+      <span style="font-size:24px;display:block;margin-bottom:4px;">👥</span>
+      <strong style="color:#c084fc;font-size:13px;letter-spacing:0.5px;">PREMIUM GROUP INVITATION</strong>
+    </div>
+    <h2 style="margin:0 0 12px;font-size:18px;font-weight:800;color:#ffffff;">You’re invited to a Premium Portfolio Group</h2>
+    <p style="margin:0 0 18px;font-size:14px;color:#9ca3af;line-height:1.6;">${safeOwner} invited you to join their ${seatLimit}-seat group. You’ll use your own account and portfolio while receiving Premium features and your own usage limits.</p>
+    <div style="text-align:center;margin:28px 0;"><a href="${safeUrl}" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:14px 30px;border-radius:10px;">Accept Invitation</a></div>
+    <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5;">Sign in with this email first, then click the button to activate your seat. If you weren’t expecting this invitation, you can ignore it.</p>
+  `;
+  return baseLayout(content, '3D Portfolio Maker — Premium Group Invitation');
+}
+
+export function generateGroupMemberActivatedEmail({ memberName = 'there', ownerName = 'your team owner', activeUntil, studioUrl = 'https://portfolio-maker-murex.vercel.app/studio' }) {
+  const content = `
+    <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.35);border-radius:10px;padding:12px 16px;margin-bottom:20px;text-align:center;"><span style="font-size:24px;display:block;margin-bottom:4px;">🎉</span><strong style="color:#4ade80;font-size:13px;letter-spacing:.5px;">YOU’RE IN THE GROUP</strong></div>
+    <h2 style="margin:0 0 12px;font-size:18px;font-weight:800;color:#ffffff;">Welcome to your Premium Group</h2>
+    <p style="margin:0 0 18px;font-size:14px;color:#9ca3af;line-height:1.6;">Hi ${memberName}, ${ownerName}’s invitation was accepted. Your own account now has Premium features, its own portfolio, and its own usage limits.</p>
+    ${activeUntil ? `<p style="margin:0 0 18px;font-size:13px;color:#c084fc;">Access is active until <strong>${new Date(activeUntil).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</strong>.</p>` : ''}
+    <div style="text-align:center;margin:28px 0;"><a href="${studioUrl}" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:14px 30px;border-radius:10px;">Open My Studio</a></div>
+  `;
+  return baseLayout(content, '3D Portfolio Maker — Premium Group Access');
+}
+
+export function generateGroupMemberJoinedEmail({ ownerName = 'there', memberEmail, studioUrl = 'https://portfolio-maker-murex.vercel.app/studio' }) {
+  const content = `
+    <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.35);border-radius:10px;padding:12px 16px;margin-bottom:20px;text-align:center;"><span style="font-size:24px;display:block;margin-bottom:4px;">✅</span><strong style="color:#4ade80;font-size:13px;letter-spacing:.5px;">NEW MEMBER JOINED</strong></div>
+    <h2 style="margin:0 0 12px;font-size:18px;font-weight:800;color:#ffffff;">Your Premium Group is growing</h2>
+    <p style="margin:0 0 18px;font-size:14px;color:#9ca3af;line-height:1.6;">${memberEmail || 'A teammate'} accepted your invitation and now has their own Premium account and usage limits.</p>
+    <div style="text-align:center;margin:28px 0;"><a href="${studioUrl}" style="display:inline-block;background:linear-gradient(135deg,#059669,#0891b2);color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:14px 30px;border-radius:10px;">Manage My Team</a></div>
+  `;
+  return baseLayout(content, '3D Portfolio Maker — Group Management');
+}
+
 /**
  * 1. Verification OTP Email
  */
@@ -160,7 +197,7 @@ export function generatePaymentApprovedEmail({ firstName = 'there', planName, ac
     </div>
 
     <div style="text-align:center;margin:28px 0;">
-      <a href="https://portfolio-maker-murex.vercel.app/studio" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:14px 32px;border-radius:10px;box-shadow:0 8px 20px rgba(124,58,237,0.35);">Open Studio</a>
+      <a href="https://portfolio-maker-murex.vercel.app/studio${groupSeats ? '?manage_group=1' : ''}" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:14px 32px;border-radius:10px;box-shadow:0 8px 20px rgba(124,58,237,0.35);">${groupSeats ? 'Open Studio & Invite Team' : 'Open Studio'}</a>
     </div>
   `;
   return baseLayout(content, '3D Portfolio Maker — Subscription Management');
@@ -195,4 +232,3 @@ export function generatePaymentRejectedEmail({ firstName = 'there', planName, re
   `;
   return baseLayout(content, '3D Portfolio Maker — Billing Support');
 }
-

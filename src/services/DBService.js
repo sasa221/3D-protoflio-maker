@@ -47,6 +47,23 @@ export async function fetchUserProfileAndEntitlements(user) {
       groupMembership = gm;
     } catch (_) {}
 
+    // Reconcile active group access with the server so an expired owner
+    // subscription immediately falls back to Free on the next app load.
+    if (groupMembership?.status === 'active') {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData?.session?.access_token) {
+          const response = await fetch('/api/entitlements', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionData.session.access_token}` },
+            body: JSON.stringify({})
+          });
+          const serverEntitlements = await response.json().catch(() => ({}));
+          if (response.ok && serverEntitlements.effectivePlan === 'free') groupMembership = null;
+        }
+      } catch (_) {}
+    }
+
     // 4. Fetch Keep It Live entitlements
     let keepLiveEntitlements = [];
     try {

@@ -120,7 +120,9 @@ function renderPlanCard(plan, currentPlan, planId) {
       </ul>
       <div class="pricing-card-cta">
         ${isCurrent
-          ? '<button class="btn-plan btn-plan--current" disabled>Current Plan</button>'
+          ? planId === 'premium_group'
+            ? '<button class="btn-plan" data-plan-select="premium_group">Manage Team</button>'
+            : '<button class="btn-plan btn-plan--current" disabled>Current Plan</button>'
           : `<button class="btn-plan ${isPopular ? 'btn-plan--primary' : ''}" data-plan-select="${planId}">${plan.cta}</button>`
         }
       </div>
@@ -163,7 +165,7 @@ function renderGroupCard(currentPlan) {
       <p class="group-note">Need more than 5 seats? <a href="mailto:support@3dportfolio.app">Contact us.</a></p>
       <div class="pricing-card-cta">
         ${isCurrent
-          ? '<button class="btn-plan btn-plan--current" disabled>Current Plan</button>'
+          ? '<button class="btn-plan" data-plan-select="premium_group">Manage Team</button>'
           : `<button class="btn-plan" data-plan-select="premium_group">${plan.cta}</button>`
         }
       </div>

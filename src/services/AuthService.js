@@ -180,6 +180,54 @@ export function isPaidPlan() {
   return globalEntitlements.getEffectivePlanId() !== 'free';
 }
 
+async function groupRequest(options = {}) {
+  const session = await getAuthSession();
+  if (!session?.access_token) throw new Error('Please sign in first.');
+  const response = await fetch('/api/groups/manage', {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+      ...(options.headers || {})
+    }
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || 'Group request failed.');
+  return payload;
+}
+
+export function getGroupManagement() {
+  return groupRequest({ method: 'GET' });
+}
+
+export function inviteGroupMember(memberEmail) {
+  return groupRequest({
+    method: 'POST',
+    body: JSON.stringify({ subAction: 'invite_member', memberEmail })
+  });
+}
+
+export function acceptGroupInvitation(groupId) {
+  return groupRequest({
+    method: 'POST',
+    body: JSON.stringify({ subAction: 'accept_invitation', groupId })
+  });
+}
+
+export function declineGroupInvitation(groupId) {
+  return groupRequest({
+    method: 'POST',
+    body: JSON.stringify({ subAction: 'decline_invitation', groupId })
+  });
+}
+
+export function removeGroupMember(groupId, memberId) {
+  return groupRequest({
+    method: 'POST',
+    body: JSON.stringify({ subAction: 'remove_member', groupId, memberId })
+  });
+}
+
 export function getCurrentPlanId() {
   return globalEntitlements.getEffectivePlanId();
 }

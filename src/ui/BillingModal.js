@@ -8,6 +8,7 @@
 import { globalEntitlements } from '../services/EntitlementService.js';
 import { PLANS, GROUP_SEAT_PRICING, formatEGP } from '../config/PlanConfig.js';
 import { submitManualPayment, getUserPaymentStatus, redeemPromoCode, getPublicPaymentConfig } from '../services/AuthService.js';
+import { openGroupManagementModal } from './GroupManagementModal.js';
 
 let modalContainer = null;
 let currentSelectedGroupSeats = 2;
@@ -50,7 +51,7 @@ export async function openBillingModal(arg1, arg2, arg3) {
   modalContainer.className = 'cv-import-modal-overlay billing-modal-overlay';
   modalContainer.style.cssText = 'position: fixed; inset: 0; background: rgba(0, 0, 0, 0.88); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 100000; padding: clamp(12px, 3vw, 24px); box-sizing: border-box;';
 
-  const currentPlan = globalEntitlements.getPlanId();
+  const currentPlan = globalEntitlements.getEffectivePlanId();
   let pendingRequests = [];
   try {
     const statusData = await getUserPaymentStatus();
@@ -138,6 +139,14 @@ function renderBillingMainView(currentPlan, pendingRequests, onSubscriptionUpdat
     btn.addEventListener('click', () => {
       const planId = btn.getAttribute('data-plan');
       renderInstaPayView(planId, onSubscriptionUpdated, currentPlan, pendingRequests, targetPlan, currentSelectedGroupSeats);
+    });
+  });
+
+  modalContainer.querySelectorAll('.btn-manage-group').forEach(btn => {
+    btn.addEventListener('click', () => {
+      modalContainer?.remove();
+      modalContainer = null;
+      openGroupManagementModal();
     });
   });
 }
@@ -277,7 +286,14 @@ function buildPlanCard(planId, currentPlan, targetPlan = null, selectedGroupSeat
     ctaClass = 'background: linear-gradient(135deg, #059669, #0891b2); color: #fff; box-shadow: 0 4px 14px rgba(16,185,129,0.35);';
   }
 
-  const ctaSectionHTML = isCurrent
+  const ctaSectionHTML = isCurrent && isGroup
+    ? `
+      <div style="margin-top: auto; padding-top: 18px;">
+        <button class="btn-manage-group" style="width: 100%; padding: 11px; font-size: 0.85rem; font-weight: 800; background: linear-gradient(135deg,#059669,#0891b2); border: 0; border-radius: 12px; color: #fff; cursor: pointer;">Manage Team</button>
+        <div style="font-size: 11px; color: rgba(255,255,255,0.45); margin-top: 6px; font-weight: 500;">Invite or replace teammates</div>
+      </div>
+    `
+    : isCurrent
     ? `
       <div style="margin-top: auto; padding-top: 18px;">
         <button disabled style="width: 100%; padding: 11px; font-size: 0.85rem; font-weight: 700; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; color: rgba(255,255,255,0.6); cursor: default;">Current Plan</button>

@@ -144,8 +144,10 @@ export default async function handler(req, res) {
       if (effectivePlan !== 'premium' && effectivePlan !== 'pro') {
         const { data: membership } = await adminClient.from('group_members').select('group_id').eq('user_id', userId).eq('status', 'active').maybeSingle();
         if (membership) {
-          const { data: group } = await adminClient.from('groups').select('status').eq('id', membership.group_id).eq('status', 'active').maybeSingle();
-          if (group) effectivePlan = 'premium';
+          const { data: group } = await adminClient.from('groups').select('status,owner_user_id').eq('id', membership.group_id).eq('status', 'active').maybeSingle();
+          const { data: ownerSub } = group ? await adminClient.from('subscriptions').select('status,current_period_end').eq('user_id', group.owner_user_id).maybeSingle() : { data: null };
+          const ownerActive = group && ['active', 'grace', 'canceling'].includes(ownerSub?.status || '') && (!ownerSub?.current_period_end || new Date(ownerSub.current_period_end).getTime() > Date.now());
+          if (ownerActive) effectivePlan = 'premium';
         }
       }
 
@@ -291,8 +293,9 @@ export default async function handler(req, res) {
       if (!canUseCustomDomain) {
         const { data: membership } = await adminClient.from('group_members').select('group_id').eq('user_id', userData.user.id).eq('status', 'active').maybeSingle();
         if (membership) {
-          const { data: group } = await adminClient.from('groups').select('id').eq('id', membership.group_id).eq('status', 'active').maybeSingle();
-          canUseCustomDomain = Boolean(group);
+          const { data: group } = await adminClient.from('groups').select('id,owner_user_id').eq('id', membership.group_id).eq('status', 'active').maybeSingle();
+          const { data: ownerSub } = group ? await adminClient.from('subscriptions').select('status,current_period_end').eq('user_id', group.owner_user_id).maybeSingle() : { data: null };
+          canUseCustomDomain = Boolean(group && ['active', 'grace', 'canceling'].includes(ownerSub?.status || '') && (!ownerSub?.current_period_end || new Date(ownerSub.current_period_end).getTime() > Date.now()));
         }
       }
       if (!canUseCustomDomain) return res.status(403).json({ error: 'Custom domains require an active Premium plan.' });
