@@ -697,7 +697,7 @@ function buildHTML() {
         <div class="logo-name">3D Portfolio Maker</div>
         <div class="logo-sub">Ultra Studio v3.0</div>
       </div>
-      <div class="tier-chip ${globalEntitlements.getEffectivePlanId() !== 'free' ? 'tier-pro' : 'tier-free'}" id="tier-chip" role="button" tabindex="0" aria-label="View plan and billing" onclick="handleUpgradeClick()" style="cursor:pointer">
+      <div class="tier-chip ${globalEntitlements.getEffectivePlanId() !== 'free' ? 'tier-pro' : 'tier-free'}" id="tier-chip" role="button" tabindex="0" aria-label="View plan and billing" style="cursor:pointer">
         ${(() => { const p = globalEntitlements.getEffectivePlanId(); return p === 'premium' ? '👑 PREMIUM' : p === 'premium_group' ? '👥 GROUP' : p === 'pro' ? '💎 PRO' : '🆓 FREE'; })()}
       </div>
       <button class="admin-btn" id="logout-btn" title="Logout" onclick="handleLogout()" style="font-size:16px">🚪</button>
@@ -3233,14 +3233,13 @@ window.handleLogout = function() {
 window.handleUpgradeClick = async function(targetPlanId = null) {
   const user = await getCurrentAuthUser().catch(() => null);
   const effectivePlan = globalEntitlements.getEffectivePlanId();
-  const rawPlan = globalEntitlements.getPlanId();
-  if (!targetPlanId && (effectivePlan === 'premium_group' || (effectivePlan === 'premium' && rawPlan === 'free'))) {
-    await openGroupManagementModal();
-    return;
-  }
+  // Keep Studio's plan chip on the same pricing surface as Home. The
+  // current Premium Group card still exposes Manage Team, so billing and
+  // team administration remain available without an unexpected overlay.
+  const requestedPlan = targetPlanId || (effectivePlan === 'premium_group' ? 'premium_group' : null);
   openBillingModal({
     currentUserId: user?.id,
-    targetPlan: targetPlanId,
+    targetPlan: requestedPlan,
     onSubscriptionUpdated: () => {
       refreshStudioEntitlements({ notify: true });
     }

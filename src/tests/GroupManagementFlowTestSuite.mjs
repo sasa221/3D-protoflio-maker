@@ -6,6 +6,7 @@ const api = await readFile(new URL('../../api/entitlements.js', import.meta.url)
 const modal = await readFile(new URL('../ui/GroupManagementModal.js', import.meta.url), 'utf8');
 const billing = await readFile(new URL('../ui/BillingModal.js', import.meta.url), 'utf8');
 const landing = await readFile(new URL('../ui/LandingPage.js', import.meta.url), 'utf8');
+const main = await readFile(new URL('../main.js', import.meta.url), 'utf8');
 const migration = await readFile(new URL('../../supabase_phase8a_migration.sql', import.meta.url), 'utf8');
 const checks = [];
 function check(name, passed) {
@@ -24,6 +25,8 @@ check('Owner subscription expiry is checked before group access', /ownerSub\?\.c
 check('Missing group row self-heals from an active Premium Group subscription', /Self-heal accounts upgraded to Premium Group/.test(api) && /from\('groups'\)\.insert/.test(api));
 check('Group email templates exist for invite, member activation, and owner notice', generateGroupInvitationEmail({ invitationUrl: 'https://example.com' }).includes('Accept Invitation') && generateGroupMemberActivatedEmail({}).includes('Premium Group') && generateGroupMemberJoinedEmail({}).includes('NEW MEMBER JOINED'));
 check('Studio exposes Manage Team instead of a dead Current Plan CTA', modal.includes('Manage your team') && billing.includes('btn-manage-group'));
+check('Studio plan chip uses one delegated click handler (no duplicate inline click)', /id="tier-chip"/.test(main) && !/id="tier-chip"[^>]*onclick=/.test(main));
+check('Studio plan chip opens the shared billing surface before team management', /const requestedPlan = targetPlanId \|\| \(effectivePlan === 'premium_group' \? 'premium_group' : null\)/.test(main) && !/if \(!targetPlanId && \(effectivePlan === 'premium_group'/.test(main));
 check('Landing Choose Group opens pricing selection instead of dropping into Studio', /Choose Group<\/a>/.test(landing) && /pricing\?plan=premium_group/.test(landing));
 check('Migration keeps unique group membership protection', /UNIQUE\s*\(group_id, user_id\)/i.test(migration));
 check('All supported group prices remain defined', Object.keys(GROUP_SEAT_PRICING).join(',') === '2,3,4,5');
