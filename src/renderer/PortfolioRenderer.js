@@ -182,6 +182,9 @@ export function generatePortfolioCSS(colors) {
 
     .nav-link {
       padding: 8px 18px;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
       border-radius: 20px;
       color: rgba(255, 255, 255, 0.7);
       text-decoration: none;
@@ -1376,7 +1379,7 @@ export function generatePortfolioHTMLBody(portfolioData, theme, options = {}) {
       </header>
 
       <!-- DEDICATED FULL-SCREEN CINEMATIC MOBILE MENU -->
-      <div id="mobile-menu-panel" class="mobile-menu-panel" role="dialog" aria-modal="true" aria-label="Mobile Navigation Menu" aria-hidden="true">
+      <div id="mobile-menu-panel" class="mobile-menu-panel" role="dialog" aria-modal="true" aria-label="Mobile Navigation Menu" aria-hidden="true" inert>
         <div class="mobile-menu-inner">
           <div class="mobile-menu-top">
             <span class="mobile-menu-brand">${escapeHTML(portfolioData.name || 'PORTFOLIO')}</span>
@@ -1612,7 +1615,7 @@ function renderProjectsHTML(projects, primary, secondary) {
     <div class="glass-card project-card">
       ${p.image ? `
         <div class="project-img-wrap">
-          <img src="${escapeHTML(p.image)}"/>
+        <img src="${escapeHTML(p.image)}" alt="${escapeHTML(p.name || 'Project image')}" loading="lazy" decoding="async" />
         </div>
       ` : `
         <div class="project-img-wrap" style="display:flex;align-items:center;justify-content:center;font-size:2.5rem;opacity:0.4">🚀</div>
@@ -1680,7 +1683,7 @@ function renderCertsHTML(certs) {
   }
   return certs.map((c, i) => `
     <div class="glass-card cert-card">
-      ${c.image ? `<img class="cert-img" src="${escapeHTML(c.image)}"/>` : ''}
+      ${c.image ? `<img class="cert-img" src="${escapeHTML(c.image)}" alt="${escapeHTML(c.name || c.title || 'Certificate image')}" loading="lazy" decoding="async" />` : ''}
       <div class="cert-badge">CERTIFICATE 0${i + 1}</div>
       <div class="cert-title">${escapeHTML(c.name || c.title || 'Certificate')}</div>
       <div class="cert-issuer">${escapeHTML(c.issuer || '')} ${c.date ? `(${escapeHTML(c.date)})` : ''}</div>
@@ -1784,6 +1787,7 @@ export function getPortfolioScript(sectionFlyToCallbackName = 'flyToSection') {
 
       if (nextState) {
         panel.classList.add('active');
+        panel.removeAttribute('inert');
         panel.setAttribute('aria-hidden', 'false');
         if (btn) btn.setAttribute('aria-expanded', 'true');
         if (viewport) viewport.style.overflow = 'hidden';
@@ -1792,6 +1796,7 @@ export function getPortfolioScript(sectionFlyToCallbackName = 'flyToSection') {
         }
       } else {
         panel.classList.remove('active');
+        panel.setAttribute('inert', '');
         panel.setAttribute('aria-hidden', 'true');
         if (btn) btn.setAttribute('aria-expanded', 'false');
         if (viewport) viewport.style.overflow = 'auto';

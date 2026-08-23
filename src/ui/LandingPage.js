@@ -17,6 +17,7 @@ import { PLANS, GROUP_SEAT_PRICING } from '../config/PlanConfig.js';
 
 let demoEngine = null;
 let currentDemoThemeId = 'code';
+let landingDemoInitScheduled = false;
 
 export async function renderLandingPage(container) {
   if (!container) return;
@@ -199,7 +200,7 @@ export async function renderLandingPage(container) {
             ">
               Interactive Portfolio Demo
             </div>
-            <div style="font-size: 0.7rem; color: rgba(255,255,255,0.3);">⚡ 3D LIVE</div>
+            <div style="font-size: 0.7rem; color: rgba(255,255,255,0.72);">⚡ 3D LIVE</div>
           </div>
 
           <div style="position: relative; flex: 1; overflow: hidden;">
@@ -298,7 +299,7 @@ export async function renderLandingPage(container) {
                 color: #fff; font-weight: 700; cursor: pointer; text-align: left; transition: all 0.2s;
               ">
                 <span>📊 Data Galaxy (Data Analysts & BI)</span>
-                <span style="font-size: 0.75rem; color: rgba(255,255,255,0.4);">SELECT</span>
+                <span style="font-size: 0.75rem; color: rgba(255,255,255,0.72);">SELECT</span>
               </button>
 
               <button onclick="switchDemoTheme('cyber')" id="theme-btn-cyber" class="demo-theme-btn" style="
@@ -307,7 +308,7 @@ export async function renderLandingPage(container) {
                 color: #fff; font-weight: 700; cursor: pointer; text-align: left; transition: all 0.2s;
               ">
                 <span>🛡️ Cyber Command (Cybersecurity & Infra)</span>
-                <span style="font-size: 0.75rem; color: rgba(255,255,255,0.4);">SELECT</span>
+                <span style="font-size: 0.75rem; color: rgba(255,255,255,0.72);">SELECT</span>
               </button>
 
               <button onclick="switchDemoTheme('cosmic')" id="theme-btn-cosmic" class="demo-theme-btn" style="
@@ -316,7 +317,7 @@ export async function renderLandingPage(container) {
                 color: #fff; font-weight: 700; cursor: pointer; text-align: left; transition: all 0.2s;
               ">
                 <span>🌌 Cosmic Elite (Executives & General)</span>
-                <span style="font-size: 0.75rem; color: rgba(255,255,255,0.4);">SELECT</span>
+                <span style="font-size: 0.75rem; color: rgba(255,255,255,0.72);">SELECT</span>
               </button>
             </div>
           </div>
@@ -376,7 +377,7 @@ export async function renderLandingPage(container) {
           ">
             <div style="
               position: absolute; top: 16px; right: 16px; font-size: 0.68rem; font-weight: 800;
-              color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.06); padding: 3px 10px;
+              color: rgba(255,255,255,0.72); background: rgba(255,255,255,0.06); padding: 3px 10px;
               border-radius: 10px; font-family: 'JetBrains Mono', monospace; letter-spacing: 1px;
             ">
               EXAMPLE ANALYSIS
@@ -384,7 +385,7 @@ export async function renderLandingPage(container) {
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
               <div>
-                <div style="font-size: 0.75rem; color: rgba(255,255,255,0.5);">Target Job Role:</div>
+                <div style="font-size: 0.75rem; color: rgba(255,255,255,0.72);">Target Job Role:</div>
                 <div style="font-size: 1.2rem; font-weight: 800; color: #fff;">Senior Frontend Engineer</div>
               </div>
               <div style="text-align: right; margin-right: 80px;">
@@ -504,7 +505,7 @@ export async function renderLandingPage(container) {
           <div style="background: rgba(10,10,20,0.85); border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 30px; position: relative;">
             <div style="
               position: absolute; top: 16px; right: 16px; font-size: 0.68rem; font-weight: 800;
-              color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.06); padding: 3px 10px;
+              color: rgba(255,255,255,0.72); background: rgba(255,255,255,0.06); padding: 3px 10px;
               border-radius: 10px; font-family: 'JetBrains Mono', monospace; letter-spacing: 1px;
             ">
               DEMO ANALYTICS
@@ -517,15 +518,15 @@ export async function renderLandingPage(container) {
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px;">
               <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; text-align: center;">
                 <div style="font-size: 1.8rem; font-weight: 900; color: #fff; font-family: 'JetBrains Mono', monospace;">142</div>
-                <div style="font-size: 0.72rem; color: rgba(255,255,255,0.5);">Total Visits</div>
+                <div style="font-size: 0.72rem; color: rgba(255,255,255,0.72);">Total Visits</div>
               </div>
               <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; text-align: center;">
                 <div style="font-size: 1.8rem; font-weight: 900; color: #a855f7; font-family: 'JetBrains Mono', monospace;">58</div>
-                <div style="font-size: 0.72rem; color: rgba(255,255,255,0.5);">Project Opens</div>
+                <div style="font-size: 0.72rem; color: rgba(255,255,255,0.72);">Project Opens</div>
               </div>
               <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; text-align: center;">
                 <div style="font-size: 1.8rem; font-weight: 900; color: #10b981; font-family: 'JetBrains Mono', monospace;">19</div>
-                <div style="font-size: 0.72rem; color: rgba(255,255,255,0.5);">Resume Downloads</div>
+                <div style="font-size: 0.72rem; color: rgba(255,255,255,0.72);">Resume Downloads</div>
               </div>
             </div>
 
@@ -591,7 +592,7 @@ export async function renderLandingPage(container) {
             <div>
               <div style="font-size: 1.3rem; font-weight: 800; margin-bottom: 6px;">Pro Plan</div>
               <div style="font-size: 2.2rem; font-weight: 900; color: #10b981; margin-bottom: 18px; font-family: 'JetBrains Mono', monospace;">
-                ${PLANS.pro.priceMonthlyEGP} EGP <span style="font-size: 0.9rem; color: rgba(255,255,255,0.4); font-weight: normal;">/ month</span>
+                ${PLANS.pro.priceMonthlyEGP} EGP <span style="font-size: 0.9rem; color: rgba(255,255,255,0.72); font-weight: normal;">/ month</span>
               </div>
               <ul style="list-style: none; padding: 0; margin: 0 0 28px 0; font-size: 0.88rem; color: rgba(255,255,255,0.85); line-height: 2;">
                 <li>✓ Everything in Free</li>
@@ -613,7 +614,7 @@ export async function renderLandingPage(container) {
             <div>
               <div style="font-size: 1.3rem; font-weight: 800; margin-bottom: 6px;">Premium Plan</div>
               <div style="font-size: 2.2rem; font-weight: 900; color: #fff; margin-bottom: 18px; font-family: 'JetBrains Mono', monospace;">
-                ${PLANS.premium.priceMonthlyEGP} EGP <span style="font-size: 0.9rem; color: rgba(255,255,255,0.4); font-weight: normal;">/ month</span>
+                ${PLANS.premium.priceMonthlyEGP} EGP <span style="font-size: 0.9rem; color: rgba(255,255,255,0.72); font-weight: normal;">/ month</span>
               </div>
               <ul style="list-style: none; padding: 0; margin: 0 0 28px 0; font-size: 0.88rem; color: rgba(255,255,255,0.75); line-height: 2;">
                 <li>✓ Everything in Pro</li>
@@ -634,7 +635,7 @@ export async function renderLandingPage(container) {
             <div>
               <div style="font-size: 1.3rem; font-weight: 800; margin-bottom: 6px;">Premium Group</div>
               <div style="font-size: 2.2rem; font-weight: 900; color: #fff; margin-bottom: 18px; font-family: 'JetBrains Mono', monospace;">
-                <span style="font-size: 1rem; color: rgba(255,255,255,0.6);">From</span> ${PLANS.premium_group.priceStartingMonthlyEGP} EGP <span style="font-size: 0.9rem; color: rgba(255,255,255,0.4); font-weight: normal;">/ month</span>
+                <span style="font-size: 1rem; color: rgba(255,255,255,0.72);">From</span> ${PLANS.premium_group.priceStartingMonthlyEGP} EGP <span style="font-size: 0.9rem; color: rgba(255,255,255,0.72); font-weight: normal;">/ month</span>
               </div>
               <ul style="list-style: none; padding: 0; margin: 0 0 28px 0; font-size: 0.88rem; color: rgba(255,255,255,0.75); line-height: 2;">
                 <li>✓ Premium for 2–5 team members</li>
@@ -728,21 +729,33 @@ export async function renderLandingPage(container) {
       <!-- FOOTER -->
       <footer style="
         padding: 28px 48px; border-top: 1px solid rgba(255,255,255,0.08); text-align: center;
-        font-size: 0.8rem; color: rgba(255,255,255,0.4); font-family: 'Inter', sans-serif;
+        font-size: 0.8rem; color: rgba(255,255,255,0.72); font-family: 'Inter', sans-serif;
         display: flex; justify-content: space-between; align-items: center; max-width: 1300px; margin: 0 auto;
       ">
         <div>© ${new Date().getFullYear()} 3D Portfolio Maker. Built for ambitious careers.</div>
         <div style="display: flex; gap: 20px;">
-          <a href="/privacy" style="color: rgba(255,255,255,0.5); text-decoration: none;">Privacy</a>
-          <a href="/terms" style="color: rgba(255,255,255,0.5); text-decoration: none;">Terms</a>
-          <a href="mailto:support@3dportfolio.app" style="color: rgba(255,255,255,0.5); text-decoration: none;">Support</a>
+          <a href="/privacy" style="color: rgba(255,255,255,0.72); text-decoration: none;">Privacy</a>
+          <a href="/terms" style="color: rgba(255,255,255,0.72); text-decoration: none;">Terms</a>
+          <a href="mailto:support@3dportfolio.app" style="color: rgba(255,255,255,0.72); text-decoration: none;">Support</a>
         </div>
       </footer>
     </div>
   `;
 
-  // Initialize Demo 3D Engine in Hero Viewport
-  initLandingHeroDemo();
+  // Keep the marketing copy and CTA responsive first; the WebGL demo is
+  // initialized during idle time so it cannot delay the first mobile paint.
+  scheduleLandingHeroDemo();
+}
+
+function scheduleLandingHeroDemo() {
+  if (landingDemoInitScheduled) return;
+  landingDemoInitScheduled = true;
+  const start = () => initLandingHeroDemo();
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(start, { timeout: 1600 });
+  } else {
+    window.setTimeout(start, 350);
+  }
 }
 
 function updateLandingDemoScale() {
@@ -801,6 +814,22 @@ function initThemeShowcaseCanvas(theme) {
   }
 }
 
+function initThemeShowcaseWhenVisible(theme) {
+  const canvas = document.getElementById('theme-showcase-canvas');
+  if (!canvas) return;
+  if (!('IntersectionObserver' in window)) {
+    initThemeShowcaseCanvas(theme);
+    return;
+  }
+  const observer = new IntersectionObserver((entries) => {
+    if (entries.some(entry => entry.isIntersecting)) {
+      observer.disconnect();
+      initThemeShowcaseCanvas(theme);
+    }
+  }, { rootMargin: '240px 0px' });
+  observer.observe(canvas);
+}
+
 function initLandingHeroDemo() {
   const canvas = document.getElementById('landing-hero-canvas');
   const viewport = document.getElementById('landing-hero-viewport');
@@ -825,9 +854,9 @@ function initLandingHeroDemo() {
       demoEngine.init(heroTheme);
     }
 
-    // Initialize Theme Showcase canvas with initial theme
+    // Initialize the below-the-fold showcase only when it is near the viewport.
     const showcaseTheme = getThemeById('code');
-    initThemeShowcaseCanvas(showcaseTheme);
+    initThemeShowcaseWhenVisible(showcaseTheme);
 
     const html = generatePortfolioHTMLBody(MARKETING_DEMO_PORTFOLIO, heroTheme, { deviceMode: 'desktop' });
     renderScaledDemoHTML(viewport, html);
@@ -867,7 +896,7 @@ window.switchDemoTheme = function(themeId) {
     const spanTag = btn.querySelector('span:last-child');
     if (spanTag) {
       spanTag.textContent = 'SELECT';
-      spanTag.style.color = 'rgba(255,255,255,0.4)';
+      spanTag.style.color = 'rgba(255,255,255,0.72)';
     }
   });
 

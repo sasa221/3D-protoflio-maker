@@ -87,6 +87,7 @@ export function toggleMobileMenu(forceState, contextEl) {
     panel.style.height = viewportHeight + 'px';
 
     panel.classList.add('active');
+    panel.removeAttribute('inert');
     panel.setAttribute('aria-hidden', 'false');
     panel.style.opacity = '1';
     panel.style.pointerEvents = 'auto';
@@ -100,6 +101,7 @@ export function toggleMobileMenu(forceState, contextEl) {
     }
   } else {
     panel.classList.remove('active');
+    panel.setAttribute('inert', '');
     panel.setAttribute('aria-hidden', 'true');
     panel.style.opacity = '0';
     panel.style.pointerEvents = 'none';

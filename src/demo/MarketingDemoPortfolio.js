@@ -11,7 +11,7 @@ export const MARKETING_DEMO_PORTFOLIO = {
   tagline: 'Crafting high-throughput web products & immersive 3D interfaces.',
   bio: 'Building fast, accessible web experiences with modern JavaScript and WebGL.',
   location: 'San Francisco, CA',
-  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&fm=webp&w=220&q=65',
   theme: 'code',
   availability: { status: 'open', text: '🟢 Open to Opportunities' },
   social: {

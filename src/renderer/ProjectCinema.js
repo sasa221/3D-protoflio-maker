@@ -78,13 +78,13 @@ export function generateProjectCinemaHTML(projects = [], theme = {}) {
           ` : images.length > 0 ? `
             <div class="cinema-gallery-wrap">
               <div class="cinema-main-img-box">
-                <img id="cinema-main-img-${i}" src="${escapeHTML(images[0])}" alt="${escapeHTML(p.name)}" />
+                <img id="cinema-main-img-${i}" src="${escapeHTML(images[0])}" alt="${escapeHTML(p.name || 'Project image')}" loading="lazy" decoding="async" />
               </div>
               ${images.length > 1 ? `
                 <div class="cinema-thumb-strip">
                   ${images.map((imgUrl, imgIdx) => `
                     <button class="cinema-thumb-btn ${imgIdx === 0 ? 'active' : ''}" onclick="switchCinemaImage(${i}, '${escapeHTML(imgUrl)}', this)">
-                      <img src="${escapeHTML(imgUrl)}" alt="Screenshot ${imgIdx + 1}" />
+                      <img src="${escapeHTML(imgUrl)}" alt="${escapeHTML(p.name || 'Project')} screenshot ${imgIdx + 1}" loading="lazy" decoding="async" />
                     </button>
                   `).join('')}
                 </div>
