@@ -187,8 +187,33 @@ export default async function handler(req, res) {
       const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
       if (req.method === 'GET') {
-        const { data: group, error: groupErr } = await adminClient.from('groups').select('*').eq('owner_user_id', userId).maybeSingle();
+        let { data: group, error: groupErr } = await adminClient.from('groups').select('*').eq('owner_user_id', userId).maybeSingle();
         if (groupErr) return res.status(500).json({ error: groupErr.message });
+        // Self-heal accounts upgraded to Premium Group before their group row
+        // existed, so the Studio GROUP control always has an actionable team.
+        if (!group) {
+          const { data: ownerSub } = await adminClient.from('subscriptions').select('plan_id,status,current_period_end,metadata').eq('user_id', userId).maybeSingle();
+          const ownerActive = ownerSub?.plan_id === 'premium_group'
+            && ['active', 'grace', 'canceling'].includes(ownerSub.status || '')
+            && (!ownerSub.current_period_end || new Date(ownerSub.current_period_end).getTime() > Date.now());
+          if (ownerActive) {
+            const metadataSeats = Number(ownerSub.metadata?.seat_count || ownerSub.metadata?.group_seats || ownerSub.metadata?.seatCount);
+            const seatLimit = Number.isFinite(metadataSeats) && metadataSeats >= 2 && metadataSeats <= 5 ? metadataSeats : 2;
+            const { data: createdGroup, error: createGroupErr } = await adminClient.from('groups').insert([{
+              owner_user_id: userId,
+              seat_limit: seatLimit,
+              plan_type: 'premium_group',
+              status: 'active'
+            }]).select('*').maybeSingle();
+            if (!createGroupErr) {
+              group = createdGroup;
+            } else if (createGroupErr.code === '23505') {
+              group = (await adminClient.from('groups').select('*').eq('owner_user_id', userId).maybeSingle()).data;
+            } else {
+              return res.status(500).json({ error: createGroupErr.message });
+            }
+          }
+        }
         if (group) {
           const { data: ownerSub } = await adminClient.from('subscriptions').select('plan_id,status,current_period_end').eq('user_id', userId).maybeSingle();
           const groupActive = ownerSub?.plan_id === 'premium_group' && ['active', 'grace', 'canceling'].includes(ownerSub.status || '') && (!ownerSub.current_period_end || new Date(ownerSub.current_period_end).getTime() > Date.now());

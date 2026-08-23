@@ -32,9 +32,10 @@ async function renderGroupManagement(feedback = '') {
         const group = data.membershipGroup || {};
         card.innerHTML = `<button data-close style="float:right;background:none;border:0;color:#fff;font-size:22px;cursor:pointer">×</button><div style="text-align:center;font-size:28px;margin-top:16px">👑</div><h2 style="margin:8px 0;text-align:center">Premium access is active</h2><p style="text-align:center;color:rgba(255,255,255,.65);font-size:13px;line-height:1.6">You’re a member of ${escapeHtml(owner)}’s Premium Group. Your account and portfolio are separate, and your own Premium limits apply.</p><div style="margin-top:18px;padding:14px;border-radius:12px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.25);color:#86efac;font-size:12px;text-align:center">Seat group: ${escapeHtml(group.seat_limit || 2)} users · Status: ACTIVE</div>`;
       } else {
-        card.innerHTML = '<button data-close style="float:right;background:none;border:0;color:#fff;font-size:22px;cursor:pointer">×</button><h2 style="margin-top:20px">Premium Group</h2><p style="color:#fca5a5">No active group was found for this account.</p>';
+        card.innerHTML = '<button data-close style="float:right;background:none;border:0;color:#fff;font-size:22px;cursor:pointer">×</button><h2 style="margin-top:20px">Setting up your Premium Group</h2><p style="color:rgba(255,255,255,.68);line-height:1.6">Your group subscription is active, but the team record is still syncing. Try again to load the invite controls.</p><button data-retry-group style="margin-top:12px;width:100%;padding:11px;border:0;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#fff;font-weight:800;cursor:pointer">Retry setup</button>';
       }
       bindClose();
+      card.querySelector('[data-retry-group]')?.addEventListener('click', () => renderGroupManagement());
       return;
     }
     const members = data.members || [];

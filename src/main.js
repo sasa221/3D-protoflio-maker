@@ -283,6 +283,7 @@ async function router() {
       style.textContent = getPricingStyles();
       document.head.appendChild(style);
     }
+    const requestedPlan = new URLSearchParams(window.location.search).get('plan');
     renderPricingPage(getAppContainer(), {
       currentPlan: globalEntitlements.getEffectivePlanId(),
         onSelectPlan: (planId) => planId === 'free'
@@ -291,6 +292,9 @@ async function router() {
           ? openGroupManagementModal()
           : openBillingModal({ targetPlan: planId })
     });
+    if (['pro', 'premium', 'premium_group'].includes(requestedPlan)) {
+      setTimeout(() => openBillingModal({ targetPlan: requestedPlan }), 0);
+    }
     return;
   }
 

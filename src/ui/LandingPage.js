@@ -633,7 +633,7 @@ export async function renderLandingPage(container) {
                 <li>✓ Centralized billing</li>
               </ul>
             </div>
-            <a href="${isAuthenticated ? '/studio' : '/start'}" style="
+            <a href="${isAuthenticated ? '/pricing?plan=premium_group' : '/login?next=%2Fpricing%3Fplan%3Dpremium_group'}" style="
               display: block; width: 100%; padding: 14px; text-align: center; background: rgba(255,255,255,0.08);
               border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; color: #fff; font-weight: 700; text-decoration: none;
             ">Choose Group</a>
