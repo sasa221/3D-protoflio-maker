@@ -301,6 +301,15 @@ async function router() {
   // 6. Start Onboarding Route
   if (path === '/start') {
     setPageTitle('Build My Portfolio');
+    const startUser = await getCurrentAuthUser();
+    if (!startUser) {
+      window.location.href = `/login?next=${encodeURIComponent('/start')}`;
+      return;
+    }
+    if (!isEmailVerified(startUser)) {
+      renderAuthPage(() => { window.location.href = '/start'; });
+      return;
+    }
     renderOnboardingWizard(getAppContainer());
     return;
   }

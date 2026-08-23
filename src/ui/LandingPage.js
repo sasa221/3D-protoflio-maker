@@ -102,7 +102,7 @@ export async function renderLandingPage(container) {
           ">⚡ Open Studio</a>
         ` : `
           <a href="/login" style="color: rgba(255,255,255,0.85); font-size: 0.85rem; font-weight: 600; text-decoration: none; margin-right: 6px;">Sign In</a>
-          <a href="/start" style="
+          <a href="/login?next=%2Fstart" style="
             padding: 10px 20px; background: linear-gradient(135deg, #7c3aed, #06b6d4); border-radius: 10px;
             color: #fff; font-size: 0.85rem; font-weight: 700; text-decoration: none; box-shadow: 0 4px 15px rgba(124,58,237,0.3);
           ">Build My Portfolio</a>
@@ -141,7 +141,7 @@ export async function renderLandingPage(container) {
           </p>
 
           <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-bottom: 24px;">
-            <a href="${isAuthenticated ? '/studio' : '/start'}" style="
+            <a href="${isAuthenticated ? '/studio' : '/login?next=%2Fstart'}" style="
               padding: 16px 32px; background: linear-gradient(135deg, #7c3aed, #06b6d4); border-radius: 12px;
               color: #fff; font-size: 1rem; font-weight: 800; text-decoration: none; box-shadow: 0 10px 30px rgba(124,58,237,0.4);
               transition: transform 0.2s; display: inline-flex; align-items: center; gap: 10px;
@@ -567,7 +567,7 @@ export async function renderLandingPage(container) {
                 <li>✓ Resume PDF Upload</li>
               </ul>
             </div>
-            <a href="${isAuthenticated ? '/studio' : '/start'}" style="
+            <a href="${isAuthenticated ? '/studio' : '/login?next=%2Fstart'}" style="
               display: block; width: 100%; padding: 14px; text-align: center; background: rgba(255,255,255,0.08);
               border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; color: #fff; font-weight: 700; text-decoration: none;
             ">Get Started Free</a>
@@ -593,7 +593,7 @@ export async function renderLandingPage(container) {
                 <li>✓ Job Fit Analysis</li>
               </ul>
             </div>
-            <a href="${isAuthenticated ? '/studio' : '/start'}" style="
+            <a href="${isAuthenticated ? '/studio' : '/login?next=%2Fstart'}" style="
               display: block; width: 100%; padding: 14px; text-align: center; background: linear-gradient(135deg, #7c3aed, #06b6d4);
               border-radius: 10px; color: #fff; font-weight: 800; text-decoration: none; box-shadow: 0 8px 25px rgba(124,58,237,0.4);
             ">Upgrade to Pro</a>
@@ -614,7 +614,7 @@ export async function renderLandingPage(container) {
                 <li>✓ Advanced Analytics</li>
               </ul>
             </div>
-            <a href="${isAuthenticated ? '/studio' : '/start'}" style="
+            <a href="${isAuthenticated ? '/studio' : '/login?next=%2Fstart'}" style="
               display: block; width: 100%; padding: 14px; text-align: center; background: rgba(255,255,255,0.08);
               border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; color: #fff; font-weight: 700; text-decoration: none;
             ">Go Premium</a>
@@ -707,7 +707,7 @@ export async function renderLandingPage(container) {
         <p style="color: rgba(255,255,255,0.7); max-width: 580px; margin: 0 auto 32px auto; font-size: 1.05rem;">
           Turn your career story into an interactive 3D portfolio built for the jobs you want.
         </p>
-        <a href="${isAuthenticated ? '/studio' : '/start'}" style="
+        <a href="${isAuthenticated ? '/studio' : '/login?next=%2Fstart'}" style="
           padding: 18px 40px; background: linear-gradient(135deg, #7c3aed, #06b6d4); border-radius: 14px;
           color: #fff; font-size: 1.1rem; font-weight: 800; text-decoration: none; box-shadow: 0 10px 35px rgba(124,58,237,0.4);
           display: inline-block; transition: transform 0.2s;
