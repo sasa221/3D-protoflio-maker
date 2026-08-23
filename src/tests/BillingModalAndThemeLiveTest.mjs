@@ -2,6 +2,7 @@
 import { PLANS, GROUP_SEAT_PRICING, formatEGP, formatPrice } from '../config/PlanConfig.js';
 import { canAccessTheme, getThemeTier, THEME_TIERS } from '../config/ThemeTierConfig.js';
 import { getAllThemes } from '../three/ProceduralTheme.js';
+import { getSubscriptionSummary } from '../ui/BillingModal.js';
 
 let passed = 0;
 let failed = 0;
@@ -50,6 +51,19 @@ assert(formatEGP(1000) === '1,000' || formatEGP(1000) === '1000', 'formatEGP(100
 
 assert(formatPrice(undefined) === '0 EGP', 'formatPrice(undefined) returns "0 EGP"');
 assert(formatPrice(600) === '600 EGP/month', 'formatPrice(600) returns "600 EGP/month"');
+
+// Current subscription summary must be visible to every plan, including group members.
+const summaryNow = new Date('2026-08-23T00:00:00.000Z');
+const memberSummary = getSubscriptionSummary('premium', {
+  membership: { status: 'active' },
+  membershipSubscription: { status: 'active', current_period_end: '2026-09-02T00:00:00.000Z' }
+}, summaryNow);
+assert(memberSummary.planId === 'premium_group', 'Active group member is shown as Premium Group in billing');
+assert(memberSummary.isGroupMember === true && memberSummary.daysRemaining === 10, 'Group member sees personal remaining subscription days');
+const proSummary = getSubscriptionSummary('pro', { subscription: { status: 'active', current_period_end: '2026-09-22T00:00:00.000Z' } }, summaryNow);
+assert(proSummary.planId === 'pro' && proSummary.daysRemaining === 30, 'Pro user sees subscription end and remaining days');
+const freeSummary = getSubscriptionSummary('free', { subscription: { status: 'active' } }, summaryNow);
+assert(freeSummary.planId === 'free' && freeSummary.daysRemaining === null, 'Free user sees no-expiry status safely');
 
 // ─── 2. THEME CATALOG VISIBILITY & LOCK RULES ──────────────────
 console.log('\n2. Testing 15-theme catalog visibility and tiered accessibility...');
@@ -218,6 +232,5 @@ console.log(`  SUMMARY: ${passed} / ${passed + failed} assertions PASSED (Failur
 console.log('============================================================\n');
 
 if (failed > 0) process.exit(1);
-
 
 

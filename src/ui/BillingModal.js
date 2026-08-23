@@ -7,7 +7,7 @@
 
 import { globalEntitlements } from '../services/EntitlementService.js';
 import { PLANS, GROUP_SEAT_PRICING, formatEGP } from '../config/PlanConfig.js';
-import { submitManualPayment, getUserPaymentStatus, redeemPromoCode, getPublicPaymentConfig } from '../services/AuthService.js';
+import { submitManualPayment, getUserPaymentStatus, redeemPromoCode, getPublicPaymentConfig, getGroupManagement } from '../services/AuthService.js';
 import { openGroupManagementModal } from './GroupManagementModal.js';
 
 let modalContainer = null;
@@ -51,19 +51,68 @@ export async function openBillingModal(arg1, arg2, arg3) {
   modalContainer.className = 'cv-import-modal-overlay billing-modal-overlay';
   modalContainer.style.cssText = 'position: fixed; inset: 0; background: rgba(0, 0, 0, 0.88); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 100000; padding: clamp(12px, 3vw, 24px); box-sizing: border-box;';
 
-  const currentPlan = globalEntitlements.getEffectivePlanId();
+  const effectivePlan = globalEntitlements.getEffectivePlanId();
+  let groupState = null;
+  try { groupState = await getGroupManagement(); } catch (_) {}
+  const currentPlan = getDisplayPlanId(effectivePlan, groupState);
+  const subscriptionSummary = getSubscriptionSummary(effectivePlan, groupState);
   let pendingRequests = [];
   try {
     const statusData = await getUserPaymentStatus();
     pendingRequests = (statusData?.requests || []).filter(r => r.status === 'PENDING');
   } catch (_) {}
 
-  renderBillingMainView(currentPlan, pendingRequests, onSubscriptionUpdated, targetPlan);
+  renderBillingMainView(currentPlan, pendingRequests, onSubscriptionUpdated, targetPlan, subscriptionSummary);
   document.body.appendChild(modalContainer);
 }
 
-function renderBillingMainView(currentPlan, pendingRequests, onSubscriptionUpdated, targetPlan = null) {
+function getDisplayPlanId(effectivePlan, groupState = null) {
+  const isGroupMember = Boolean(groupState?.membership?.status === 'active' || globalEntitlements.groupMembership?.status === 'active');
+  return isGroupMember ? 'premium_group' : effectivePlan;
+}
+
+export function getSubscriptionSummary(effectivePlan, groupState = null, now = new Date()) {
+  const isGroupMember = Boolean(groupState?.membership?.status === 'active' || globalEntitlements.groupMembership?.status === 'active');
+  const planId = isGroupMember ? 'premium_group' : effectivePlan;
+  const planName = planId === 'premium_group' ? 'Premium Group' : (PLANS[planId]?.name || 'Free');
+  const subscription = isGroupMember
+    ? (groupState?.membershipSubscription || null)
+    : (groupState?.subscription || globalEntitlements.subscription || null);
+  const rawEnd = subscription?.current_period_end || subscription?.currentPeriodEnd || null;
+  const end = rawEnd ? new Date(rawEnd) : null;
+  const validEnd = end && !Number.isNaN(end.getTime()) ? end : null;
+  const daysRemaining = validEnd ? Math.ceil((validEnd.getTime() - now.getTime()) / 86400000) : null;
+  return {
+    planId,
+    planName,
+    status: subscription?.status || 'active',
+    isGroupMember,
+    endsAt: validEnd?.toISOString() || null,
+    daysRemaining
+  };
+}
+
+function renderSubscriptionSummary(summary) {
+  if (!summary) return '';
+  const isFree = summary.planId === 'free';
+  const hasExpiry = Number.isFinite(summary.daysRemaining);
+  const urgent = hasExpiry && summary.daysRemaining <= 7;
+  const tone = urgent ? '#fbbf24' : '#86efac';
+  const detail = isFree
+    ? 'No expiry — free access is active.'
+    : hasExpiry
+      ? (summary.daysRemaining > 0
+        ? `${summary.daysRemaining} day${summary.daysRemaining === 1 ? '' : 's'} remaining · ends ${new Date(summary.endsAt).toLocaleDateString()}`
+        : 'This subscription has ended.')
+      : 'Active subscription · renewal date not available';
+  const memberNote = summary.isGroupMember ? 'You are covered by your group owner; your portfolio limits stay personal.' : 'Your subscription and portfolio limits are personal to this account.';
+  return `<div style="margin:0 auto 24px;max-width:760px;padding:14px 16px;border-radius:14px;background:${urgent ? 'rgba(245,158,11,.1)' : 'rgba(16,185,129,.08)'};border:1px solid ${urgent ? 'rgba(245,158,11,.3)' : 'rgba(16,185,129,.25)'};display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap"><div><strong style="display:block;color:#fff;font-size:14px">Current plan: ${escapeHtml(summary.planName)}</strong><span style="display:block;margin-top:4px;color:${tone};font-size:12px;font-weight:700">${escapeHtml(detail)}</span></div><span style="color:rgba(255,255,255,.58);font-size:11px;line-height:1.4;max-width:280px">${escapeHtml(memberNote)}</span></div>`;
+}
+
+function renderBillingMainView(currentPlan, pendingRequests, onSubscriptionUpdated, targetPlan = null, subscriptionSummary = null) {
   if (!modalContainer) return;
+
+  const summary = subscriptionSummary || getSubscriptionSummary(currentPlan);
 
   const cardsHTML = ['free', 'pro', 'premium', 'premium_group']
     .map(id => buildPlanCard(id, currentPlan, targetPlan, currentSelectedGroupSeats))
@@ -91,6 +140,8 @@ function renderBillingMainView(currentPlan, pendingRequests, onSubscriptionUpdat
           Start free. Upgrade when you're ready to publish, grow, or unlock premium features.
         </p>
       </div>
+
+      ${renderSubscriptionSummary(summary)}
 
       <!-- PENDING PAYMENT BANNER (IF ACTIVE) -->
       ${pendingRequests.length ? `

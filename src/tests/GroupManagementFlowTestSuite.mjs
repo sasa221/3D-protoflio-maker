@@ -23,6 +23,7 @@ check('Owner sees remaining invitations based on purchased seats', /remainingSea
 check('Accepted group members are labeled Premium Group', /Premium Group access is active/.test(modal) && /globalEntitlements\.groupMembership\?\.status === 'active'/.test(main));
 check('Group management exposes subscription end date to owner and member', /subscription: ownerSub/.test(api) && /membershipSubscription/.test(api));
 check('Studio shows in-app invitation and expiry notices', /pending Premium Group invitations/.test(main) && /ends in \$\{daysLeft\}/.test(main) && /groupExpiryBanner/.test(modal));
+check('Billing shows subscription details for every user, not only group owners', /getSubscriptionSummary/.test(billing) && /membershipSubscription/.test(billing) && /daysRemaining/.test(billing));
 check('Invitee can accept from authenticated account only', /subAction === 'accept_invitation'/.test(api) && /eq\('user_id', userId\)/.test(api));
 check('Invitee can decline and become eligible for a later invite', /subAction === 'decline_invitation'/.test(api) && /status: 'declined'/.test(api));
 check('Accepted seats remain protected at accept time', /if \(\(activeMemberCount \|\| 0\) >= group\.seat_limit\)/.test(api));
