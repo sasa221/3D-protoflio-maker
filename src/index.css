@@ -798,6 +798,54 @@ body {
   .mode-btn { padding-inline: 10px; }
 }
 
+/* Keep the desktop editor focused: the navigation chrome should not consume
+   the vertical space needed for profile fields. */
+@media (min-width: 901px) {
+  .sidebar-header { padding: 12px 18px 10px; }
+  .workspace-nav-shell { padding: 7px 12px !important; }
+  .workspace-nav-shell > div:first-child {
+    margin-bottom: 4px !important;
+    font-size: 0.6rem !important;
+  }
+  .workspace-nav-list {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .workspace-nav-list::-webkit-scrollbar { display: none; }
+  .workspace-nav-list .ws-btn {
+    flex: 0 0 auto;
+    padding: 5px 8px !important;
+    font-size: 0.66rem !important;
+  }
+  #workspace-header-area > div {
+    padding: 9px 14px !important;
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+  }
+  #workspace-header-area > div > div:first-child { min-width: 0; }
+  #workspace-header-area > div > div:first-child > div:first-child {
+    font-size: 1rem !important;
+    margin-bottom: 1px !important;
+  }
+  #workspace-header-area > div > div:first-child > div:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.7rem !important;
+  }
+  #create-subnav-bar { padding: 6px 10px !important; }
+  #create-subnav-bar .tab-btn {
+    padding: 6px 4px;
+    gap: 3px;
+    font-size: 0.66rem;
+  }
+  #create-subnav-bar .tab-btn .tab-icon { font-size: 15px; }
+  .sidebar-content { padding: 14px 16px; gap: 14px; }
+  .sidebar-footer { padding: 10px 16px; gap: 8px; }
+}
+
 @media (max-width: 900px) {
   :root { --sidebar-w: 100vw; }
   body { min-height: 100dvh; }
