@@ -6,7 +6,8 @@ const landing = await readFile(new URL('../ui/LandingPage.js', import.meta.url),
 const checks = [
   ['Start route checks the authenticated user before rendering onboarding', /if \(path === '\/start'\)[\s\S]*?getCurrentAuthUser\(\)[\s\S]*?renderOnboardingWizard/.test(main)],
   ['Unauthenticated Start redirects to login and preserves /start', /login\?next=\$\{encodeURIComponent\('\/start'\)\}/.test(main)],
-  ['Landing Build buttons send visitors to login first', (landing.match(/login\?next=%2Fstart/g) || []).length >= 6],
+  ['Landing Free CTA still sends visitors to login and onboarding', (landing.match(/login\?next=%2Fstart/g) || []).length >= 3],
+  ['Landing paid CTAs go to the selected plan checkout after auth', /planCheckoutPath\('pro'\)/.test(landing) && /planCheckoutPath\('premium'\)/.test(landing) && /pricing\?plan=\$\{planId\}/.test(landing)],
   ['Verified users can still reach onboarding after login', /renderAuthPage\(\(\) => \{ window\.location\.href = '\/start'; \}\)/.test(main)]
 ];
 

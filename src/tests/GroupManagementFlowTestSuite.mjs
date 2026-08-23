@@ -35,6 +35,7 @@ check('Studio plan chip uses one delegated click handler (no duplicate inline cl
 check('Studio plan chip opens group management for an active group owner', /if \(effectivePlan === 'premium_group'\) \{\s*openGroupManagementModal\(\)/s.test(main));
 check('Landing group CTA sends paid group owners to invite management', /isPremiumGroupOwner \? '\/studio\?manage_group=1'/s.test(landing) && /Invite Teammates/.test(landing));
 check('Landing group CTA keeps unpaid users on pricing', /pricing\?plan=premium_group/.test(landing));
+check('Landing paid plan CTAs preserve the selected checkout plan', /planCheckoutPath\('pro'\)/.test(landing) && /planCheckoutPath\('premium'\)/.test(landing));
 check('Migration keeps unique group membership protection', /UNIQUE\s*\(group_id, user_id\)/i.test(migration));
 check('All supported group prices remain defined', Object.keys(GROUP_SEAT_PRICING).join(',') === '2,3,4,5');
 

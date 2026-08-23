@@ -43,6 +43,9 @@ export async function renderLandingPage(container) {
     await fetchUserProfileAndEntitlements(authUser).catch(() => null);
     isPremiumGroupOwner = globalEntitlements.getPlanId() === 'premium_group';
   }
+  const planCheckoutPath = (planId) => isAuthenticated
+    ? `/pricing?plan=${encodeURIComponent(planId)}`
+    : `/login?next=${encodeURIComponent(`/pricing?plan=${planId}`)}`;
 
   let responsiveStyle = document.getElementById('landing-responsive-style');
   if (!responsiveStyle) {
@@ -603,7 +606,7 @@ export async function renderLandingPage(container) {
                 <li>✓ Job Fit Analysis</li>
               </ul>
             </div>
-            <a href="${isAuthenticated ? '/studio' : '/login?next=%2Fstart'}" style="
+            <a href="${planCheckoutPath('pro')}" style="
               display: block; width: 100%; padding: 14px; text-align: center; background: linear-gradient(135deg, #7c3aed, #06b6d4);
               border-radius: 10px; color: #fff; font-weight: 800; text-decoration: none; box-shadow: 0 8px 25px rgba(124,58,237,0.4);
             ">Upgrade to Pro</a>
@@ -624,7 +627,7 @@ export async function renderLandingPage(container) {
                 <li>✓ Advanced Analytics</li>
               </ul>
             </div>
-            <a href="${isAuthenticated ? '/studio' : '/login?next=%2Fstart'}" style="
+            <a href="${planCheckoutPath('premium')}" style="
               display: block; width: 100%; padding: 14px; text-align: center; background: rgba(255,255,255,0.08);
               border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; color: #fff; font-weight: 700; text-decoration: none;
             ">Go Premium</a>
@@ -688,8 +691,15 @@ export async function renderLandingPage(container) {
 
           <details style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; cursor: pointer;">
             <summary style="font-weight: 700; font-size: 1rem; color: #fff;">Can I use my own custom domain?</summary>
+              <p style="margin-top: 10px; font-size: 0.9rem; color: rgba(255,255,255,0.65); line-height: 1.6;">
+                Custom domains are a Premium feature. Vercel provides the required DNS record and activates the domain only after verification and secure serving are ready.
+              </p>
+          </details>
+
+          <details style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; cursor: pointer;">
+            <summary style="font-weight: 700; font-size: 1rem; color: #fff;">Which plan should I choose?</summary>
             <p style="margin-top: 10px; font-size: 0.9rem; color: rgba(255,255,255,0.65); line-height: 1.6;">
-              Custom domains are a Premium feature. Vercel provides the required DNS record and activates the domain only after verification and secure serving are ready.
+              Choose Free to build and download one portfolio. Choose Pro when you need a hosted link, continuous editing, PDF export, and targeted versions. Choose Premium for all themes, custom domains, no branding, and advanced analytics. Premium Group gives the same Premium access to 2–5 individual accounts under one subscription.
             </p>
           </details>
 
