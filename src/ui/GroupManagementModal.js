@@ -6,6 +6,17 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
 }
 
+function groupExpiryBanner(subscription) {
+  const end = subscription?.current_period_end ? new Date(subscription.current_period_end) : null;
+  if (!end || Number.isNaN(end.getTime())) return '';
+  const daysLeft = Math.ceil((end.getTime() - Date.now()) / 86400000);
+  const urgent = daysLeft <= 7;
+  const color = urgent ? '#fbbf24' : '#94a3b8';
+  const background = urgent ? 'rgba(245,158,11,.1)' : 'rgba(148,163,184,.08)';
+  const label = daysLeft > 0 ? `ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'}` : 'has ended';
+  return `<div style="margin:14px 0;padding:10px 12px;border-radius:10px;background:${background};border:1px solid ${urgent ? 'rgba(245,158,11,.3)' : 'rgba(148,163,184,.18)'};color:${color};font-size:12px;text-align:center">⏳ Subscription ${label} · ${escapeHtml(end.toLocaleDateString())}</div>`;
+}
+
 export async function openGroupManagementModal() {
   activeOverlay?.remove();
   activeOverlay = document.createElement('div');
@@ -30,7 +41,7 @@ async function renderGroupManagement(feedback = '') {
       if (data.membership?.status === 'active') {
         const owner = data.membershipOwner?.display_name || data.membershipOwner?.email || 'your team owner';
         const group = data.membershipGroup || {};
-        card.innerHTML = `<button data-close style="float:right;background:none;border:0;color:#fff;font-size:22px;cursor:pointer">×</button><div style="text-align:center;font-size:28px;margin-top:16px">👑</div><h2 style="margin:8px 0;text-align:center">Premium Group access is active</h2><p style="text-align:center;color:rgba(255,255,255,.65);font-size:13px;line-height:1.6">You’re an active member of ${escapeHtml(owner)}’s Premium Group. Your account and portfolio are separate, and your own Premium limits apply.</p><div style="margin-top:18px;padding:14px;border-radius:12px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.25);color:#86efac;font-size:12px;text-align:center">Premium Group · ${escapeHtml(group.seat_limit || 2)} teammate seats · Status: ACTIVE</div><p style="margin:12px 0 0;text-align:center;color:rgba(255,255,255,.5);font-size:11px">Your group owner manages invitations and membership.</p>`;
+        card.innerHTML = `<button data-close style="float:right;background:none;border:0;color:#fff;font-size:22px;cursor:pointer">×</button><div style="text-align:center;font-size:28px;margin-top:16px">👑</div><h2 style="margin:8px 0;text-align:center">Premium Group access is active</h2>${groupExpiryBanner(data.membershipSubscription)}<p style="text-align:center;color:rgba(255,255,255,.65);font-size:13px;line-height:1.6">You’re an active member of ${escapeHtml(owner)}’s Premium Group. Your account and portfolio are separate, and your own Premium limits apply.</p><div style="margin-top:18px;padding:14px;border-radius:12px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.25);color:#86efac;font-size:12px;text-align:center">Premium Group · ${escapeHtml(group.seat_limit || 2)} teammate seats · Status: ACTIVE</div><p style="margin:12px 0 0;text-align:center;color:rgba(255,255,255,.5);font-size:11px">Your group owner manages invitations and membership.</p>`;
       } else {
         card.innerHTML = '<button data-close style="float:right;background:none;border:0;color:#fff;font-size:22px;cursor:pointer">×</button><h2 style="margin-top:20px">Setting up your Premium Group</h2><p style="color:rgba(255,255,255,.68);line-height:1.6">Your group subscription is active, but the team record is still syncing. Try again to load the invite controls.</p><button data-retry-group style="margin-top:12px;width:100%;padding:11px;border:0;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#fff;font-weight:800;cursor:pointer">Retry setup</button>';
       }
@@ -58,6 +69,7 @@ async function renderGroupManagement(feedback = '') {
       <button data-close style="float:right;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:50%;width:32px;height:32px;font-size:20px;cursor:pointer">×</button>
       <div style="text-align:center;color:#c084fc;font-weight:800;letter-spacing:1px;font-size:12px">PREMIUM GROUP</div>
       <h2 style="margin:8px 0 6px;text-align:center">Manage your team</h2>
+      ${groupExpiryBanner(data.subscription)}
       <p style="margin:0 0 20px;text-align:center;color:rgba(255,255,255,.62);font-size:13px">${reservedCount} of ${group.seat_limit} teammate seats reserved · <strong style="color:#86efac">${remainingLabel}</strong></p>
       ${feedback ? `<div style="margin-bottom:14px;padding:10px 12px;border-radius:9px;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);color:#86efac;font-size:12px">${escapeHtml(feedback)}</div>` : ''}
       <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:0 14px;margin-bottom:20px"><div style="padding:14px 0;border-bottom:1px solid rgba(255,255,255,.08)"><strong>${escapeHtml(data.owner?.email || 'You')}</strong><span style="display:block;color:#4ade80;font-size:11px;margin-top:3px">OWNER · ACTIVE</span></div>${rows}</div>

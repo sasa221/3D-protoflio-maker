@@ -217,7 +217,7 @@ export default async function handler(req, res) {
         if (group) {
           const { data: ownerSub } = await adminClient.from('subscriptions').select('plan_id,status,current_period_end').eq('user_id', userId).maybeSingle();
           const groupActive = ownerSub?.plan_id === 'premium_group' && ['active', 'grace', 'canceling'].includes(ownerSub.status || '') && (!ownerSub.current_period_end || new Date(ownerSub.current_period_end).getTime() > Date.now());
-          if (!groupActive) return res.status(200).json({ group, groupExpired: true, members: [], pendingInvitations: [], owner: { id: userId, email: userData.user.email || '' } });
+          if (!groupActive) return res.status(200).json({ group, groupExpired: true, members: [], pendingInvitations: [], subscription: ownerSub ? { status: ownerSub.status, current_period_end: ownerSub.current_period_end || null } : null, owner: { id: userId, email: userData.user.email || '' } });
         }
         if (!group) {
           const { data: pendingInvitations } = await adminClient
@@ -227,11 +227,13 @@ export default async function handler(req, res) {
             .eq('status', 'pending');
           const { data: membership } = await adminClient.from('group_members').select('id,group_id,role,status,joined_at,groups(id,seat_limit,status,owner_user_id)').eq('user_id', userId).eq('status', 'active').maybeSingle();
           let membershipOwner = null;
+          let membershipSubscription = null;
           const membershipGroup = Array.isArray(membership?.groups) ? membership.groups[0] : membership?.groups;
           if (membershipGroup?.owner_user_id) {
             membershipOwner = (await adminClient.from('profiles').select('email,display_name').eq('id', membershipGroup.owner_user_id).maybeSingle()).data || null;
+            membershipSubscription = (await adminClient.from('subscriptions').select('status,current_period_end').eq('user_id', membershipGroup.owner_user_id).maybeSingle()).data || null;
           }
-          return res.status(200).json({ group: null, members: [], membership: membership || null, membershipGroup: membershipGroup || null, membershipOwner, pendingInvitations: pendingInvitations || [], owner: { id: userId, email: userData.user.email || '' } });
+          return res.status(200).json({ group: null, members: [], membership: membership || null, membershipGroup: membershipGroup || null, membershipOwner, membershipSubscription, pendingInvitations: pendingInvitations || [], owner: { id: userId, email: userData.user.email || '' } });
         }
         const { data: members, error: membersErr } = await adminClient.from('group_members').select('*').eq('group_id', group.id).order('invited_at', { ascending: true });
         if (membersErr) return res.status(500).json({ error: membersErr.message });
@@ -240,10 +242,12 @@ export default async function handler(req, res) {
           ? await adminClient.from('profiles').select('id,email,display_name').in('id', memberIds)
           : { data: [] };
         const profileById = new Map((profiles || []).map(profile => [profile.id, profile]));
+        const { data: ownerSub } = await adminClient.from('subscriptions').select('status,current_period_end').eq('user_id', userId).maybeSingle();
         return res.status(200).json({
           group,
           owner: { id: userId, email: userData.user.email || '' },
-          members: (members || []).map(member => ({ ...member, profile: profileById.get(member.user_id) || null }))
+          members: (members || []).map(member => ({ ...member, profile: profileById.get(member.user_id) || null })),
+          subscription: ownerSub || null
         });
       }
 

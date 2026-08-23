@@ -549,6 +549,7 @@ async function initStudio() {
       }
       const groupState = await getGroupManagement().catch(() => null);
       pendingGroupInvites = groupState?.pendingInvitations || [];
+      notifyGroupStatus(groupState);
       const cloudPortfolio = await loadUserPortfoliosFromSupabase(authUser);
 
       // Deterministic Identity Priority:
@@ -607,7 +608,30 @@ async function initStudio() {
   if (new URLSearchParams(window.location.search).get('manage_group') === '1' && globalEntitlements.getEffectivePlanId() === 'premium_group') {
     setTimeout(() => openGroupManagementModal(), 500);
   }
-  if (pendingGroupInvites.length) setTimeout(() => showPendingGroupInvitations(pendingGroupInvites), 500);
+  if (pendingGroupInvites.length) setTimeout(() => showPendingGroupInvitations(pendingGroupInvites), 700);
+}
+
+function notifyGroupStatus(groupState) {
+  if (!groupState) return;
+  const pendingCount = Array.isArray(groupState.pendingInvitations) ? groupState.pendingInvitations.length : 0;
+  if (pendingCount) {
+    const inviteLabel = pendingCount === 1 ? 'You have 1 pending Premium Group invitation.' : `You have ${pendingCount} pending Premium Group invitations.`;
+    showToast('info', '👥', `${inviteLabel} Open it to accept or decline.`);
+  }
+
+  const subscription = groupState.subscription || groupState.membershipSubscription || null;
+  const end = subscription?.current_period_end ? new Date(subscription.current_period_end) : null;
+  if (!end || Number.isNaN(end.getTime())) return;
+  const daysLeft = Math.ceil((end.getTime() - Date.now()) / 86400000);
+  const scope = groupState.group ? 'Your Premium Group' : 'Your Premium Group access';
+  const noticeKey = `group-expiry-notice:${scope}:${end.toISOString()}`;
+  let alreadyShown = false;
+  try { alreadyShown = sessionStorage.getItem(noticeKey) === '1'; } catch (_) {}
+  if (alreadyShown) return;
+  if (daysLeft <= 7 && daysLeft > 0) {
+    try { sessionStorage.setItem(noticeKey, '1'); } catch (_) {}
+    showToast('warning', '⏳', `${scope} ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'} (${end.toLocaleDateString()}).`);
+  }
 }
 
 async function refreshStudioEntitlements({ notify = false } = {}) {
