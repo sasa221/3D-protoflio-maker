@@ -14,6 +14,8 @@ import { getCurrentAuthUser } from '../services/AuthService.js';
 import { fetchUserProfileAndEntitlements } from '../services/DBService.js';
 import { globalEntitlements } from '../services/EntitlementService.js';
 import { PLANS, GROUP_SEAT_PRICING } from '../config/PlanConfig.js';
+import { LANDING_GALLERY_FILTERS, LANDING_GALLERY_ITEMS } from '../config/LandingGalleryConfig.js';
+import { getThemeTier } from '../config/ThemeTierConfig.js';
 
 let demoEngine = null;
 let currentDemoThemeId = 'code';
@@ -70,16 +72,18 @@ export async function renderLandingPage(container) {
       #themes > div { grid-template-columns: 1fr !important; }
       /* Job targeting: stack */
       #targeting > div { grid-template-columns: 1fr !important; }
-      /* Recruiter comparison: stack */
-      section:nth-of-type(5) > div > div:last-child { grid-template-columns: 1fr !important; }
-      /* Analytics: stack */
-      section:nth-of-type(6) > div { grid-template-columns: 1fr !important; }
+      /* Recruiter comparison and analytics: stack */
+      #recruiter-mode > div > div:last-child, #analytics > div { grid-template-columns: 1fr !important; }
       /* Pricing: stack to 2 then 1 */
       #pricing > div:last-child { grid-template-columns: repeat(2, 1fr) !important; }
+    }
+    @media (max-width: 900px) {
+      #portfolio-gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
     }
     @media (max-width: 480px) {
       /* All grids to 1 column */
       #pricing > div:last-child { grid-template-columns: 1fr !important; }
+      #portfolio-gallery-grid { grid-template-columns: 1fr !important; }
     }
   `;
 
@@ -355,6 +359,38 @@ export async function renderLandingPage(container) {
         </div>
       </section>
 
+      <!-- 4. PORTFOLIO GALLERY -->
+      <section id="gallery" aria-labelledby="gallery-title" style="padding: clamp(60px, 8vw, 85px) 48px; max-width: 1300px; margin: 0 auto;">
+        <div style="text-align: center; max-width: 760px; margin: 0 auto 32px auto;">
+          <div style="font-size: 0.75rem; font-weight: 800; color: #06b6d4; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px;">
+            PORTFOLIO GALLERY
+          </div>
+          <h2 id="gallery-title" style="font-family: 'Outfit', sans-serif; font-size: 2.3rem; font-weight: 900; margin-bottom: 16px;">
+            See what your work could look like before you sign up.
+          </h2>
+          <p style="color: rgba(255,255,255,0.7); font-size: 1rem; line-height: 1.6; margin: 0 auto;">
+            Explore fictional examples by profession, preview the 3D world, then start your own portfolio with the plan that fits you.
+          </p>
+        </div>
+
+        <div id="portfolio-gallery-filters" role="tablist" aria-label="Filter portfolio examples" style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 28px;">
+          ${LANDING_GALLERY_FILTERS.map((filter, index) => `
+            <button type="button" role="tab" aria-selected="${index === 0 ? 'true' : 'false'}" data-gallery-filter="${filter.id}" style="
+              min-height: 44px; padding: 10px 16px; border-radius: 999px; cursor: pointer; font-weight: 700;
+              color: #fff; background: ${index === 0 ? 'linear-gradient(135deg, #7c3aed, #06b6d4)' : 'rgba(255,255,255,0.04)'};
+              border: 1px solid ${index === 0 ? 'transparent' : 'rgba(255,255,255,0.12)'}; transition: all 0.2s;
+            ">${filter.label}</button>
+          `).join('')}
+        </div>
+
+        <div id="portfolio-gallery-grid" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px;">
+          ${renderGalleryCards(isAuthenticated ? '/studio' : '/login?next=%2Fstart')}
+        </div>
+        <p id="portfolio-gallery-empty" hidden style="text-align: center; color: rgba(255,255,255,0.68); margin: 28px 0 0;">
+          No examples in this category yet.
+        </p>
+      </section>
+
       <!-- 4. JOB TARGETING SECTION -->
       <section id="targeting" style="padding: clamp(60px, 8vw, 85px) 48px; max-width: 1300px; margin: 0 auto;">
         <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 40px; align-items: center;">
@@ -417,8 +453,8 @@ export async function renderLandingPage(container) {
         </div>
       </section>
 
-      <!-- 5. RECRUITER MODE VISUAL COMPARISON -->
-      <section style="padding: clamp(60px, 8vw, 85px) 48px; background: rgba(255,255,255,0.015); border-y: 1px solid rgba(255,255,255,0.06); text-align: center;">
+      <!-- 6. RECRUITER MODE VISUAL COMPARISON -->
+      <section id="recruiter-mode" style="padding: clamp(60px, 8vw, 85px) 48px; background: rgba(255,255,255,0.015); border-y: 1px solid rgba(255,255,255,0.06); text-align: center;">
         <div style="max-width: 1200px; margin: 0 auto;">
           <div style="font-size: 0.75rem; font-weight: 800; color: #a855f7; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px;">
             DUAL PRESENTATION MODE
@@ -501,8 +537,8 @@ export async function renderLandingPage(container) {
         </div>
       </section>
 
-      <!-- 6. ANALYTICS SECTION -->
-      <section style="padding: clamp(60px, 8vw, 85px) 48px; max-width: 1300px; margin: 0 auto;">
+      <!-- 7. ANALYTICS SECTION -->
+      <section id="analytics" style="padding: clamp(60px, 8vw, 85px) 48px; max-width: 1300px; margin: 0 auto;">
         <div style="display: grid; grid-template-columns: 1.1fr 1fr; gap: 40px; align-items: center;">
           <!-- REALISTIC DEMO ANALYTICS DASHBOARD -->
           <div style="background: rgba(10,10,20,0.85); border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 30px; position: relative;">
@@ -552,7 +588,7 @@ export async function renderLandingPage(container) {
         </div>
       </section>
 
-      <!-- 7. PRICING SECTION -->
+      <!-- 8. PRICING SECTION -->
       <section id="pricing" style="padding: clamp(60px, 8vw, 85px) 48px; max-width: 1200px; margin: 0 auto; text-align: center;">
         <div style="font-size: 0.75rem; font-weight: 800; color: #a855f7; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px;">
           TRANSPARENT PRICING
@@ -654,7 +690,7 @@ export async function renderLandingPage(container) {
         </div>
       </section>
 
-      <!-- 8. TRUTHFUL FAQ -->
+      <!-- 9. TRUTHFUL FAQ -->
       <section style="padding: clamp(60px, 8vw, 85px) 48px; max-width: 900px; margin: 0 auto;">
         <h2 style="font-family: 'Outfit', sans-serif; font-size: 2.2rem; font-weight: 900; text-align: center; margin-bottom: 32px;">
           Frequently Asked Questions
@@ -719,7 +755,7 @@ export async function renderLandingPage(container) {
         </div>
       </section>
 
-      <!-- 9. FINAL CALL TO ACTION -->
+      <!-- 10. FINAL CALL TO ACTION -->
       <section style="padding: 80px 48px; text-align: center; background: linear-gradient(180deg, rgba(5,5,12,0) 0%, rgba(124,58,237,0.1) 100%); border-t: 1px solid rgba(255,255,255,0.08);">
         <h2 style="font-family: 'Outfit', sans-serif; font-size: 2.6rem; font-weight: 900; margin-bottom: 16px;">
           Your experience deserves more than a PDF.
@@ -752,9 +788,86 @@ export async function renderLandingPage(container) {
     </div>
   `;
 
+  setupLandingGallery();
+
   // Keep the marketing copy and CTA responsive first; the WebGL demo is
   // initialized during idle time so it cannot delay the first mobile paint.
   scheduleLandingHeroDemo();
+}
+
+function renderGalleryCards(buildHref) {
+  const tierLabels = { free: 'Free theme', pro: 'Pro theme', premium: 'Premium theme' };
+  const tierColors = { free: '#10b981', pro: '#a855f7', premium: '#06b6d4' };
+
+  return LANDING_GALLERY_ITEMS.map(item => {
+    const theme = getThemeById(item.themeId);
+    const tier = getThemeTier(item.themeId);
+    const themeName = theme?.name || item.themeId;
+    const themeEmoji = theme?.emoji || '✨';
+    const color = tierColors[tier] || tierColors.free;
+    return `
+      <article data-gallery-card data-gallery-filters="${item.filters.join(',')}" style="
+        display: flex; flex-direction: column; min-width: 0; background: linear-gradient(145deg, rgba(255,255,255,0.065), rgba(255,255,255,0.02));
+        border: 1px solid rgba(255,255,255,0.12); border-radius: 18px; padding: 22px; min-height: 250px;
+      ">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 20px;">
+          <span style="font-size: 1.8rem;" aria-hidden="true">${themeEmoji}</span>
+          <span style="font-size: 0.68rem; font-weight: 800; letter-spacing: 0.6px; color: ${color}; background: ${color}1c; border: 1px solid ${color}55; padding: 5px 9px; border-radius: 999px; white-space: nowrap;">
+            ${tierLabels[tier]}
+          </span>
+        </div>
+        <div style="font-size: 0.75rem; color: ${color}; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 7px;">${item.role}</div>
+        <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.35rem; margin: 0 0 9px;">${item.title}</h3>
+        <p style="font-size: 0.88rem; color: rgba(255,255,255,0.68); line-height: 1.55; margin: 0 0 20px; flex: 1;">${item.description}</p>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+          <button type="button" data-gallery-preview="${item.themeId}" style="
+            min-height: 44px; padding: 10px 12px; border: 1px solid rgba(255,255,255,0.15); border-radius: 10px;
+            color: rgba(255,255,255,0.86); background: rgba(255,255,255,0.05); cursor: pointer; font-weight: 700;
+          ">Preview ${themeName}</button>
+          <a href="${buildHref}" data-gallery-build style="
+            min-height: 44px; padding: 10px 12px; display: inline-flex; align-items: center; border-radius: 10px;
+            color: #fff; background: linear-gradient(135deg, #7c3aed, #06b6d4); text-decoration: none; font-weight: 800;
+          ">Build this style</a>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
+function setupLandingGallery() {
+  const filterButtons = [...document.querySelectorAll('[data-gallery-filter]')];
+  const cards = [...document.querySelectorAll('[data-gallery-card]')];
+  const emptyState = document.getElementById('portfolio-gallery-empty');
+  if (!filterButtons.length || !cards.length) return;
+
+  const applyFilter = (filterId) => {
+    let visibleCount = 0;
+    cards.forEach(card => {
+      const matches = filterId === 'all' || card.dataset.galleryFilters.split(',').includes(filterId);
+      card.hidden = !matches;
+      if (matches) visibleCount += 1;
+    });
+    if (emptyState) emptyState.hidden = visibleCount > 0;
+    filterButtons.forEach(button => {
+      const active = button.dataset.galleryFilter === filterId;
+      button.setAttribute('aria-selected', String(active));
+      button.style.background = active ? 'linear-gradient(135deg, #7c3aed, #06b6d4)' : 'rgba(255,255,255,0.04)';
+      button.style.borderColor = active ? 'transparent' : 'rgba(255,255,255,0.12)';
+    });
+  };
+
+  filterButtons.forEach(button => {
+    button.addEventListener('click', () => applyFilter(button.dataset.galleryFilter));
+  });
+
+  document.querySelectorAll('[data-gallery-preview]').forEach(button => {
+    button.addEventListener('click', () => {
+      window.switchDemoTheme(button.dataset.galleryPreview);
+      document.getElementById('themes')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+
+  applyFilter('all');
 }
 
 function scheduleLandingHeroDemo() {
