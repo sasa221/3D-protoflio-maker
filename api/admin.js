@@ -7,6 +7,7 @@ import {
   generatePaymentApprovedEmail,
   generatePaymentRejectedEmail
 } from '../src/services/EmailTemplates.js';
+import { INSTAPAY_CONFIG } from '../src/config/PlanConfig.js';
 
 const VALID_PLANS = ['free', 'pro', 'premium', 'premium_group'];
 const VALID_STATUSES = ['active', 'canceling', 'expired', 'grace', 'keep_it_live'];
@@ -99,8 +100,13 @@ export default async function handler(req, res) {
     const serviceKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
     const database = (url && serviceKey) ? 'connected' : 'not_connected';
     const storage = (url && anonKey) ? 'connected' : 'not_connected';
-    const billing = Boolean(process.env.STRIPE_SECRET_KEY || process.env.PAYMOB_API_KEY || process.env.VITE_ENABLE_BILLING_PORTAL);
-    const email = Boolean(process.env.BREVO_API_KEY || process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY);
+    // The product's active billing path is manual InstaPay, not Stripe/Paymob.
+    // api/billing.js exposes the official fallback destination when the optional
+    // PAYMENT_INSTAPAY_* overrides are absent, so health must report that real
+    // path instead of a stale Stripe-only dependency.
+    const manualInstaPayBilling = Boolean(INSTAPAY_CONFIG?.isConfigured);
+    const billing = manualInstaPayBilling || Boolean(process.env.STRIPE_SECRET_KEY || process.env.PAYMOB_API_KEY || process.env.VITE_ENABLE_BILLING_PORTAL);
+    const email = Boolean(process.env.BREVO_API_KEY && process.env.BREVO_SENDER_EMAIL);
     const monitoring = Boolean(process.env.SENTRY_AUTH_TOKEN || process.env.VITE_SENTRY_DSN);
     const coreHealthy = database === 'connected' && storage === 'connected';
     const launchReady = coreHealthy && billing && email && monitoring;

@@ -113,6 +113,7 @@ console.log('\n4. Testing Input Validation on Public & Health Endpoints...');
   const res = mockRes();
   await adminHandler({ method: 'GET', query: { action: 'health' }, headers: {} }, res);
   assert(res.statusCode === 200 || res.statusCode === 503, 'admin health endpoint executes and returns status code');
+  assert(res.body?.billing === 'configured', 'admin health recognizes the active manual InstaPay billing path');
 }
 
 console.log('\n============================================================');
