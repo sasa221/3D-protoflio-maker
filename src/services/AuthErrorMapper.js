@@ -11,6 +11,14 @@ export function mapAuthError(err) {
   const code = err.code || '';
   const msgLower = message.toLowerCase();
 
+  if (code === 'email_not_registered' || msgLower.includes('email is not registered')) {
+    return {
+      type: 'email_not_registered',
+      message: 'This email is not registered yet.',
+      userFacing: 'This email is not registered yet. Create an account first.'
+    };
+  }
+
   // 1. Email Confirmation & Verification
   if (
     msgLower.includes('email not confirmed') ||

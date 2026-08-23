@@ -6,7 +6,7 @@
  */
 
 import {
-  signUp, login, getSession, isLoggedIn, getCurrentUser, verifyEmailOtp, resendEmailOtp, isEmailVerified
+  signUp, login, getSession, isLoggedIn, getCurrentUser, verifyEmailOtp, resendEmailOtp, checkEmailRegistered, isEmailVerified
 } from './services/AuthService.js';
 import { mapAuthError } from './services/AuthErrorMapper.js';
 import { PLAN_CONFIG } from './services/EntitlementService.js';
@@ -209,6 +209,31 @@ export function renderAuthPage(onSuccess) {
   let resendCooldownTimer = null;
   let cooldownSecondsLeft = 0;
 
+  function setLoginNotice(message, { tone = 'error', showSignup = false } = {}) {
+    const notice = document.getElementById('login-error');
+    if (!notice) return;
+    const palette = {
+      error: ['#ef4444', 'rgba(239,68,68,0.1)', '1px solid rgba(239,68,68,0.2)'],
+      info: ['#38bdf8', 'rgba(56,189,248,0.1)', '1px solid rgba(56,189,248,0.2)'],
+      success: ['#10b981', 'rgba(16,185,129,0.1)', '1px solid rgba(16,185,129,0.25)']
+    }[tone] || ['#ef4444', 'rgba(239,68,68,0.1)', '1px solid rgba(239,68,68,0.2)'];
+    notice.innerHTML = '';
+    notice.appendChild(document.createTextNode(message));
+    if (showSignup) {
+      notice.appendChild(document.createTextNode(' '));
+      const signupButton = document.createElement('button');
+      signupButton.type = 'button';
+      signupButton.textContent = 'Create an account';
+      signupButton.style.cssText = 'background:none;border:none;padding:0;color:#c084fc;text-decoration:underline;font:inherit;font-weight:700;cursor:pointer';
+      signupButton.addEventListener('click', () => authSwitchTab('signup'));
+      notice.appendChild(signupButton);
+    }
+    notice.style.color = palette[0];
+    notice.style.background = palette[1];
+    notice.style.border = palette[2];
+    notice.style.display = 'block';
+  }
+
   window.authSwitchTab = (tab) => {
     const isLogin = tab === 'login';
     const formLogin = document.getElementById('form-login');
@@ -225,6 +250,13 @@ export function renderAuthPage(onSuccess) {
     if (signupTab) {
       signupTab.style.background = !isLogin ? 'linear-gradient(135deg,#7c3aed,#06b6d4)' : 'transparent';
       signupTab.style.color = !isLogin ? '#fff' : 'rgba(255,255,255,0.4)';
+    }
+    if (isLogin) {
+      const signupError = document.getElementById('signup-error');
+      if (signupError) signupError.style.display = 'none';
+    } else {
+      const loginError = document.getElementById('login-error');
+      if (loginError) loginError.style.display = 'none';
     }
   };
 
@@ -283,7 +315,19 @@ export function renderAuthPage(onSuccess) {
         return;
       }
 
-      if (err) {
+      if (mapped.type === 'invalid_credentials') {
+        const email = document.getElementById('login-email')?.value?.trim() || '';
+        try {
+          const lookup = await checkEmailRegistered(email);
+          if (!lookup?.exists) {
+            setLoginNotice('This email is not registered yet.', { showSignup: true });
+          } else {
+            setLoginNotice('Incorrect password. Try again or use Forgot Password.');
+          }
+        } catch (_) {
+          setLoginNotice(mapped.userFacing);
+        }
+      } else if (err) {
         err.textContent = mapped.userFacing;
         err.style.display = 'block';
       }
@@ -461,20 +505,11 @@ export function renderAuthPage(onSuccess) {
     const err = document.getElementById('login-error');
 
     if (!email || !email.includes('@')) {
-      if (err) {
-        err.textContent = 'Please enter your email address in the Email box first.';
-        err.style.display = 'block';
-      }
+      setLoginNotice('Please enter your email address in the Email box first.');
       return;
     }
 
-    if (err) {
-      err.textContent = '⏳ Sending password reset instructions...';
-      err.style.color = '#38bdf8';
-      err.style.background = 'rgba(56,189,248,0.1)';
-      err.style.border = '1px solid rgba(56,189,248,0.2)';
-      err.style.display = 'block';
-    }
+    setLoginNotice('⏳ Checking your email address...', { tone: 'info' });
 
     try {
       const res = await fetch('/api/public?action=reset-password', {
@@ -483,18 +518,17 @@ export function renderAuthPage(onSuccess) {
         body: JSON.stringify({ email })
       });
       const data = await res.json().catch(() => ({}));
-      if (err) {
-        err.textContent = '✅ Password reset instructions sent. Please check your inbox.';
-        err.style.color = '#10b981';
-        err.style.background = 'rgba(16,185,129,0.1)';
-        err.style.border = '1px solid rgba(16,185,129,0.25)';
-        err.style.display = 'block';
+      if (data.code === 'email_not_registered') {
+        setLoginNotice('This email is not registered yet.', { showSignup: true });
+        return;
       }
-    } catch (_) {
-      if (err) {
-        err.textContent = 'We sent password reset instructions if an account exists.';
-        err.style.display = 'block';
+      if (!res.ok) {
+        setLoginNotice(data.error || 'We could not send the reset email right now. Please try again.');
+        return;
       }
+      setLoginNotice('✅ Reset email sent. Check your inbox, Spam, and Promotions.', { tone: 'success' });
+    } catch (error) {
+      setLoginNotice('We could not check this email right now. Please try again.');
     }
   };
 }

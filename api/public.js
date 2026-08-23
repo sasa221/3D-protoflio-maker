@@ -143,6 +143,19 @@ async function sendCustomAuthVerification(req, res, action) {
   }
 }
 
+async function checkRegisteredAuthEmail(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (!isAllowedAuthOrigin(req)) return res.status(403).json({ error: 'Origin not allowed' });
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Valid email address required.' });
+  }
+  const adminClient = getAdminClient({ requireSecret: true });
+  if (!adminClient) return res.status(503).json({ code: 'auth_service', error: 'Authentication service is not configured.' });
+  const user = await findAuthUser(adminClient, email);
+  return res.status(200).json({ success: true, exists: Boolean(user) });
+}
+
 async function sendPortfolio(req, res, adminClient, slug) {
   if (RESERVED_SLUGS.has(slug)) return res.status(400).json({ error: 'Invalid portfolio path' });
   const variantSlug = String(req.query.variant || '').trim().toLowerCase();
@@ -188,6 +201,9 @@ export default async function handler(req, res) {
   // Brevo's HTTP API. Supabase never sends this message itself.
   if (action === 'auth-signup' || action === 'auth-resend') {
     return sendCustomAuthVerification(req, res, action);
+  }
+  if (action === 'auth-check-email') {
+    return checkRegisteredAuthEmail(req, res);
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -248,15 +264,13 @@ export default async function handler(req, res) {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const safeEscapedEmail = escapeHtml(cleanEmail);
-    const genericSuccessResponse = {
-      success: true,
-      message: "If an account exists for this email, we've sent password reset instructions."
-    };
-
     try {
       const adminClient = getAdminClient({ requireSecret: true });
       if (!adminClient) return res.status(503).json({ success: false, error: 'Authentication service is not configured.' });
+      const user = await findAuthUser(adminClient, cleanEmail);
+      if (!user) {
+        return res.status(404).json({ success: false, code: 'email_not_registered', error: 'This email is not registered. Create an account first.' });
+      }
       const brevoApiKey = process.env.BREVO_API_KEY;
       const senderEmail = process.env.BREVO_SENDER_EMAIL;
       const senderName = process.env.BREVO_SENDER_NAME || '3D Portfolio Maker';
@@ -275,19 +289,22 @@ export default async function handler(req, res) {
       });
 
       if (linkErr) {
-        return res.status(200).json(genericSuccessResponse);
+        return res.status(502).json({ success: false, code: 'email_delivery', error: 'We could not create the password reset email.' });
       }
 
       const actionUrl = linkData.properties?.action_link || 'https://portfolio-maker-murex.vercel.app/reset-password';
       const html = generatePasswordResetEmail({ firstName: cleanEmail.split('@')[0], actionUrl });
 
-      await sendBrevoEmail({
+      const emailResult = await sendBrevoEmail({
         to: cleanEmail,
         subject: 'Reset Your Portfolio Maker Password',
         htmlContent: html
       });
+      if (!emailResult?.success) {
+        return res.status(503).json({ success: false, code: 'email_delivery', error: 'We could not deliver the password reset email.' });
+      }
 
-      return res.status(200).json(genericSuccessResponse);
+      return res.status(200).json({ success: true, emailSent: true });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }

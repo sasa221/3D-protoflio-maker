@@ -14,6 +14,8 @@ check('Custom auth signup action uses Supabase Admin generateLink', source.inclu
 check('Custom auth resend action uses magiclink generateLink', source.includes("type: 'magiclink'"));
 check('Auth confirmation is dispatched through Brevo API', source.includes('sendBrevoEmail') && source.includes('generateSignupVerificationEmail'));
 check('Custom auth routes are mapped without adding a serverless function', vercel.includes('/api/auth/signup') && vercel.includes('/api/auth/resend'));
+check('Auth email lookup route is mapped', vercel.includes('/api/auth/check-email') && source.includes('auth-check-email'));
+check('Reset endpoint distinguishes unknown emails', source.includes("code: 'email_not_registered'") && source.includes('findAuthUser(adminClient, cleanEmail)'));
 check('Verification email contains both OTP and secure link', (() => {
   const html = generateSignupVerificationEmail({ firstName: 'Test', otpCode: '12345678', actionUrl: 'https://example.com/verify' });
   return html.includes('12345678') && html.includes('https://example.com/verify') && html.includes('Verify My Email');

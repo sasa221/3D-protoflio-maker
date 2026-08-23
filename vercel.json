@@ -142,6 +142,10 @@
       "destination": "/api/public?action=auth-resend"
     },
     {
+      "source": "/api/auth/check-email",
+      "destination": "/api/public?action=auth-check-email"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },

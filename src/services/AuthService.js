@@ -148,6 +148,13 @@ export async function resendEmailOtp(email, userId = '') {
   });
 }
 
+/** Check whether an email already has an account. Used only to give clear,
+ * actionable sign-in and password-reset feedback in the auth UI. */
+export async function checkEmailRegistered(email) {
+  if (!email || !email.includes('@')) throw new Error('Valid email address required.');
+  return requestAuthEmailApi('/api/auth/check-email', { email: email.trim() });
+}
+
 export function isEmailVerified(user) {
   if (!user) return false;
   return Boolean(user.email_confirmed_at || user.confirmed_at || user.user_metadata?.email_verified);
