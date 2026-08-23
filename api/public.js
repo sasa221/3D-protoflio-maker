@@ -126,7 +126,8 @@ async function sendCustomAuthVerification(req, res, action) {
     const emailResult = await sendBrevoEmail({
       to: email,
       subject: 'Verify your 3D Portfolio Maker account',
-      htmlContent: generateSignupVerificationEmail({ firstName, otpCode, actionUrl })
+      htmlContent: generateSignupVerificationEmail({ firstName, otpCode, actionUrl }),
+      tags: [action === 'auth-resend' ? 'auth-verification-resend' : 'auth-signup-verification']
     });
     if (!emailResult.success) return res.status(503).json({ code: 'email_delivery', error: 'Verification email could not be delivered.' });
 
@@ -269,13 +270,10 @@ export default async function handler(req, res) {
       if (!adminClient) return res.status(503).json({ success: false, error: 'Authentication service is not configured.' });
       const user = await findAuthUser(adminClient, cleanEmail);
       if (!user) {
-        return res.status(404).json({ success: false, code: 'email_not_registered', error: 'This email is not registered. Create an account first.' });
+        // Do not reveal whether an account exists.
+        return res.status(200).json({ success: true, emailSent: true });
       }
-      const brevoApiKey = process.env.BREVO_API_KEY;
-      const senderEmail = process.env.BREVO_SENDER_EMAIL;
-      const senderName = process.env.BREVO_SENDER_NAME || '3D Portfolio Maker';
-
-      if (!brevoApiKey || !senderEmail) {
+      if (!process.env.BREVO_API_KEY || !process.env.BREVO_SENDER_EMAIL) {
         return res.status(503).json({
           success: false,
           error: 'Transactional email is not configured (BREVO_API_KEY or BREVO_SENDER_EMAIL missing)'
@@ -297,8 +295,9 @@ export default async function handler(req, res) {
 
       const emailResult = await sendBrevoEmail({
         to: cleanEmail,
-        subject: 'Reset Your Portfolio Maker Password',
-        htmlContent: html
+        subject: 'Reset your 3D Portfolio Maker password',
+        htmlContent: html,
+        tags: ['auth-password-reset']
       });
       if (!emailResult?.success) {
         return res.status(503).json({ success: false, code: 'email_delivery', error: 'We could not deliver the password reset email.' });

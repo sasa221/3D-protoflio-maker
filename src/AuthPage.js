@@ -509,7 +509,7 @@ export function renderAuthPage(onSuccess) {
       return;
     }
 
-    setLoginNotice('⏳ Checking your email address...', { tone: 'info' });
+    setLoginNotice('⏳ Sending a password reset email...', { tone: 'info' });
 
     try {
       const res = await fetch('/api/public?action=reset-password', {
@@ -518,10 +518,6 @@ export function renderAuthPage(onSuccess) {
         body: JSON.stringify({ email })
       });
       const data = await res.json().catch(() => ({}));
-      if (data.code === 'email_not_registered') {
-        setLoginNotice('This email is not registered yet.', { showSignup: true });
-        return;
-      }
       if (!res.ok) {
         setLoginNotice(data.error || 'We could not send the reset email right now. Please try again.');
         return;

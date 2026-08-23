@@ -287,8 +287,9 @@ export default async function handler(req, res) {
           const invitationUrl = `https://portfolio-maker-murex.vercel.app/studio?group_invite=${encodeURIComponent(group.id)}`;
           const emailResult = await sendBrevoEmail({
             to: cleanEmail,
-            subject: `${ownerName} invited you to a Premium Portfolio Group`,
-            htmlContent: generateGroupInvitationEmail({ ownerName, invitationUrl, seatLimit: group.seat_limit })
+            subject: 'You’re invited to a Premium Portfolio Group',
+            htmlContent: generateGroupInvitationEmail({ ownerName, invitationUrl, seatLimit: group.seat_limit }),
+            tags: ['group-invitation']
           });
           return res.status(200).json({ success: true, memberEmail: cleanEmail, status: 'pending', resent: Boolean(existingMember), emailSent: emailResult.success, emailError: emailResult.success ? null : emailResult.error });
         }
@@ -332,12 +333,14 @@ export default async function handler(req, res) {
             sendBrevoEmail({
               to: userData.user.email,
               subject: 'Your Premium Group access is active',
-              htmlContent: generateGroupMemberActivatedEmail({ memberName, ownerName, activeUntil })
+              htmlContent: generateGroupMemberActivatedEmail({ memberName, ownerName, activeUntil }),
+              tags: ['group-membership-activated']
             }),
             ownerProfile?.email ? sendBrevoEmail({
               to: ownerProfile.email,
-              subject: `${memberName} joined your Premium Group`,
-              htmlContent: generateGroupMemberJoinedEmail({ ownerName, memberEmail: userData.user.email })
+              subject: 'A member joined your Premium Group',
+              htmlContent: generateGroupMemberJoinedEmail({ ownerName, memberEmail: userData.user.email }),
+              tags: ['group-member-joined']
             }) : Promise.resolve(null)
           ]);
           return res.status(200).json({ success: true, status: 'active', groupId });

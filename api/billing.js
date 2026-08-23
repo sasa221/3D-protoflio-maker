@@ -212,8 +212,9 @@ export default async function handler(req, res) {
         });
         await sendBrevoEmail({
           to: adminEmail,
-          subject: `🔔 New Payment Verification Request — ${targetPlanId.toUpperCase()} (${finalExpectedAmount} EGP)`,
-          htmlContent: html
+          subject: 'New payment verification request',
+          htmlContent: html,
+          tags: ['billing-payment-submitted']
         }).catch(err => console.error('Admin email error:', err));
       }
 

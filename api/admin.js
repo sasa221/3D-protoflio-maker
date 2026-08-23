@@ -930,8 +930,9 @@ export default async function handler(req, res) {
         });
         await sendBrevoEmail({
           to: userEmail,
-          subject: `🎉 Your Portfolio Maker ${request.plan_id.toUpperCase()} Plan is Now Active!`,
-          htmlContent: html
+          subject: 'Your 3D Portfolio Maker plan is now active',
+          htmlContent: html,
+          tags: ['billing-payment-approved']
         }).catch(err => console.error('Approval email error:', err));
       }
 
@@ -971,8 +972,9 @@ export default async function handler(req, res) {
         });
         await sendBrevoEmail({
           to: userEmail,
-          subject: `Payment Verification Notice — Portfolio Maker`,
-          htmlContent: html
+          subject: 'Payment verification update',
+          htmlContent: html,
+          tags: ['billing-payment-rejected']
         }).catch(err => console.error('Rejection email error:', err));
       }
 
@@ -1017,4 +1019,3 @@ export default async function handler(req, res) {
 
   return res.status(405).json({ error: 'Unsupported admin action' });
 }
-

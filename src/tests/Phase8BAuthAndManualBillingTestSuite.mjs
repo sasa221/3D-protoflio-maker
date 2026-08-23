@@ -162,8 +162,8 @@ check('OTP email contains Portfolio Maker header', otpEmail.includes('Portfolio 
 check('OTP email contains prominent 6-digit code', otpEmail.includes('482910'));
 check('OTP email contains dark-mode compatible styling', otpEmail.includes('#050508') && otpEmail.includes('#0c0d16'));
 
-const resetEmail = generatePasswordResetEmail({ firstName: 'Saleh', actionUrl: 'https://example.com/reset' });
-check('Password reset email contains action link button', resetEmail.includes('https://example.com/reset') && resetEmail.includes('Reset Password'));
+const resetEmail = generatePasswordResetEmail({ firstName: 'Saleh', actionUrl: 'https://portfolio-maker-murex.vercel.app/reset-password' });
+check('Password reset email contains action link button', resetEmail.includes('https://portfolio-maker-murex.vercel.app/reset-password') && resetEmail.includes('Reset Password'));
 
 const adminPaymentEmail = generateAdminNewPaymentEmail({
   userName: 'Saleh Mohamed',

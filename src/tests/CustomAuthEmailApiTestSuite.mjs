@@ -15,10 +15,11 @@ check('Custom auth resend action uses magiclink generateLink', source.includes("
 check('Auth confirmation is dispatched through Brevo API', source.includes('sendBrevoEmail') && source.includes('generateSignupVerificationEmail'));
 check('Custom auth routes are mapped without adding a serverless function', vercel.includes('/api/auth/signup') && vercel.includes('/api/auth/resend'));
 check('Auth email lookup route is mapped', vercel.includes('/api/auth/check-email') && source.includes('auth-check-email'));
-check('Reset endpoint distinguishes unknown emails', source.includes("code: 'email_not_registered'") && source.includes('findAuthUser(adminClient, cleanEmail)'));
+check('Reset endpoint does not reveal account existence', source.includes('Do not reveal whether an account exists') && source.includes('emailSent: true') && !source.includes("code: 'email_not_registered'"));
+check('Auth flows carry distinct Brevo tags', source.includes('auth-signup-verification') && source.includes('auth-password-reset'));
 check('Verification email contains both OTP and secure link', (() => {
-  const html = generateSignupVerificationEmail({ firstName: 'Test', otpCode: '12345678', actionUrl: 'https://example.com/verify' });
-  return html.includes('12345678') && html.includes('https://example.com/verify') && html.includes('Verify My Email');
+  const html = generateSignupVerificationEmail({ firstName: 'Test', otpCode: '12345678', actionUrl: 'https://portfolio-maker-murex.vercel.app/start' });
+  return html.includes('12345678') && html.includes('https://portfolio-maker-murex.vercel.app/start') && html.includes('Verify My Email');
 })());
 
 const req = {
