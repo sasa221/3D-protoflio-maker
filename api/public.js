@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { sendBrevoEmail } from '../src/services/BrevoDispatcher.js';
-import { generatePasswordResetEmail } from '../src/services/EmailTemplates.js';
+import { generatePasswordResetEmail, generateSignupVerificationEmail } from '../src/services/EmailTemplates.js';
 
 const RESERVED_SLUGS = new Set(['admin', 'api', 'login', 'studio', 'start', 'privacy', 'terms', 'reset-password']);
 
@@ -8,6 +8,139 @@ function escapeHtml(str) {
   return String(str || '').replace(/[&<>"']/g, match => {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[match];
   });
+}
+
+const AUTH_REDIRECT_URL = process.env.AUTH_REDIRECT_URL || 'https://portfolio-maker-murex.vercel.app/start';
+const authMailThrottle = globalThis.__portfolioMakerAuthMailThrottle || (globalThis.__portfolioMakerAuthMailThrottle = new Map());
+
+function getAdminClient({ requireSecret = false } = {}) {
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://kupxhrfijkdlcteniqfp.supabase.co';
+  const secretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const publicKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const key = requireSecret ? secretKey : (secretKey || publicKey);
+  return key ? createClient(supabaseUrl, key, { auth: { persistSession: false, autoRefreshToken: false } }) : null;
+}
+
+function getRequestIp(req) {
+  const forwarded = req.headers?.['x-forwarded-for'] || req.headers?.['X-Forwarded-For'] || '';
+  return String(forwarded).split(',')[0].trim() || 'unknown';
+}
+
+function checkAuthMailThrottle(req, email, action) {
+  const now = Date.now();
+  const keys = [`${action}:email:${email}`, `${action}:ip:${getRequestIp(req)}`];
+  for (const key of keys) {
+    const last = authMailThrottle.get(key) || 0;
+    if (now - last < 30_000) return false;
+  }
+  for (const key of keys) authMailThrottle.set(key, now);
+  for (const [key, timestamp] of authMailThrottle) {
+    if (now - timestamp > 10 * 60_000) authMailThrottle.delete(key);
+  }
+  return true;
+}
+
+function isAllowedAuthOrigin(req) {
+  const origin = req.headers?.origin || req.headers?.Origin;
+  if (!origin) return true;
+  return origin === 'https://portfolio-maker-murex.vercel.app' || /^https?:\/\/localhost(?::\d+)?$/.test(origin);
+}
+
+async function findAuthUser(adminClient, email, userId = '') {
+  if (userId) {
+    const { data, error } = await adminClient.auth.admin.getUserById(userId);
+    if (!error && data?.user?.email?.toLowerCase() === email) return data.user;
+  }
+
+  // The client sends the id after signup. For an unverified login, fall back
+  // to a bounded admin lookup so resend still works without exposing users.
+  for (let page = 1; page <= 10; page++) {
+    const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) return null;
+    const match = (data?.users || []).find(user => user.email?.toLowerCase() === email);
+    if (match) return match;
+    if ((data?.users || []).length < 1000) break;
+  }
+  return null;
+}
+
+async function sendCustomAuthVerification(req, res, action) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (!isAllowedAuthOrigin(req)) return res.status(403).json({ error: 'Origin not allowed' });
+
+  const body = req.body || {};
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Valid email address required.' });
+  }
+  if (!checkAuthMailThrottle(req, email, action)) {
+    return res.status(429).json({ code: 'over_email_send_rate_limit', error: 'Please wait before requesting another verification email.' });
+  }
+
+  const brevoConfigured = Boolean(process.env.BREVO_API_KEY && process.env.BREVO_SENDER_EMAIL);
+  if (!brevoConfigured) {
+    return res.status(503).json({ code: 'email_delivery', error: 'Verification email delivery is not configured.' });
+  }
+
+  const adminClient = getAdminClient({ requireSecret: true });
+  if (!adminClient) return res.status(503).json({ code: 'auth_service', error: 'Authentication service is not configured.' });
+
+  try {
+    let generated;
+    if (action === 'auth-signup') {
+      const password = typeof body.password === 'string' ? body.password : '';
+      if (password.length < 6) return res.status(400).json({ code: 'weak_password', error: 'Password should be at least 6 characters.' });
+      const displayName = typeof body.displayName === 'string' ? body.displayName.trim().slice(0, 120) : '';
+      const { data, error } = await adminClient.auth.admin.generateLink({
+        type: 'signup',
+        email,
+        password,
+        options: { data: { full_name: displayName }, redirectTo: AUTH_REDIRECT_URL }
+      });
+      if (error) {
+        const lower = String(error.message || '').toLowerCase();
+        if (lower.includes('already') || lower.includes('registered')) return res.status(409).json({ code: 'already_registered', error: 'An account with this email already exists. Sign in instead.' });
+        return res.status(502).json({ code: 'email_delivery', error: 'We could not create the verification request.' });
+      }
+      generated = data;
+    } else {
+      const user = await findAuthUser(adminClient, email, typeof body.userId === 'string' ? body.userId : '');
+      // Keep resend non-enumerating: unknown or already-confirmed addresses
+      // receive the same success shape without generating a new account.
+      if (!user || user.email_confirmed_at || user.confirmed_at) return res.status(200).json({ success: true, emailSent: true });
+      const { data, error } = await adminClient.auth.admin.generateLink({
+        type: 'magiclink',
+        email,
+        options: { redirectTo: AUTH_REDIRECT_URL }
+      });
+      if (error) return res.status(200).json({ success: true, emailSent: true });
+      generated = data;
+    }
+
+    const properties = generated?.properties || {};
+    const otpCode = String(properties.email_otp || '').replace(/\D/g, '');
+    const actionUrl = properties.action_link || AUTH_REDIRECT_URL;
+    if (!otpCode && !actionUrl) return res.status(502).json({ code: 'email_delivery', error: 'No verification payload was generated.' });
+
+    const firstName = (typeof body.displayName === 'string' && body.displayName.trim()) || email.split('@')[0];
+    const emailResult = await sendBrevoEmail({
+      to: email,
+      subject: 'Verify your 3D Portfolio Maker account',
+      htmlContent: generateSignupVerificationEmail({ firstName, otpCode, actionUrl })
+    });
+    if (!emailResult.success) return res.status(503).json({ code: 'email_delivery', error: 'Verification email could not be delivered.' });
+
+    return res.status(200).json({
+      success: true,
+      emailSent: true,
+      user: generated.user || null,
+      otpLength: otpCode ? otpCode.length : null,
+      verificationType: properties.verification_type || (action === 'auth-signup' ? 'signup' : 'magiclink')
+    });
+  } catch (error) {
+    console.error('[Custom Auth Email]', error?.message || error);
+    return res.status(502).json({ code: 'email_delivery', error: 'Verification email could not be delivered.' });
+  }
 }
 
 async function sendPortfolio(req, res, adminClient, slug) {
@@ -50,6 +183,12 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const action = req.query.action || (req.method === 'POST' ? 'reset-password' : 'resume');
+
+  // Auth confirmation is generated by Supabase Admin and delivered through
+  // Brevo's HTTP API. Supabase never sends this message itself.
+  if (action === 'auth-signup' || action === 'auth-resend') {
+    return sendCustomAuthVerification(req, res, action);
+  }
 
   // ─────────────────────────────────────────────────────────────
   // 1. ACTION: RESUME & PUBLIC PORTFOLIO
@@ -116,6 +255,8 @@ export default async function handler(req, res) {
     };
 
     try {
+      const adminClient = getAdminClient({ requireSecret: true });
+      if (!adminClient) return res.status(503).json({ success: false, error: 'Authentication service is not configured.' });
       const brevoApiKey = process.env.BREVO_API_KEY;
       const senderEmail = process.env.BREVO_SENDER_EMAIL;
       const senderName = process.env.BREVO_SENDER_NAME || '3D Portfolio Maker';

@@ -134,6 +134,14 @@
       "destination": "/api/public?action=reset-password"
     },
     {
+      "source": "/api/auth/signup",
+      "destination": "/api/public?action=auth-signup"
+    },
+    {
+      "source": "/api/auth/resend",
+      "destination": "/api/public?action=auth-resend"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },

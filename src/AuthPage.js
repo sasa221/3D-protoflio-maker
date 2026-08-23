@@ -205,6 +205,7 @@ export function renderAuthPage(onSuccess) {
   setupOtpInputHandlers(onSuccess);
 
   let currentPendingEmail = '';
+  let currentPendingUserId = '';
   let resendCooldownTimer = null;
   let cooldownSecondsLeft = 0;
 
@@ -227,8 +228,9 @@ export function renderAuthPage(onSuccess) {
     }
   };
 
-  window.showOtpScreen = (email) => {
+  window.showOtpScreen = (email, userId = '') => {
     currentPendingEmail = email;
+    currentPendingUserId = userId || '';
     const mainView = document.getElementById('auth-main-view');
     const otpView = document.getElementById('auth-otp-view');
     const targetEmailLabel = document.getElementById('otp-target-email');
@@ -268,7 +270,7 @@ export function renderAuthPage(onSuccess) {
 
       if (res?.user) {
         if (!isEmailVerified(res.user)) {
-          showOtpScreen(email);
+          showOtpScreen(email, res.user.id);
           return;
         }
         onSuccess(res.user);
@@ -332,7 +334,7 @@ export function renderAuthPage(onSuccess) {
           onSuccess(res.user);
         } else {
           // Transition to OTP Screen
-          showOtpScreen(email);
+          showOtpScreen(email, res.user.id);
         }
       }
     } catch (e) {
@@ -406,7 +408,7 @@ export function renderAuthPage(onSuccess) {
     if (resendBtn) resendBtn.textContent = 'Sending...';
 
     try {
-      await resendEmailOtp(currentPendingEmail);
+      await resendEmailOtp(currentPendingEmail, currentPendingUserId);
       if (statusMsg) {
         statusMsg.textContent = 'New verification email sent. Check Inbox, Spam, and Promotions.';
         statusMsg.style.color = '#10b981';

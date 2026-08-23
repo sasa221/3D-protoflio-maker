@@ -29,6 +29,10 @@ Keep `PRODUCT_CONFIG`, Stripe return URLs, email links, sitemap, OAuth callbacks
 
 Never commit secret values. Rotate a credential immediately if it appears in source control or logs.
 
+## Authentication email delivery
+
+Signup confirmation and resend use `/api/auth/signup` and `/api/auth/resend`. The server generates the Supabase verification payload with the Admin API and sends the message through Brevo's HTTP API. Supabase SMTP is intentionally not used. Keep `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `SUPABASE_SECRET_KEY`, and the verified Brevo sender configured in Vercel.
+
 ## Monitoring
 
 - Poll `/api/health` every five minutes.

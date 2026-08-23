@@ -73,10 +73,12 @@ export function mapAuthError(err) {
   // confirmation message to its mail provider. Keep this actionable instead
   // of showing the generic authentication error.
   if (
+    code === 'email_delivery' ||
     msgLower.includes('error sending confirmation email') ||
     msgLower.includes('error sending email') ||
     msgLower.includes('failed to send email') ||
     msgLower.includes('email provider') ||
+    msgLower.includes('email delivery') ||
     msgLower.includes('smtp') ||
     msgLower.includes('mail service')
   ) {

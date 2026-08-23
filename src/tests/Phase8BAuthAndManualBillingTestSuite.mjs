@@ -102,6 +102,8 @@ check('Maps rate limiting safely', errRateLimit.type === 'rate_limit' && errRate
 
 const errEmailDelivery = mapAuthError(new Error('Error sending confirmation email'));
 check('Maps confirmation email delivery failures to an actionable message', errEmailDelivery.type === 'email_delivery' && errEmailDelivery.userFacing.includes('email service needs to be configured'));
+const errApiEmailDelivery = mapAuthError(Object.assign(new Error('Verification email could not be delivered.'), { code: 'email_delivery' }));
+check('Maps Brevo API delivery failures to the same actionable message', errApiEmailDelivery.type === 'email_delivery');
 
 const errNetwork = mapAuthError(new Error('Failed to fetch'));
 check('Maps network failures friendly', errNetwork.type === 'network' && errNetwork.userFacing.includes('Check your connection'));

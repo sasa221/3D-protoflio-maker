@@ -119,6 +119,26 @@ export function generateOtpEmail({ firstName = 'there', otpCode }) {
 }
 
 /**
+ * Supabase Auth confirmation delivered through Brevo's HTTP API.
+ * The action link is included as a fallback for mail clients that reflow or
+ * hide the OTP, while the code remains the primary verification method.
+ */
+export function generateSignupVerificationEmail({ firstName = 'there', otpCode, actionUrl }) {
+  const safeName = String(firstName || 'there').replace(/[<>&"']/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#039;' }[char]));
+  const safeCode = String(otpCode || '').replace(/[^0-9]/g, '');
+  const safeUrl = String(actionUrl || '').replace(/"/g, '&quot;');
+  const content = `
+    <div style="background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.35);border-radius:10px;padding:12px 16px;margin-bottom:20px;text-align:center;"><span style="font-size:24px;display:block;margin-bottom:4px;">✉️</span><strong style="color:#c084fc;font-size:13px;letter-spacing:.5px;">VERIFY YOUR EMAIL</strong></div>
+    <h2 style="margin:0 0 12px;font-size:18px;font-weight:800;color:#ffffff;">Welcome to 3D Portfolio Maker</h2>
+    <p style="margin:0 0 18px;font-size:14px;color:#d1d5db;line-height:1.6;">Hi ${safeName}, use this code to finish creating your account:</p>
+    <div style="background-color:#131522;border:1.5px solid #7c3aed;border-radius:14px;padding:22px;text-align:center;margin-bottom:22px;box-shadow:0 0 24px rgba(124,58,237,0.15);"><span style="font-family:'Courier New',Courier,monospace;font-size:34px;font-weight:900;letter-spacing:8px;color:#c084fc;">${safeCode}</span></div>
+    ${safeUrl ? `<p style="margin:0 0 12px;font-size:13px;color:#9ca3af;line-height:1.5;text-align:center;">You can also verify with the secure button:</p><div style="text-align:center;margin:20px 0 26px;"><a href="${safeUrl}" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:14px 30px;border-radius:10px;">Verify My Email</a></div>` : ''}
+    <p style="margin:0;font-size:12px;color:#6b7280;line-height:1.5;">This code expires shortly. If you did not create this account, you can safely ignore this email.</p>
+  `;
+  return baseLayout(content, '3D Portfolio Maker — Account Security');
+}
+
+/**
  * 2. Password Reset Email
  */
 export function generatePasswordResetEmail({ firstName = 'there', actionUrl }) {
