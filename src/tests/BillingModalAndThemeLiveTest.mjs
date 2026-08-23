@@ -1,8 +1,11 @@
 // src/tests/BillingModalAndThemeLiveTest.mjs
+import { readFile } from 'node:fs/promises';
 import { PLANS, GROUP_SEAT_PRICING, formatEGP, formatPrice } from '../config/PlanConfig.js';
 import { canAccessTheme, getThemeTier, THEME_TIERS } from '../config/ThemeTierConfig.js';
 import { getAllThemes } from '../three/ProceduralTheme.js';
 import { getSubscriptionSummary } from '../ui/BillingModal.js';
+
+const billingSource = await readFile(new URL('../ui/BillingModal.js', import.meta.url), 'utf8');
 
 let passed = 0;
 let failed = 0;
@@ -64,6 +67,8 @@ const proSummary = getSubscriptionSummary('pro', { subscription: { status: 'acti
 assert(proSummary.planId === 'pro' && proSummary.daysRemaining === 30, 'Pro user sees subscription end and remaining days');
 const freeSummary = getSubscriptionSummary('free', { subscription: { status: 'active' } }, summaryNow);
 assert(freeSummary.planId === 'free' && freeSummary.daysRemaining === null, 'Free user sees no-expiry status safely');
+assert(billingSource.includes('Want to switch plans? View plan details and change subscription'), 'Current plan includes a switch-plan link');
+assert(billingSource.includes('billing-change-plan-link') && billingSource.includes('billing-plan-options'), 'Switch-plan link scrolls to the full plan comparison safely');
 
 // ─── 2. THEME CATALOG VISIBILITY & LOCK RULES ──────────────────
 console.log('\n2. Testing 15-theme catalog visibility and tiered accessibility...');
@@ -232,5 +237,3 @@ console.log(`  SUMMARY: ${passed} / ${passed + failed} assertions PASSED (Failur
 console.log('============================================================\n');
 
 if (failed > 0) process.exit(1);
-
-

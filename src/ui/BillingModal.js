@@ -106,7 +106,7 @@ function renderSubscriptionSummary(summary) {
         : 'This subscription has ended.')
       : 'Active subscription · renewal date not available';
   const memberNote = summary.isGroupMember ? 'You are covered by your group owner; your portfolio limits stay personal.' : 'Your subscription and portfolio limits are personal to this account.';
-  return `<div style="margin:0 auto 24px;max-width:760px;padding:14px 16px;border-radius:14px;background:${urgent ? 'rgba(245,158,11,.1)' : 'rgba(16,185,129,.08)'};border:1px solid ${urgent ? 'rgba(245,158,11,.3)' : 'rgba(16,185,129,.25)'};display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap"><div><strong style="display:block;color:#fff;font-size:14px">Current plan: ${escapeHtml(summary.planName)}</strong><span style="display:block;margin-top:4px;color:${tone};font-size:12px;font-weight:700">${escapeHtml(detail)}</span></div><span style="color:rgba(255,255,255,.58);font-size:11px;line-height:1.4;max-width:280px">${escapeHtml(memberNote)}</span></div>`;
+  return `<div style="margin:0 auto 24px;max-width:760px;padding:14px 16px;border-radius:14px;background:${urgent ? 'rgba(245,158,11,.1)' : 'rgba(16,185,129,.08)'};border:1px solid ${urgent ? 'rgba(245,158,11,.3)' : 'rgba(16,185,129,.25)'}"><div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap"><div><strong style="display:block;color:#fff;font-size:14px">Current plan: ${escapeHtml(summary.planName)}</strong><span style="display:block;margin-top:4px;color:${tone};font-size:12px;font-weight:700">${escapeHtml(detail)}</span></div><span style="color:rgba(255,255,255,.58);font-size:11px;line-height:1.4;max-width:280px">${escapeHtml(memberNote)}</span></div><button type="button" id="billing-change-plan-link" style="display:block;margin:10px auto 0;background:none;border:0;padding:0;color:#c084fc;text-decoration:underline;font-size:11px;font-weight:700;cursor:pointer">Want to switch plans? View plan details and change subscription</button></div>`;
 }
 
 function renderBillingMainView(currentPlan, pendingRequests, onSubscriptionUpdated, targetPlan = null, subscriptionSummary = null) {
@@ -160,7 +160,7 @@ function renderBillingMainView(currentPlan, pendingRequests, onSubscriptionUpdat
       ` : ''}
 
       <!-- 4-CARD PRICING GRID -->
-      <div class="pricing-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; align-items: stretch;">
+      <div id="billing-plan-options" class="pricing-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; align-items: stretch;">
         ${cardsHTML}
       </div>
 
@@ -171,6 +171,10 @@ function renderBillingMainView(currentPlan, pendingRequests, onSubscriptionUpdat
   modalContainer.querySelector('#btn-close-billing')?.addEventListener('click', () => {
     modalContainer.remove();
     modalContainer = null;
+  });
+
+  modalContainer.querySelector('#billing-change-plan-link')?.addEventListener('click', () => {
+    modalContainer.querySelector('#billing-plan-options')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
   // Bind Group Seat Selector Dynamic Price Update
