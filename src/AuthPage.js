@@ -159,9 +159,14 @@ export function renderAuthPage(onSuccess) {
       <div style="text-align:center;margin-bottom:24px">
         <h2 style="margin:0 0 8px;font-size:1.3rem;font-weight:800;color:#fff">Verify your email</h2>
         <p style="margin:0;font-size:0.85rem;color:rgba(255,255,255,0.6);line-height:1.4">
-          We sent a verification code to<br/>
+          We sent a verification code or confirmation link to<br/>
           <strong id="otp-target-email" style="color:#c084fc"></strong>
         </p>
+      </div>
+
+      <div style="margin:-8px 0 18px;padding:12px 14px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.18);border-radius:10px;color:rgba(255,255,255,0.62);font-size:0.76rem;line-height:1.55">
+        <strong style="display:block;color:#d8b4fe;margin-bottom:4px">Nothing arrived?</strong>
+        Check Spam, Promotions, and junk folders. Search for “3D Portfolio Maker” and wait up to 2 minutes before requesting another message.
       </div>
 
       <!-- Configurable OTP Box Grid -->
@@ -403,7 +408,7 @@ export function renderAuthPage(onSuccess) {
     try {
       await resendEmailOtp(currentPendingEmail);
       if (statusMsg) {
-        statusMsg.textContent = 'New verification code sent to your email.';
+        statusMsg.textContent = 'New verification email sent. Check Inbox, Spam, and Promotions.';
         statusMsg.style.color = '#10b981';
         statusMsg.style.background = 'rgba(16,185,129,0.1)';
         statusMsg.style.border = '1px solid rgba(16,185,129,0.25)';

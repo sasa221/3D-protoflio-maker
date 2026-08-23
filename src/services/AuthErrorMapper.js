@@ -68,7 +68,26 @@ export function mapAuthError(err) {
     };
   }
 
-  // 4. Rate Limiting & Throttling
+  // 4. Email delivery / SMTP configuration
+  // Supabase can create the auth request but fail while handing the
+  // confirmation message to its mail provider. Keep this actionable instead
+  // of showing the generic authentication error.
+  if (
+    msgLower.includes('error sending confirmation email') ||
+    msgLower.includes('error sending email') ||
+    msgLower.includes('failed to send email') ||
+    msgLower.includes('email provider') ||
+    msgLower.includes('smtp') ||
+    msgLower.includes('mail service')
+  ) {
+    return {
+      type: 'email_delivery',
+      message: 'Email delivery is temporarily unavailable.',
+      userFacing: 'We couldn\'t send the verification email right now. Check Spam/Promotions, then try again in a few minutes. If it still does not arrive, the email service needs to be configured by the site owner.'
+    };
+  }
+
+  // 5. Rate Limiting & Throttling
   if (
     msgLower.includes('rate limit') ||
     msgLower.includes('over_email_send_rate_limit') ||
@@ -82,7 +101,7 @@ export function mapAuthError(err) {
     };
   }
 
-  // 5. User Already Registered
+  // 6. User Already Registered
   if (msgLower.includes('user already registered') || msgLower.includes('email already in use')) {
     return {
       type: 'already_registered',
@@ -91,7 +110,7 @@ export function mapAuthError(err) {
     };
   }
 
-  // 6. Network & Connection
+  // 7. Network & Connection
   if (msgLower.includes('network') || msgLower.includes('fetch') || msgLower.includes('connection')) {
     return {
       type: 'network',
@@ -100,7 +119,7 @@ export function mapAuthError(err) {
     };
   }
 
-  // 7. Password Complexity
+  // 8. Password Complexity
   if (msgLower.includes('password should be at least')) {
     return {
       type: 'weak_password',

@@ -100,6 +100,9 @@ check('Maps incorrect OTP code cleanly to incorrect message', errInvalidOtp.type
 const errRateLimit = mapAuthError(new Error('over_email_send_rate_limit'));
 check('Maps rate limiting safely', errRateLimit.type === 'rate_limit' && errRateLimit.userFacing === 'Please wait before requesting another code.');
 
+const errEmailDelivery = mapAuthError(new Error('Error sending confirmation email'));
+check('Maps confirmation email delivery failures to an actionable message', errEmailDelivery.type === 'email_delivery' && errEmailDelivery.userFacing.includes('email service needs to be configured'));
+
 const errNetwork = mapAuthError(new Error('Failed to fetch'));
 check('Maps network failures friendly', errNetwork.type === 'network' && errNetwork.userFacing.includes('Check your connection'));
 
