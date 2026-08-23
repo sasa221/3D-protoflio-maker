@@ -90,7 +90,8 @@ assert(getPlanConfig('pro').id === 'pro', 'getPlanConfig("pro") returns Pro plan
 assert(getPlanConfig('garbage').id === 'free', 'getPlanConfig("garbage") falls back to Free');
 assert(formatPrice(600, '/month') === '600 EGP/month', 'formatPrice correctly formats');
 assert(formatPrice(0) === '0 EGP', 'formatPrice handles zero');
-assert(getGroupPrice(2) === 1500, 'getGroupPrice(2) = 1500');
+// Current approved Premium Group pricing starts at 1,800 EGP for two seats.
+assert(getGroupPrice(2) === 1800, 'getGroupPrice(2) = 1800');
 assert(getGroupPrice(10) === null, 'getGroupPrice(10) = null (invalid)');
 
 // ─── THEME TIER CONFIG TESTS ────────────────────
@@ -284,7 +285,8 @@ assert(kilUser.can(CAPABILITIES.HTML_EXPORT) === true, 'KIL CAN HTML export');
 assert(kilUser.can(CAPABILITIES.PUBLISH_HOSTED) === false, 'KIL CANNOT publish hosted');
 assert(kilUser.can(CAPABILITIES.CONTINUOUS_EDIT) === false, 'KIL CANNOT continuous edit');
 assert(kilUser.canEditPortfolio({}) === false, 'KIL CANNOT edit portfolio');
-assert(kilUser.canPublishHosted() === true, 'KIL canPublishHosted() = true when HOSTING_PAYWALL flag is OFF (default)');
+// Keep It Live is intentionally read-only even when the hosting paywall flag is off.
+assert(kilUser.canPublishHosted() === false, 'KIL cannot publish new hosted portfolios');
 assert(kilUser.hasKeepItLive('pf_1') === true, 'KIL has active entitlement for pf_1');
 assert(kilUser.hasKeepItLive('pf_other') === false, 'KIL does NOT have entitlement for pf_other');
 
