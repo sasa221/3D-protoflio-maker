@@ -30,7 +30,7 @@ async function renderGroupManagement(feedback = '') {
       if (data.membership?.status === 'active') {
         const owner = data.membershipOwner?.display_name || data.membershipOwner?.email || 'your team owner';
         const group = data.membershipGroup || {};
-        card.innerHTML = `<button data-close style="float:right;background:none;border:0;color:#fff;font-size:22px;cursor:pointer">×</button><div style="text-align:center;font-size:28px;margin-top:16px">👑</div><h2 style="margin:8px 0;text-align:center">Premium access is active</h2><p style="text-align:center;color:rgba(255,255,255,.65);font-size:13px;line-height:1.6">You’re a member of ${escapeHtml(owner)}’s Premium Group. Your account and portfolio are separate, and your own Premium limits apply.</p><div style="margin-top:18px;padding:14px;border-radius:12px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.25);color:#86efac;font-size:12px;text-align:center">Seat group: ${escapeHtml(group.seat_limit || 2)} users · Status: ACTIVE</div>`;
+        card.innerHTML = `<button data-close style="float:right;background:none;border:0;color:#fff;font-size:22px;cursor:pointer">×</button><div style="text-align:center;font-size:28px;margin-top:16px">👑</div><h2 style="margin:8px 0;text-align:center">Premium Group access is active</h2><p style="text-align:center;color:rgba(255,255,255,.65);font-size:13px;line-height:1.6">You’re an active member of ${escapeHtml(owner)}’s Premium Group. Your account and portfolio are separate, and your own Premium limits apply.</p><div style="margin-top:18px;padding:14px;border-radius:12px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.25);color:#86efac;font-size:12px;text-align:center">Premium Group · ${escapeHtml(group.seat_limit || 2)} teammate seats · Status: ACTIVE</div><p style="margin:12px 0 0;text-align:center;color:rgba(255,255,255,.5);font-size:11px">Your group owner manages invitations and membership.</p>`;
       } else {
         card.innerHTML = '<button data-close style="float:right;background:none;border:0;color:#fff;font-size:22px;cursor:pointer">×</button><h2 style="margin-top:20px">Setting up your Premium Group</h2><p style="color:rgba(255,255,255,.68);line-height:1.6">Your group subscription is active, but the team record is still syncing. Try again to load the invite controls.</p><button data-retry-group style="margin-top:12px;width:100%;padding:11px;border:0;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#fff;font-weight:800;cursor:pointer">Retry setup</button>';
       }
@@ -40,6 +40,8 @@ async function renderGroupManagement(feedback = '') {
     }
     const members = data.members || [];
     const reservedCount = members.filter(member => ['active', 'pending'].includes(member.status)).length;
+    const remainingSeats = Math.max(0, Number(group.seat_limit || 0) - reservedCount);
+    const remainingLabel = remainingSeats === 1 ? '1 invitation remaining' : `${remainingSeats} invitations remaining`;
     const rows = members.length ? members.map(member => {
       const profile = member.profile || {};
       const label = profile.display_name || profile.email || member.user_id;
@@ -47,17 +49,20 @@ async function renderGroupManagement(feedback = '') {
       const actions = member.status === 'pending'
         ? `<button data-resend="${escapeHtml(profile.email || '')}" style="background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.3);color:#7dd3fc;border-radius:7px;padding:4px 7px;font-size:10px;cursor:pointer">Resend</button>`
         : '';
-      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.08)"><div><strong style="display:block">${escapeHtml(label)}</strong><span style="font-size:11px;color:rgba(255,255,255,.5)">${escapeHtml(profile.email || '')}</span></div><div style="display:flex;align-items:center;gap:7px">${actions}<span style="color:${statusColor};font-size:11px;font-weight:800;text-transform:uppercase">${escapeHtml(member.status)}</span><button data-remove="${escapeHtml(member.id)}" title="Remove" style="background:none;border:0;color:#fca5a5;font-size:15px;cursor:pointer">×</button></div></div>`;
+      const pendingRemove = member.status === 'pending'
+        ? `<button data-remove="${escapeHtml(member.id)}" title="Cancel invitation" style="background:none;border:0;color:#fca5a5;font-size:15px;cursor:pointer">×</button>`
+        : '';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.08)"><div><strong style="display:block">${escapeHtml(label)}</strong><span style="font-size:11px;color:rgba(255,255,255,.5)">${escapeHtml(profile.email || '')}</span></div><div style="display:flex;align-items:center;gap:7px">${actions}<span style="color:${statusColor};font-size:11px;font-weight:800;text-transform:uppercase">${escapeHtml(member.status)}</span>${pendingRemove}</div></div>`;
     }).join('') : '<p style="color:rgba(255,255,255,.55);font-size:13px">No invitations sent yet.</p>';
     card.innerHTML = `
       <button data-close style="float:right;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:50%;width:32px;height:32px;font-size:20px;cursor:pointer">×</button>
       <div style="text-align:center;color:#c084fc;font-weight:800;letter-spacing:1px;font-size:12px">PREMIUM GROUP</div>
       <h2 style="margin:8px 0 6px;text-align:center">Manage your team</h2>
-      <p style="margin:0 0 20px;text-align:center;color:rgba(255,255,255,.62);font-size:13px">${reservedCount} of ${group.seat_limit} teammate seats reserved · pending invites count until replaced or removed.</p>
+      <p style="margin:0 0 20px;text-align:center;color:rgba(255,255,255,.62);font-size:13px">${reservedCount} of ${group.seat_limit} teammate seats reserved · <strong style="color:#86efac">${remainingLabel}</strong></p>
       ${feedback ? `<div style="margin-bottom:14px;padding:10px 12px;border-radius:9px;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);color:#86efac;font-size:12px">${escapeHtml(feedback)}</div>` : ''}
       <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:0 14px;margin-bottom:20px"><div style="padding:14px 0;border-bottom:1px solid rgba(255,255,255,.08)"><strong>${escapeHtml(data.owner?.email || 'You')}</strong><span style="display:block;color:#4ade80;font-size:11px;margin-top:3px">OWNER · ACTIVE</span></div>${rows}</div>
-      <form id=group-invite-form style="display:flex;gap:8px;margin-top:10px"><input id=group-invite-email type=email required placeholder="teammate@email.com" style="flex:1;min-width:0;background:#141624;border:1px solid rgba(255,255,255,.18);padding:11px 12px;border-radius:10px;color:#fff;outline:none"><button type=submit style="background:linear-gradient(135deg,#059669,#0891b2);border:0;border-radius:10px;padding:0 16px;color:#fff;font-weight:800;cursor:pointer">Invite</button></form>
-      <p style="font-size:11px;color:rgba(255,255,255,.48);line-height:1.5;margin:12px 0 0">The teammate must already have an account with this email. They’ll receive an email and must accept before Premium access activates.</p>
+      <form id=group-invite-form style="display:flex;gap:8px;margin-top:10px"><input id=group-invite-email type=email required ${remainingSeats === 0 ? 'disabled' : ''} placeholder="${remainingSeats === 0 ? 'All invitations are reserved' : 'teammate@email.com'}" style="flex:1;min-width:0;background:#141624;border:1px solid rgba(255,255,255,.18);padding:11px 12px;border-radius:10px;color:#fff;outline:none"><button type=submit ${remainingSeats === 0 ? 'disabled' : ''} style="background:${remainingSeats === 0 ? 'rgba(255,255,255,.08)' : 'linear-gradient(135deg,#059669,#0891b2)'};border:0;border-radius:10px;padding:0 16px;color:${remainingSeats === 0 ? 'rgba(255,255,255,.35)' : '#fff'};font-weight:800;cursor:${remainingSeats === 0 ? 'not-allowed' : 'pointer'}">${remainingSeats === 0 ? 'No seats left' : 'Invite'}</button></form>
+      <p style="font-size:11px;color:rgba(255,255,255,.48);line-height:1.5;margin:12px 0 0">Accepted members keep their seat for this subscription. You can resend or cancel a pending invitation, then use the freed seat for another email.</p>
     `;
     bindClose();
     card.querySelectorAll('[data-remove]').forEach(button => button.addEventListener('click', async () => {

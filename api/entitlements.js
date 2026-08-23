@@ -295,7 +295,11 @@ export default async function handler(req, res) {
           if (!ownedGroup) return res.status(403).json({ error: 'Only the group owner can manage members.' });
           const memberId = String(req.body.memberId || '');
           if (!memberId) return res.status(400).json({ error: 'memberId required' });
-          const { error: removeErr } = await adminClient.from('group_members').update({ status: 'removed' }).eq('id', memberId).eq('group_id', groupId);
+          const { data: memberToRemove, error: memberLookupErr } = await adminClient.from('group_members').select('id,status').eq('id', memberId).eq('group_id', groupId).maybeSingle();
+          if (memberLookupErr) return res.status(500).json({ error: memberLookupErr.message });
+          if (!memberToRemove) return res.status(404).json({ error: 'Invitation was not found.' });
+          if (memberToRemove.status === 'active') return res.status(400).json({ error: 'Accepted members cannot be removed. Their seat remains active until the subscription ends.' });
+          const { error: removeErr } = await adminClient.from('group_members').update({ status: 'removed' }).eq('id', memberId).eq('group_id', groupId).eq('status', 'pending');
           if (removeErr) return res.status(500).json({ error: removeErr.message });
           return res.status(200).json({ success: true, status: 'removed' });
         }

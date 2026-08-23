@@ -630,7 +630,8 @@ async function refreshStudioEntitlements({ notify = false } = {}) {
       premium: { text: '👑 PREMIUM', cls: 'tier-premium' },
       premium_group: { text: '👥 GROUP', cls: 'tier-premium' }
     };
-    const chip = chipConfig[nextPlan] || chipConfig.free;
+    const isGroupMember = globalEntitlements.groupMembership?.status === 'active';
+    const chip = isGroupMember ? chipConfig.premium_group : (chipConfig[nextPlan] || chipConfig.free);
     tierChip.textContent = chip.text;
     tierChip.className = 'tier-chip ' + chip.cls;
   }
@@ -708,7 +709,7 @@ function buildHTML() {
         <div class="logo-sub">Ultra Studio v3.0</div>
       </div>
       <div class="tier-chip ${globalEntitlements.getEffectivePlanId() !== 'free' ? 'tier-pro' : 'tier-free'}" id="tier-chip" role="button" tabindex="0" aria-label="View plan and billing" style="cursor:pointer">
-        ${(() => { const p = globalEntitlements.getEffectivePlanId(); return p === 'premium' ? '👑 PREMIUM' : p === 'premium_group' ? '👥 GROUP' : p === 'pro' ? '💎 PRO' : '🆓 FREE'; })()}
+        ${(() => { const p = globalEntitlements.getEffectivePlanId(); const isGroupMember = globalEntitlements.groupMembership?.status === 'active'; return p === 'premium' && !isGroupMember ? '👑 PREMIUM' : (p === 'premium_group' || isGroupMember) ? '👥 GROUP' : p === 'pro' ? '💎 PRO' : '🆓 FREE'; })()}
       </div>
       <button class="admin-btn" id="logout-btn" title="Logout" onclick="handleLogout()" style="font-size:16px">🚪</button>
     </div>

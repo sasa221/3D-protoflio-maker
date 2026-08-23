@@ -18,6 +18,9 @@ check('Pending invitations are stored as pending (not auto-activated)', /status:
 check('Pending invitations reserve purchased seats', /reservedSeats = .*\['active', 'pending'\]/s.test(api) && /reservedSeats >= group\.seat_limit/.test(api));
 check('Duplicate pending invite is resent instead of duplicated', /resent:\s*Boolean\(existingMember\)/.test(api));
 check('Owner can replace/remove an unaccepted invitation', /subAction === 'remove_member'/.test(api));
+check('Accepted members cannot be removed and keep their seat', /memberToRemove\.status === 'active'/.test(api) && /Accepted members cannot be removed/.test(api));
+check('Owner sees remaining invitations based on purchased seats', /remainingSeats = Math\.max/.test(modal) && /invitations remaining/.test(modal));
+check('Accepted group members are labeled Premium Group', /Premium Group access is active/.test(modal) && /globalEntitlements\.groupMembership\?\.status === 'active'/.test(main));
 check('Invitee can accept from authenticated account only', /subAction === 'accept_invitation'/.test(api) && /eq\('user_id', userId\)/.test(api));
 check('Invitee can decline and become eligible for a later invite', /subAction === 'decline_invitation'/.test(api) && /status: 'declined'/.test(api));
 check('Accepted seats remain protected at accept time', /if \(\(activeMemberCount \|\| 0\) >= group\.seat_limit\)/.test(api));
