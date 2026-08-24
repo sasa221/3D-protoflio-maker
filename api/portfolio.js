@@ -91,6 +91,32 @@ function isServerFeatureEnabled(flagName) {
   return val === 'true' || val === '1';
 }
 
+function localCareerPlanOverride() {
+  if (process.env.SUPABASE_ENV !== 'local') return '';
+  const value = String(process.env.CV_LOCAL_PLAN_OVERRIDE || '').trim().toLowerCase();
+  return ['free', 'pro', 'premium', 'premium_group'].includes(value) ? value : '';
+}
+
+async function resolveCareerExportPlan(adminClient, userId) {
+  const override = localCareerPlanOverride();
+  if (override) return override;
+  const { data: subscription } = await adminClient.from('subscriptions').select('plan_id,status,current_period_end').eq('user_id', userId).maybeSingle();
+  let plan = subscription?.plan_id || 'free';
+  const status = subscription?.status || 'active';
+  if (plan !== 'free' && subscription?.current_period_end && new Date(subscription.current_period_end).getTime() <= Date.now()) plan = 'free';
+  if (!['active', 'grace', 'canceling'].includes(status) && plan !== 'free') plan = 'free';
+  if (plan === 'free' || plan === 'pro') {
+    const { data: membership } = await adminClient.from('group_members').select('group_id').eq('user_id', userId).eq('status', 'active').maybeSingle();
+    if (membership?.group_id) {
+      const { data: group } = await adminClient.from('groups').select('owner_user_id,status').eq('id', membership.group_id).eq('status', 'active').maybeSingle();
+      const { data: ownerSubscription } = group ? await adminClient.from('subscriptions').select('plan_id,status,current_period_end').eq('user_id', group.owner_user_id).maybeSingle() : { data: null };
+      const ownerActive = group && ['active', 'grace', 'canceling'].includes(ownerSubscription?.status || '') && (!ownerSubscription?.current_period_end || new Date(ownerSubscription.current_period_end).getTime() > Date.now());
+      if (ownerActive) plan = 'premium';
+    }
+  }
+  return ['pro', 'premium', 'premium_group'].includes(plan) ? plan : 'free';
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -101,6 +127,66 @@ export default async function handler(req, res) {
   const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://kupxhrfijkdlcteniqfp.supabase.co';
   const supabaseAnonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseAnonKey;
+
+  // Career Studio is opt-in and local/development-only until a separate release approval.
+  if (action === 'cv-export') {
+    if (!isServerFeatureEnabled('CAREER_STUDIO')) return res.status(404).json({ error: 'Career Studio is not enabled.' });
+    if (process.env.SUPABASE_ENV === 'local' && !/^http:\/\/(127\.0\.0\.1|localhost):54321$/.test(supabaseUrl)) {
+      return res.status(500).json({ error: 'Local Career Studio blocked: non-local Supabase URL configured.' });
+    }
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+    const authHeader = req.headers.authorization || req.headers.Authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized — Auth token required' });
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    try {
+      const userClient = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: `Bearer ${token}` } } });
+      const { data: userData, error: userErr } = await userClient.auth.getUser();
+      if (userErr || !userData.user) return res.status(401).json({ error: 'Unauthorized user session' });
+      const userId = userData.user.id;
+      const { careerProfileId, pageCount, idempotencyKey, format } = req.body || {};
+      if (!careerProfileId || !/^[A-Za-z0-9_-]{3,160}$/.test(String(careerProfileId))) return res.status(400).json({ error: 'Invalid career profile.' });
+      if (format !== 'pdf') return res.status(400).json({ error: 'Only private PDF exports are supported.' });
+      const pages = Number(pageCount);
+      if (!Number.isInteger(pages) || pages < 1 || pages > 100) return res.status(400).json({ error: 'Invalid PDF page count.' });
+      if (!/^[A-Za-z0-9_-]{8,160}$/.test(String(idempotencyKey || ''))) return res.status(400).json({ error: 'Invalid export request.' });
+
+      const adminClient = createClient(supabaseUrl, supabaseSecretKey);
+      const { data: profile, error: profileErr } = await adminClient.from('career_profiles').select('id,owner_user_id').eq('id', String(careerProfileId)).maybeSingle();
+      if (profileErr) return res.status(500).json({ error: 'Career profile lookup failed.' });
+      if (!profile) return res.status(404).json({ error: 'Career profile not found.' });
+      if (profile.owner_user_id !== userId) return res.status(403).json({ error: 'Forbidden — You do not own this career profile.' });
+
+      const { data: existingEvent } = await adminClient.from('cv_export_events').select('id,page_count').eq('owner_user_id', userId).eq('idempotency_key', String(idempotencyKey)).maybeSingle();
+      if (existingEvent) return res.status(200).json({ success: true, duplicate: true, eventId: existingEvent.id, pageCount: existingEvent.page_count, plan: await resolveCareerExportPlan(adminClient, userId) });
+
+      const plan = await resolveCareerExportPlan(adminClient, userId);
+      if (plan === 'free') {
+        const configuredLimit = Number.parseInt(process.env.CV_FREE_EXPORT_LIMIT || '2', 10);
+        const limit = Number.isFinite(configuredLimit) && configuredLimit >= 0 ? configuredLimit : 2;
+        const monthStart = new Date();
+        monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0);
+        const { count, error: countErr } = await adminClient.from('cv_export_events').select('id', { count: 'exact', head: true }).eq('owner_user_id', userId).gte('created_at', monthStart.toISOString());
+        if (countErr) return res.status(500).json({ error: 'CV export quota lookup failed.' });
+        if ((count || 0) >= limit) return res.status(429).json({ error: 'Your local Free CV export limit has been reached.', limit, used: count || 0 });
+      }
+
+      const { data: event, error: eventErr } = await adminClient.from('cv_export_events').insert({
+        id: `cve_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+        career_profile_id: String(careerProfileId), owner_user_id: userId, format: 'pdf',
+        idempotency_key: String(idempotencyKey), page_count: pages
+      }).select('id,page_count').single();
+      if (eventErr) {
+        if (eventErr.code === '23505') {
+          const { data: duplicate } = await adminClient.from('cv_export_events').select('id,page_count').eq('owner_user_id', userId).eq('idempotency_key', String(idempotencyKey)).maybeSingle();
+          if (duplicate) return res.status(200).json({ success: true, duplicate: true, eventId: duplicate.id, pageCount: duplicate.page_count, plan });
+        }
+        return res.status(500).json({ error: 'CV export event could not be recorded.' });
+      }
+      return res.status(200).json({ success: true, eventId: event.id, pageCount: event.page_count, plan });
+    } catch (_) {
+      return res.status(500).json({ error: 'CV export service is temporarily unavailable.' });
+    }
+  }
 
   // ─────────────────────────────────────────────────────────────
   // 1. ACTION: DEPLOY (Publish Portfolio)

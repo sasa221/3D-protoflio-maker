@@ -7,6 +7,7 @@
     "dev": "node scripts/assert_local_safety.mjs && vite --mode development",
     "build": "node scripts/assert_local_safety.mjs && vite build --mode development",
     "test:career-local": "node src/tests/CareerProfileLocalTestSuite.mjs",
+    "test:cv-export": "node src/tests/CVExportServiceTestSuite.mjs",
     "preview": "vite preview",
     "test:core": "node scripts/core-tests.mjs",
     "check": "npm run test:core && npm run build"
@@ -21,6 +22,7 @@
     "canvas-confetti": "^1.9.4",
     "gsap": "^3.15.0",
     "lucide": "^1.31.0",
+    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^5.4.296",
     "postgres": "^3.4.9",
     "qrcode": "^1.5.4",
