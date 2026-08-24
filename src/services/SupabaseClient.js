@@ -6,9 +6,10 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { getSafeSupabaseConfig, assertNoBrowserSecretConfig } from '../config/RuntimeSafety.js';
 
-const supabaseUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) || (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) || 'https://kupxhrfijkdlcteniqfp.supabase.co';
-const supabasePublishableKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY) || (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_PUBLISHABLE_KEY) || 'sb_publishable_gILAHxBLwwDjMoNpfLUbLg_fFKiE0f5';
+assertNoBrowserSecretConfig();
+const { url: supabaseUrl, publishableKey: supabasePublishableKey } = getSafeSupabaseConfig();
 
 export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
   auth: {

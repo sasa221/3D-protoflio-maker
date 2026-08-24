@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "node scripts/assert_local_safety.mjs && vite --mode development",
+    "build": "node scripts/assert_local_safety.mjs && vite build --mode development",
+    "test:career-local": "node src/tests/CareerProfileLocalTestSuite.mjs",
     "preview": "vite preview",
     "test:core": "node scripts/core-tests.mjs",
     "check": "npm run test:core && npm run build"

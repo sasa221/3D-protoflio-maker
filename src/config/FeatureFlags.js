@@ -20,6 +20,8 @@ function envBool(key) {
 }
 
 export const FEATURE_FLAGS = {
+  /** Career Studio is opt-in while it is developed locally. */
+  CAREER_STUDIO: envBool('CAREER_STUDIO'),
   /** Show new pricing UI (plans, prices, CTAs) */
   MONETIZATION_UI_ENABLED: envBool('MONETIZATION_UI_ENABLED'),
 
