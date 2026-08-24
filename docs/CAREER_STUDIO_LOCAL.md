@@ -13,7 +13,31 @@ Career Studio is intentionally disabled unless `VITE_FF_CAREER_STUDIO=true` is s
 
 Runtime safety rejects known Production Supabase/Vercel hosts and server-only browser credentials. The app falls back to a loopback Supabase URL when no local configuration exists; it never falls back to the Production project.
 
-## Current environment limitation
+## Supabase Local verification
 
-The Supabase CLI is not installed in this workspace, so the migration has been prepared but not applied. Install/configure Supabase Local or provide a separate Development project before running it. No Production database has been contacted or changed.
+The local Supabase CLI is run with `npx supabase@latest` and Docker Desktop. No Cloud project is linked.
 
+```powershell
+npx --yes supabase@latest start
+npx --yes supabase@latest db reset --local
+```
+
+The migration is tracked at `supabase/migrations/20260825021000_career_profiles.sql`. The approved root migration can also be replayed against the local Postgres container only:
+
+```powershell
+Get-Content -Raw supabase_phase9_career_profiles.sql | docker exec -i supabase_db_protofolio_maker psql -U postgres -d postgres -v ON_ERROR_STOP=1
+```
+
+Run the real authenticated RLS fixture with local keys held only in the current process:
+
+```powershell
+$status = npx --yes supabase@latest status -o env 2>$null
+foreach ($line in $status) {
+  if ($line -match '^ANON_KEY="(.*)"$') { $env:SUPABASE_LOCAL_ANON_KEY = $matches[1] }
+  if ($line -match '^SERVICE_ROLE_KEY="(.*)"$') { $env:SUPABASE_LOCAL_SERVICE_ROLE_KEY = $matches[1] }
+  if ($line -match '^API_URL="(.*)"$') { $env:SUPABASE_LOCAL_URL = $matches[1] }
+}
+node scripts/test_local_career_rls.mjs
+```
+
+The fixture creates synthetic users only, verifies owner CRUD, cross-account denial, anonymous denial, CV isolation, then deletes the fixtures. Passing a Production URL fails before any network request. No Production database has been contacted or changed.

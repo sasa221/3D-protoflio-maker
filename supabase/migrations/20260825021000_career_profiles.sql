@@ -1,5 +1,5 @@
 -- Career Studio Phase 9: additive local/development-only migration.
--- Do not run against Production until an explicit release approval exists.
+-- This migration is intentionally not applied to Production by this branch.
 
 CREATE TABLE IF NOT EXISTS public.career_profiles (
   id TEXT PRIMARY KEY DEFAULT 'cp_' || md5(random()::text),
@@ -33,7 +33,8 @@ CREATE INDEX IF NOT EXISTS idx_career_documents_profile ON public.career_documen
 ALTER TABLE public.career_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.career_documents ENABLE ROW LEVEL SECURITY;
 
--- Explicit privileges for installations with auto-exposure disabled.
+-- Supabase Local is configured with auto-exposure disabled. Grant table
+-- privileges to authenticated users explicitly; RLS still limits each row.
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.career_profiles TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.career_documents TO authenticated;
 
