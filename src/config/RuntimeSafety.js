@@ -29,6 +29,10 @@ export function isLocalRuntime() {
     || mode === 'test';
 }
 
+export function isLocalAuthMockEnabled() {
+  return isLocalRuntime() && ['true', '1'].includes(String(readEnv('VITE_LOCAL_AUTH_MOCK') || '').toLowerCase());
+}
+
 export function isProductionHost(value) {
   try {
     const hostname = new URL(value).hostname.toLowerCase();
@@ -63,4 +67,3 @@ export function assertNoBrowserSecretConfig() {
     throw new Error(`Browser runtime blocked: server-only credentials configured (${found.join(', ')}).`);
   }
 }
-

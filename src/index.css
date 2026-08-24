@@ -1326,3 +1326,28 @@ html:has(.admin-forbidden) {
     max-height: 95vh !important;
   }
 }
+/* Career Studio PR-1: restrained additions that preserve the existing dark/3D identity. */
+.career-studio-page { min-height: 100vh; padding: 32px clamp(16px, 4vw, 56px); background: radial-gradient(circle at 10% 0%, rgba(124,58,237,.16), transparent 35%), #07070d; color: #f8fafc; font-family: 'Plus Jakarta Sans', Inter, sans-serif; }
+.career-studio-header { max-width: 1180px; margin: 0 auto 24px; display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.career-studio-header h1 { margin: 4px 0; font-size: clamp(1.7rem, 4vw, 2.6rem); letter-spacing: -.04em; }
+.career-studio-header p { margin: 0; color: rgba(255,255,255,.62); }
+.career-studio-kicker { color: #a78bfa; font-size: .7rem; font-weight: 800; letter-spacing: .18em; }
+.career-studio-back, .career-studio-link { color: #c4b5fd; text-decoration: none; font-weight: 700; font-size: .82rem; padding: 9px 12px; border: 1px solid rgba(167,139,250,.28); border-radius: 999px; }
+.career-studio-grid { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 460px) minmax(0, 1fr); gap: 24px; align-items: start; }
+.career-studio-form, .career-studio-preview { background: rgba(15,15,30,.78); border: 1px solid rgba(255,255,255,.1); border-radius: 22px; padding: 20px; box-shadow: 0 18px 50px rgba(0,0,0,.22); }
+.career-studio-form { display: grid; gap: 13px; }
+.career-studio-form label { display: grid; gap: 6px; color: rgba(255,255,255,.76); font-size: .78rem; font-weight: 700; }
+.career-studio-form input, .career-studio-form textarea, .career-studio-form select { width: 100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,.14); border-radius: 11px; background: rgba(0,0,0,.24); color: #fff; padding: 10px 11px; font: inherit; font-size: .85rem; resize: vertical; }
+.career-studio-form input:focus, .career-studio-form textarea:focus, .career-studio-form select:focus { outline: 2px solid rgba(124,58,237,.55); border-color: #a78bfa; }
+.career-studio-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.career-studio-actions button { border: 0; border-radius: 999px; padding: 10px 16px; color: white; background: linear-gradient(135deg,#7c3aed,#06b6d4); cursor: pointer; font-weight: 800; }
+.career-studio-actions button[type='button'] { background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.14); }
+#career-save-status { margin-left: auto; color: #86efac; font-size: .72rem; }
+.career-studio-preview { position: sticky; top: 18px; background: rgba(255,255,255,.94); color: #111827; }
+.ats-paper { max-width: 700px; min-height: 640px; margin: 0 auto; padding: clamp(22px, 5vw, 48px); background: white; font-family: Arial, Helvetica, sans-serif; line-height: 1.45; }
+.ats-paper h2 { margin: 0 0 8px; font-size: 1.65rem; color: #111827; }
+.ats-paper h3 { margin: 20px 0 5px; padding-bottom: 3px; border-bottom: 1px solid #111827; font-size: .82rem; text-transform: uppercase; letter-spacing: .08em; }
+.ats-paper p, .ats-paper div { margin: 0; white-space: pre-line; font-size: .86rem; }
+.career-studio-preview small { display: block; max-width: 700px; margin: 10px auto 0; color: #4b5563; }
+@media (max-width: 820px) { .career-studio-grid { grid-template-columns: 1fr; } .career-studio-preview { position: static; } }
+@media (max-width: 480px) { .career-studio-page { padding: 20px 12px; } .career-studio-form, .career-studio-preview { padding: 14px; border-radius: 16px; } .career-studio-actions button { flex: 1; } #career-save-status { width: 100%; margin-left: 0; } }

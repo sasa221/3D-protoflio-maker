@@ -47,6 +47,8 @@ import { renderCustomDomainPanel } from './ui/CustomDomainPanel.js';
 import { renderProductionReadinessPanel } from './ui/ProductionReadinessPanel.js';
 import { renderPricingPage, getPricingStyles } from './ui/PricingPage.js';
 import { renderPortfolioQualityScore, getPortfolioQualityScoreStyles } from './ui/PortfolioQualityScore.js';
+import { renderCVBuilderPage } from './ui/CVBuilderPage.js';
+import { isLocalAuthMockEnabled } from './config/RuntimeSafety.js';
 import confetti from 'canvas-confetti';
 
 // ─── STATE ─────────────────────────────────
@@ -272,6 +274,26 @@ async function router() {
   if (path === '/terms') {
     setPageTitle('Terms of Service');
     renderTermsPage(getAppContainer());
+    return;
+  }
+
+  // Career Studio is opt-in and local/development-only until separately approved.
+  if (path === '/cv' || path === '/cv/new' || path.startsWith('/cv/')) {
+    if (!isFeatureEnabled('CAREER_STUDIO')) {
+      setPageTitle('Page Not Found');
+      render404Page(path);
+      return;
+    }
+    setPageTitle('CV Builder');
+    const cvUser = await getCurrentAuthUser();
+    const localMockUser = isLocalAuthMockEnabled() ? { id: 'local-dev-user', email: 'local@example.test', user_metadata: { full_name: 'Local Test User' } } : null;
+    if (!cvUser && !localMockUser) {
+      window.location.href = `/login?next=${encodeURIComponent(path)}`;
+      return;
+    }
+    const cvParts = path.split('/').filter(Boolean);
+    const profileId = cvParts[1] && cvParts[1] !== 'new' && cvParts[2] !== 'preview' ? cvParts[1] : null;
+    renderCVBuilderPage(getAppContainer(), { ownerUserId: (cvUser || localMockUser).id, profileId });
     return;
   }
 
