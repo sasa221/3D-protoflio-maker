@@ -49,7 +49,7 @@ import { renderProductionReadinessPanel } from './ui/ProductionReadinessPanel.js
 import { renderPricingPage, getPricingStyles } from './ui/PricingPage.js';
 import { renderPortfolioQualityScore, getPortfolioQualityScoreStyles } from './ui/PortfolioQualityScore.js';
 import { renderCVBuilderPage } from './ui/CVBuilderPage.js';
-import { getCareerProfile } from './services/CareerProfileService.js';
+import { getCareerProfile, hydrateCareerProfiles } from './services/CareerProfileService.js';
 import { openCVPortfolioSyncReview } from './ui/CVPortfolioSyncPanel.js';
 import { persistPortfolioSync } from './services/CVPortfolioSyncService.js';
 import { isLocalAuthMockEnabled } from './config/RuntimeSafety.js';
@@ -294,6 +294,15 @@ async function router() {
     if (!cvUser && !localMockUser) {
       window.location.href = `/login?next=${encodeURIComponent(path)}`;
       return;
+    }
+    // Career Studio opens only after server-backed auth/entitlement and the
+    // owner's Supabase Local profile data have been hydrated. Local storage is
+    // a cache, never the source of truth for this route.
+    if (cvUser) {
+      await fetchUserProfileAndEntitlements(cvUser).catch(() => null);
+      await hydrateCareerProfiles(cvUser.id).catch(error => {
+        console.warn('Career profile hydration warning:', error.message);
+      });
     }
     const cvParts = path.split('/').filter(Boolean);
     const profileId = cvParts[1] && cvParts[1] !== 'new' && cvParts[2] !== 'preview' ? cvParts[1] : null;
@@ -566,6 +575,9 @@ async function initStudio() {
     currentAuthUser = authUser;
     if (authUser) {
       const { profile } = await fetchUserProfileAndEntitlements(authUser);
+      await hydrateCareerProfiles(authUser.id).catch(error => {
+        console.warn('Career profile hydration warning:', error.message);
+      });
       const inviteGroupId = new URLSearchParams(window.location.search).get('group_invite');
       if (inviteGroupId) {
         try {

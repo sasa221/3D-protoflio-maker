@@ -52,9 +52,11 @@ export async function logoutUser() {
   const { error } = await supabase.auth.signOut();
   if (error) console.warn('Supabase logout warning:', error.message);
 
-  // Clear memory cache and user storage
+  // Clear only transient auth state. Career data is server-owned and must not
+  // be deleted (or made unrecoverable) by logout; scoped local data remains a
+  // cache and is revalidated after the next login.
   try {
-    ScopedStorageService.wipeAllUserCaches();
+    ScopedStorageService.clearSessionState();
   } catch (e) {}
 }
 

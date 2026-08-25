@@ -105,4 +105,12 @@ export class ScopedStorageService {
       }
     } catch (_) {}
   }
+
+  /** Clear only transient auth/session state. User-scoped caches remain
+   * available as an offline hint and are revalidated from Supabase on login. */
+  static clearSessionState() {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) window.sessionStorage.clear();
+    } catch (_) {}
+  }
 }

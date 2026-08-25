@@ -75,13 +75,33 @@ export async function fetchUserProfileAndEntitlements(user) {
       keepLiveEntitlements = kl || [];
     } catch (_) {}
 
-    globalEntitlements.setSubscription(
-      sub || { user_id: user.id, plan_id: 'free', status: 'active' },
-      groupMembership,
-      keepLiveEntitlements
-    );
+    // The API is the final entitlement authority. Direct table reads provide
+    // the local fallback only when the local server adapter is unavailable;
+    // a successful server response always wins over cached/UI state.
+    let authoritativeSubscription = sub || { user_id: user.id, plan_id: 'free', status: 'active' };
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (token) {
+        const entitlementResponse = await fetch('/api/entitlements', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({})
+        });
+        const serverEntitlement = await entitlementResponse.json().catch(() => ({}));
+        if (entitlementResponse.ok && serverEntitlement.effectivePlan) {
+          authoritativeSubscription = {
+            ...authoritativeSubscription,
+            plan_id: serverEntitlement.effectivePlan,
+            status: serverEntitlement.status || authoritativeSubscription.status || 'active'
+          };
+        }
+      }
+    } catch (_) {}
 
-    return { profile, planId, subscription: sub, groupMembership, keepLiveEntitlements };
+    globalEntitlements.setSubscription(authoritativeSubscription, groupMembership, keepLiveEntitlements);
+
+    return { profile, planId: authoritativeSubscription.plan_id || planId, subscription: authoritativeSubscription, groupMembership, keepLiveEntitlements };
   } catch (e) {
     console.warn('Error loading Supabase profile/subscription:', e.message);
     return { profile: null, planId: 'free' };
