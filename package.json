@@ -10,6 +10,7 @@
     "test:cv-export": "node src/tests/CVExportServiceTestSuite.mjs",
     "test:cv-sync": "node src/tests/CVPortfolioSyncServiceTestSuite.mjs",
     "test:cv-sync-api": "node src/tests/CVPortfolioSyncApiContractTestSuite.mjs",
+    "test:cv-sync-local": "node scripts/test_local_cv_sync_api.mjs",
     "preview": "vite preview",
     "test:core": "node scripts/core-tests.mjs",
     "check": "npm run test:core && npm run build"

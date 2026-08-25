@@ -56,6 +56,11 @@ foreach ($line in $status) {
 node scripts/test_local_cv_export.mjs
 ```
 
+The sync API fixture (`npm run test:cv-sync-local`) creates a synthetic local
+`portfolios` table only when the local stack does not include the legacy schema,
+tests source/target ownership and non-overwrite behavior, then removes the
+fixture table and all synthetic users. It never contacts Production.
+
 Synthetic visual samples can be regenerated outside the repository:
 
 ```powershell
