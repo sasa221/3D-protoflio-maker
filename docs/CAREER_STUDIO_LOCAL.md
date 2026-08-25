@@ -178,6 +178,29 @@ Run the deterministic local parser/security checks with synthetic data only:
 npm run test:cv-import
 ```
 
+## Server/database-enforced rollout gate
+
+The rollout gate is additive and local/development-only until a separately
+approved release. `FF_CAREER_STUDIO` remains the API master kill switch. The
+database migration `20260825130000_career_studio_rollout_gate.sql` adds a
+closed-by-default global switch and a private Supabase-user-ID allowlist.
+Career Profile, Career Document, CV Export Event, and Targeted Variant RLS
+policies require both ownership and an enabled rollout row. Anonymous and
+authenticated clients cannot read or mutate rollout tables; the existing
+serverless `api/admin.js` route manages the switch and users through
+service-role-only RPCs and metadata-only audit rows. The legacy Portfolio
+tables and routes do not use this gate.
+
+Run the local rollout/RLS acceptance fixture with synthetic accounts only:
+
+```powershell
+npm run test:career-rollout
+```
+
+The fixture proves closed-switch denial, allowlisted owner access, outside-
+cohort API and direct-table denial, revocation/reinstatement without data
+deletion, metadata-only audit, and legacy Portfolio continuity.
+
 The browser smoke test (when run) should use only locally generated PDF/DOCX
 fixtures and a loopback Vite server. It should verify parsing progress, the
 field-by-field review, cancel-without-save, mobile/tablet layout, and no

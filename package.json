@@ -17,6 +17,7 @@
     "test:cv-sync-api": "node src/tests/CVPortfolioSyncApiContractTestSuite.mjs",
     "test:cv-sync-local": "node scripts/test_local_cv_sync_api.mjs",
     "test:career-admin-settings": "node scripts/test_local_career_studio_admin_settings.mjs",
+    "test:career-rollout": "node scripts/test_local_career_rollout_gate.mjs",
     "test:career-admin-contract": "node src/tests/CareerStudioAdminSettingsTestSuite.mjs",
     "test:cv-variants": "node src/tests/CVTargetedVariantServiceTestSuite.mjs",
     "test:cv-variants-api": "node src/tests/CVTargetedVariantApiContractTestSuite.mjs",

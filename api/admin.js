@@ -121,6 +121,61 @@ export default async function handler(req, res) {
   const context = await requireAdmin(req, res);
   if (!context?.admin) return;
 
+  // Career Studio rollout controls are metadata-only and admin-authorized.
+  // They never return CV/Profile content or a user list to ordinary callers.
+  const careerRolloutAction = action === 'career-rollout' || action === 'career-rollout-update'
+    || action === 'career-rollout-master-switch' || action === 'career-rollout-audit';
+  if (careerRolloutAction) {
+    if (req.method === 'GET' && action === 'career-rollout') {
+      const { data: config, error: configError } = await context.admin
+        .from('career_studio_rollout_config').select('enabled,updated_at,updated_by').eq('id', true).maybeSingle();
+      if (configError) return res.status(500).json({ error: 'Career Studio rollout status unavailable.' });
+      const targetUserId = String(req.query.userId || '').trim();
+      let target = null;
+      if (targetUserId) {
+        if (!/^[0-9a-f-]{36}$/i.test(targetUserId)) return res.status(400).json({ error: 'Invalid rollout user ID.' });
+        const { data, error } = await context.admin
+          .from('career_studio_rollout_users').select('user_id,enabled,created_at,enabled_by').eq('user_id', targetUserId).maybeSingle();
+        if (error) return res.status(500).json({ error: 'Career Studio rollout user unavailable.' });
+        target = data || null;
+      }
+      return res.status(200).json({ masterSwitch: Boolean(config?.enabled), targetUser: target });
+    }
+
+    if (req.method === 'GET' && action === 'career-rollout-audit') {
+      const limit = Math.min(Math.max(Number.parseInt(req.query.limit || '50', 10) || 50, 1), 100);
+      const { data, error } = await context.admin.from('career_studio_rollout_audit_log')
+        .select('admin_user_id,target_user_id,action,enabled,result,metadata_json,created_at')
+        .order('created_at', { ascending: false }).limit(limit);
+      if (error) return res.status(500).json({ error: 'Career Studio rollout audit unavailable.' });
+      return res.status(200).json({ logs: data || [] });
+    }
+
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+    if (action === 'career-rollout-master-switch') {
+      if (typeof req.body?.enabled !== 'boolean') return res.status(400).json({ error: 'Master switch value is required.' });
+      const { data, error } = await context.admin.rpc('admin_set_career_studio_master_switch', {
+        p_enabled: req.body.enabled, p_admin_user_id: context.user.id
+      });
+      if (error || !data) return res.status(500).json({ error: 'Career Studio master switch was not changed.' });
+      const row = Array.isArray(data) ? data[0] : data;
+      return res.status(200).json({ success: true, masterSwitch: Boolean(row.enabled), updatedAt: row.updated_at });
+    }
+
+    const targetUserId = String(req.body?.userId || '').trim();
+    if (!/^[0-9a-f-]{36}$/i.test(targetUserId) || typeof req.body?.enabled !== 'boolean') {
+      return res.status(400).json({ error: 'A valid user ID and enabled value are required.' });
+    }
+    const { data, error } = await context.admin.rpc('admin_set_career_studio_rollout_user', {
+      p_target_user_id: targetUserId, p_enabled: req.body.enabled, p_admin_user_id: context.user.id
+    });
+    if (error || !data) return res.status(500).json({ error: 'Career Studio rollout user was not changed.' });
+    const row = Array.isArray(data) ? data[0] : data;
+    return res.status(200).json({ success: true, rollout: {
+      user_id: row.user_id, enabled: Boolean(row.enabled), created_at: row.created_at, enabled_by: row.enabled_by
+    } });
+  }
+
   // Career Studio settings are deliberately local-only. This route exposes
   // configuration metadata, never CV/Profile content or user contact data.
   const careerSettingsAction = action === 'career-settings' || action === 'career-settings-update' || action === 'career-settings-audit';

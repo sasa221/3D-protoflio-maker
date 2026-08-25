@@ -39,13 +39,12 @@ function call(token, body) {
 
 const a = await createUser('a');
 const b = await createUser('b');
+assert.ifError((await admin.from('career_studio_rollout_config').update({ enabled: true }).eq('id', true)).error);
+assert.ifError((await admin.from('career_studio_rollout_users').upsert({ user_id: a.user.id, enabled: true })).error);
 const profileA = `cp_export_a_${suffix}`;
 const profileB = `cp_export_b_${suffix}`;
-for (const [id, owner, label] of [[profileA, a.user.id, 'Synthetic A'], [profileB, b.user.id, 'Synthetic B']]) {
-  const ownerClient = owner === a.user.id ? a.client : b.client;
-  const inserted = await ownerClient.from('career_profiles').insert({ id, owner_user_id: owner, label, career_stage: 'student', content_json: { contact: { name: label } } });
-  assert.ifError(inserted.error);
-}
+const inserted = await a.client.from('career_profiles').insert({ id: profileA, owner_user_id: a.user.id, label: 'Synthetic A', career_stage: 'student', content_json: { contact: { name: 'Synthetic A' } } });
+assert.ifError(inserted.error);
 
 process.env.FF_CAREER_STUDIO = 'false';
 let disabled = await call(a.token, { careerProfileId: profileA, pageCount: 1, format: 'pdf', idempotencyKey: `cvexp_disabled_${suffix}` });
@@ -85,5 +84,7 @@ for (const key of ['two', 'three']) {
 
 await admin.from('cv_export_events').delete().eq('owner_user_id', a.user.id);
 await admin.from('career_profiles').delete().in('id', [profileA, profileB]);
+await admin.from('career_studio_rollout_users').delete().eq('user_id', a.user.id);
+await admin.from('career_studio_rollout_config').update({ enabled: false, updated_by: null }).eq('id', true);
 for (const user of users) await admin.auth.admin.deleteUser(user.id);
 console.log('Local CV export tests passed: owner auth, cross-account denial, anonymous denial, server quota, idempotency, failed-request accounting, and local Pro override.');

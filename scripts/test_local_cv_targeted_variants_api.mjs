@@ -41,6 +41,8 @@ function call(action, token, method = 'POST', body = {}, query = {}) {
 
 const a = await createUser('a');
 const b = await createUser('b');
+assert.ifError((await admin.from('career_studio_rollout_config').update({ enabled: true }).eq('id', true)).error);
+assert.ifError((await admin.from('career_studio_rollout_users').upsert({ user_id: a.user.id, enabled: true })).error);
 const profileId = `cp_variant_api_${suffix}`;
 profileIds.push(profileId);
 const content = { contact: { name: 'Candidate A' }, summary: 'Frontend engineer.', skills: ['JavaScript', 'React'], experience: [{ text: 'Built React interfaces.' }], education: [{ text: "Bachelor's Degree" }], projects: [], certifications: [], languages: [] };
@@ -69,7 +71,7 @@ assert.equal(result.status, 200); assert.equal(result.body.variants.length, 1);
 result = await call('cv-variants', b.token, 'GET', {}, { profileId });
 assert.equal(result.status, 403, 'cross-account list is denied');
 result = await call('cv-variant-delete', b.token, 'POST', { variantId });
-assert.equal(result.status, 404, 'cross-account delete is denied');
+assert.equal(result.status, 403, 'cross-account/out-of-cohort delete is denied');
 result = await call('cv-variant-delete', a.token, 'POST', { variantId });
 assert.equal(result.status, 200);
 result = await call('cv-variant-create', '', 'POST', { careerProfileId: profileId, role: 'Frontend Developer', jobDescription: jd, idempotencyKey: `variant_anon_${suffix}` });
@@ -85,5 +87,7 @@ process.env.SUPABASE_ENV = 'local';
 
 await admin.from('career_targeted_variants').delete().eq('owner_user_id', a.user.id);
 for (const id of profileIds) await userAClient.from('career_profiles').delete().eq('id', id);
+await admin.from('career_studio_rollout_users').delete().eq('user_id', a.user.id);
+await admin.from('career_studio_rollout_config').update({ enabled: false, updated_by: null }).eq('id', true);
 for (const id of createdUsers) await admin.auth.admin.deleteUser(id);
 console.log('Local CV targeted variant API tests passed: ownership, private analysis, Pro gate, no URL fetch, immutable Base CV, idempotency, and delete isolation.');

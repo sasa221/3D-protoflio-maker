@@ -56,11 +56,13 @@ function call(token, body) {
 await ensureFixtureTable();
 const a = await createUser('a');
 const b = await createUser('b');
+assert.ifError((await admin.from('career_studio_rollout_config').update({ enabled: true }).eq('id', true)).error);
+assert.ifError((await admin.from('career_studio_rollout_users').upsert({ user_id: a.user.id, enabled: true })).error);
 const profileId = `cp_sync_api_${suffix}`;
 const portfolioId = `pf_sync_api_${suffix}`;
 const profileResult = await a.client.from('career_profiles').insert({ id: profileId, owner_user_id: a.user.id, label: 'Synthetic Sync CV', career_stage: 'professional', content_json: { contact: { name: 'Candidate A' } } });
 assert.ifError(profileResult.error);
-const portfolioResult = await a.client.from('portfolios').insert({ id: portfolioId, owner_user_id: a.user.id, name: 'Existing Portfolio', bio: 'Existing bio', master_profile_json: { name: 'Existing Portfolio', bio: 'Existing bio', skills: [{ name: 'JavaScript' }], portfolioVariants: [{ id: 'keep-me' }] } });
+const portfolioResult = await a.client.from('portfolios').insert({ id: portfolioId, owner_user_id: a.user.id, name: 'Existing Portfolio', slug: `sync-${suffix}`, bio: 'Existing bio', master_profile_json: { name: 'Existing Portfolio', bio: 'Existing bio', skills: [{ name: 'JavaScript' }], portfolioVariants: [{ id: 'keep-me' }] } });
 assert.ifError(portfolioResult.error);
 
 let result = await call(a.token, { portfolioId, careerProfileId: profileId, sourceOwnerId: a.user.id, selectedFields: ['name', 'bio', 'skills'], patch: { name: 'Candidate A', bio: 'New CV summary', skills: [{ name: 'SQL' }] } });
@@ -80,8 +82,9 @@ assert.equal(result.status, 401, 'anonymous sync must be denied');
 
 await a.client.from('portfolios').delete().eq('id', portfolioId);
 await a.client.from('career_profiles').delete().eq('id', profileId);
+await admin.from('career_studio_rollout_users').delete().eq('user_id', a.user.id);
+await admin.from('career_studio_rollout_config').update({ enabled: false, updated_by: null }).eq('id', true);
 for (const user of users) await admin.auth.admin.deleteUser(user.id);
 if (createdFixtureTable) await sql.unsafe('DROP TABLE public.portfolios CASCADE');
 await sql.end({ timeout: 1 });
 console.log('Local CV sync API tests passed: source/target ownership, non-overwrite merge, sensitive confirmation, anonymous denial, and legacy-safe fixture cleanup.');
-

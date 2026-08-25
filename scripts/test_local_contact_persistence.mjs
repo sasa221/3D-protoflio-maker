@@ -21,6 +21,8 @@ const password = `LocalOnly-Contact-${suffix}!`;
 const created = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { full_name: 'Synthetic Contact User' } });
 assert.ifError(created.error);
 const user = created.data.user;
+assert.ifError((await admin.from('career_studio_rollout_config').update({ enabled: true }).eq('id', true)).error);
+assert.ifError((await admin.from('career_studio_rollout_users').upsert({ user_id: user.id, enabled: true })).error);
 const profileId = `cp_contact_${suffix}`;
 const portfolioIds = [];
 
@@ -79,5 +81,7 @@ try {
     await admin.from('portfolio_creation_history').delete().eq('portfolio_id', id);
     await admin.from('portfolios').delete().eq('id', id);
   }
+  await admin.from('career_studio_rollout_users').delete().eq('user_id', user.id);
+  await admin.from('career_studio_rollout_config').update({ enabled: false, updated_by: null }).eq('id', true);
   await admin.auth.admin.deleteUser(user.id);
 }

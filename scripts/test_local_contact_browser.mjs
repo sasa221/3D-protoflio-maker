@@ -22,6 +22,8 @@ const password = `LocalOnly-Browser-${suffix}!`;
 const created = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { full_name: 'Browser Contact Synthetic' } });
 assert.ifError(created.error);
 const user = created.data.user;
+assert.ifError((await admin.from('career_studio_rollout_config').update({ enabled: true }).eq('id', true)).error);
+assert.ifError((await admin.from('career_studio_rollout_users').upsert({ user_id: user.id, enabled: true })).error);
 let vite = null;
 let ownsServer = false;
 
@@ -146,6 +148,8 @@ try {
 } finally {
   await admin.from('career_documents').delete().eq('owner_user_id', user.id);
   await admin.from('career_profiles').delete().eq('owner_user_id', user.id);
+  await admin.from('career_studio_rollout_users').delete().eq('user_id', user.id);
+  await admin.from('career_studio_rollout_config').update({ enabled: false, updated_by: null }).eq('id', true);
   const portfolios = await admin.from('portfolios').select('id').eq('owner_user_id', user.id);
   for (const portfolio of portfolios.data || []) {
     await admin.from('portfolio_variants').delete().eq('portfolio_id', portfolio.id);

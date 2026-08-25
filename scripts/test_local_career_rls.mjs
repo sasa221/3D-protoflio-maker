@@ -32,6 +32,8 @@ async function clientFor(credentials) {
 
 const userA = await createTestUser(users[0]);
 const userB = await createTestUser(users[1]);
+assert.ifError((await admin.from('career_studio_rollout_config').update({ enabled: true }).eq('id', true)).error);
+assert.ifError((await admin.from('career_studio_rollout_users').upsert({ user_id: userA.id, enabled: true })).error);
 const a = await clientFor(users[0]);
 const b = await clientFor(users[1]);
 
@@ -83,6 +85,8 @@ assert.equal(result.data, null, 'Anonymous client must not receive profile data'
 // through the same RLS path a real user would use.
 await a.client.from('career_documents').delete().eq('id', `cv_rls_${testSuffix}`);
 await a.client.from('career_profiles').delete().eq('id', profile.id);
+await admin.from('career_studio_rollout_users').delete().eq('user_id', userA.id);
+await admin.from('career_studio_rollout_config').update({ enabled: false, updated_by: null }).eq('id', true);
 for (const entry of clients) await entry.client.auth.signOut();
 await admin.auth.admin.deleteUser(userA.id);
 await admin.auth.admin.deleteUser(userB.id);

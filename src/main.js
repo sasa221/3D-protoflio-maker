@@ -299,6 +299,12 @@ async function router() {
     // owner's Supabase Local profile data have been hydrated. Local storage is
     // a cache, never the source of truth for this route.
     if (cvUser) {
+      const { data: careerAccess, error: careerAccessError } = await supabase.rpc('career_studio_access_allowed', { p_user_id: cvUser.id });
+      if (careerAccessError || careerAccess !== true) {
+        setPageTitle('Page Not Found');
+        render404Page(path);
+        return;
+      }
       await fetchUserProfileAndEntitlements(cvUser).catch(() => null);
       await hydrateCareerProfiles(cvUser.id).catch(error => {
         console.warn('Career profile hydration warning:', error.message);
@@ -573,14 +579,19 @@ async function initStudio() {
   resetStudioState();
   let pendingGroupInvites = [];
   let currentAuthUser = null;
+  let careerStudioAllowed = false;
   try {
     const authUser = await getCurrentAuthUser();
     currentAuthUser = authUser;
     if (authUser) {
       const { profile } = await fetchUserProfileAndEntitlements(authUser);
-      await hydrateCareerProfiles(authUser.id).catch(error => {
-        console.warn('Career profile hydration warning:', error.message);
-      });
+      const { data: careerAccess } = await supabase.rpc('career_studio_access_allowed', { p_user_id: authUser.id });
+      careerStudioAllowed = careerAccess === true;
+      if (careerStudioAllowed) {
+        await hydrateCareerProfiles(authUser.id).catch(error => {
+          console.warn('Career profile hydration warning:', error.message);
+        });
+      }
       const inviteGroupId = new URLSearchParams(window.location.search).get('group_invite');
       if (inviteGroupId) {
         try {
@@ -652,7 +663,7 @@ async function initStudio() {
   window.initStudio = initStudio;
   showToast('info', '⚡', 'Studio Ready! Synced with Supabase Postgres.');
   const requestedCVProfileId = new URLSearchParams(window.location.search).get('cv_sync_profile');
-  if (requestedCVProfileId) {
+  if (requestedCVProfileId && careerStudioAllowed) {
     const cvProfile = currentAuthUser ? getCareerProfile(requestedCVProfileId, currentAuthUser.id) : null;
     if (!cvProfile) {
       setTimeout(() => showToast('error', '🔒', 'That private CV is not available to this account. No Portfolio was changed.'), 250);

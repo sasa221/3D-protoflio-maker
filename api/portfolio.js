@@ -119,6 +119,11 @@ function localCareerPlanOverride() {
   return ['free', 'pro', 'premium', 'premium_group'].includes(value) ? value : '';
 }
 
+async function isCareerStudioUserAllowed(adminClient, userId) {
+  const { data, error } = await adminClient.rpc('career_studio_service_access_allowed', { p_user_id: userId });
+  return !error && data === true;
+}
+
 async function resolveLocalCVTemplateSetting(adminClient) {
   if (process.env.SUPABASE_ENV !== 'local') return null;
   const { data, error } = await adminClient.from('cv_template_settings')
@@ -198,6 +203,9 @@ export default async function handler(req, res) {
       if (userErr || !userData.user) return res.status(401).json({ error: 'Unauthorized user session' });
       const userId = userData.user.id;
       const adminClient = createClient(supabaseUrl, supabaseSecretKey);
+      if (!(await isCareerStudioUserAllowed(adminClient, userId))) {
+        return res.status(403).json({ error: 'Career Studio is not available for this account.' });
+      }
       const plan = await resolveCareerExportPlan(adminClient, userId);
 
       if (plan === 'free') {
@@ -306,6 +314,10 @@ export default async function handler(req, res) {
       const { data: userData, error: userErr } = await userClient.auth.getUser();
       if (userErr || !userData.user) return res.status(401).json({ error: 'Unauthorized user session' });
       const userId = userData.user.id;
+      const adminClient = createClient(supabaseUrl, supabaseSecretKey);
+      if (!(await isCareerStudioUserAllowed(adminClient, userId))) {
+        return res.status(403).json({ error: 'Career Studio is not available for this account.' });
+      }
       const { portfolioId, careerProfileId, sourceOwnerId, selectedFields = [], patch = {}, overwriteExisting = false, confirmSensitive = false } = req.body || {};
       if (!portfolioId || !/^[A-Za-z0-9_-]{3,160}$/.test(String(portfolioId))) return res.status(400).json({ error: 'Invalid Portfolio.' });
       if (sourceOwnerId && sourceOwnerId !== userId) return res.status(403).json({ error: 'Forbidden — Career profile owner mismatch.' });
@@ -314,7 +326,6 @@ export default async function handler(req, res) {
       if (!fields.length || fields.some(field => !allowedFields.has(field))) return res.status(400).json({ error: 'Select valid CV fields before syncing.' });
       const sensitiveFields = fields.filter(field => ['location', 'social.email', 'social.phone', 'social.linkedin', 'social.github'].includes(field));
       if (sensitiveFields.length && confirmSensitive !== true) return res.status(400).json({ error: 'Sensitive CV fields require explicit confirmation.' });
-      const adminClient = createClient(supabaseUrl, supabaseSecretKey);
       if (careerProfileId) {
         const { data: sourceProfile, error: sourceErr } = await adminClient.from('career_profiles').select('owner_user_id').eq('id', String(careerProfileId)).maybeSingle();
         if (sourceErr) return res.status(500).json({ error: 'Career profile ownership lookup failed.' });
@@ -380,6 +391,9 @@ export default async function handler(req, res) {
       if (!/^[A-Za-z0-9_-]{8,160}$/.test(String(idempotencyKey || ''))) return res.status(400).json({ error: 'Invalid export request.' });
 
       const adminClient = createClient(supabaseUrl, supabaseSecretKey);
+      if (!(await isCareerStudioUserAllowed(adminClient, userId))) {
+        return res.status(403).json({ error: 'Career Studio is not available for this account.' });
+      }
       const { data: profile, error: profileErr } = await adminClient.from('career_profiles').select('id,owner_user_id').eq('id', String(careerProfileId)).maybeSingle();
       if (profileErr) return res.status(500).json({ error: 'Career profile lookup failed.' });
       if (!profile) return res.status(404).json({ error: 'Career profile not found.' });
