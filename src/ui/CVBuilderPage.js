@@ -63,6 +63,32 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
 
   const form = container.querySelector('#career-profile-form');
   const status = container.querySelector('#career-save-status');
+  const hydrateFormFields = source => {
+    const contact = source?.content?.contact || {};
+    const values = {
+      careerStage: source?.careerStage || 'professional',
+      name: contact.name || '',
+      email: contact.email || '',
+      phone: contact.phone || '',
+      location: contact.location || '',
+      linkedin: contact.linkedin || '',
+      github: contact.github || '',
+      summary: source?.content?.summary || '',
+      skills: Array.isArray(source?.content?.skills) ? source.content.skills.map(item => typeof item === 'string' ? item : item?.text || '').filter(Boolean).join(', ') : '',
+      education: Array.isArray(source?.content?.education) ? source.content.education.map(item => item?.text || '').filter(Boolean).join('\n') : '',
+      projects: Array.isArray(source?.content?.projects) ? source.content.projects.map(item => item?.text || '').filter(Boolean).join('\n') : '',
+      experience: Array.isArray(source?.content?.experience) ? source.content.experience.map(item => item?.text || '').filter(Boolean).join('\n') : ''
+    };
+    for (const [name, value] of Object.entries(values)) {
+      const field = form.elements.namedItem(name);
+      if (field && field.value !== String(value)) field.value = String(value);
+    }
+  };
+  // `innerHTML` is the final binding boundary. Reapply the hydrated server
+  // snapshot directly to the live controls so no stale cache/child renderer
+  // can leave Email or Phone blank while Preview already has them.
+  hydrateFormFields(active);
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => hydrateFormFields(active));
   const collect = () => {
     const data = new FormData(form);
     const lines = key => String(data.get(key) || '').split('\n').map(text => text.trim()).filter(Boolean).map(text => ({ text }));

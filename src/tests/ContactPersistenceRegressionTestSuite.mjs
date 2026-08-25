@@ -28,10 +28,14 @@ assert.equal(legacy.social.phone, '+20 111 111 1111');
 assert.equal(legacy.social.github, 'https://github.com/example');
 
 const dbService = await fs.readFile(new URL('../services/DBService.js', import.meta.url), 'utf8');
+const cvBuilder = await fs.readFile(new URL('../ui/CVBuilderPage.js', import.meta.url), 'utf8');
+const main = await fs.readFile(new URL('../main.js', import.meta.url), 'utf8');
 assert.match(dbService, /\.upsert\(row, \{ onConflict: 'id' \}\)/, 'portfolio autosave must use an idempotent upsert');
 assert.match(dbService, /select\('id,owner_user_id'\)/, 'portfolio saves must preflight ownership');
 assert.match(dbService, /portfolioInitializationInFlight/, 'initial portfolio creation must be single-flight per owner');
 assert.doesNotMatch(dbService, /console\.warn\('Supabase createPortfolio insert error:/, 'duplicate insert warning path must be removed');
 assert.match(dbService, /var_\$\{portfolioId\}_default/, 'new default variants must be portfolio-scoped');
+assert.match(cvBuilder, /hydrateFormFields\(active\)/, 'CV controls must be hydrated after DOM rendering');
+assert.match(main, /hydrateStudioFormFields\(\)/, 'Studio controls must be hydrated after DOM rendering');
 
 console.log('ContactPersistenceRegressionTestSuite: passed (nested CV contacts, legacy portfolio contact normalization, ownership-safe idempotent saves).');

@@ -11,6 +11,7 @@
     "test:contact-persistence": "node src/tests/ContactPersistenceRegressionTestSuite.mjs",
     "test:career-persistence-local": "node scripts/test_local_career_persistence.mjs",
     "test:contact-persistence-local": "node scripts/test_local_contact_persistence.mjs",
+    "test:contact-browser": "node scripts/test_local_contact_browser.mjs",
     "test:cv-export": "node src/tests/CVExportServiceTestSuite.mjs",
     "test:cv-sync": "node src/tests/CVPortfolioSyncServiceTestSuite.mjs",
     "test:cv-sync-api": "node src/tests/CVPortfolioSyncApiContractTestSuite.mjs",

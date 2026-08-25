@@ -642,6 +642,7 @@ async function initStudio() {
   renderAll();
   initEngine();
   bindEvents();
+  hydrateStudioFormFields();
   renderWorkspaceHeader();
   renderFirstRunChecklist(document.body, portfolioData);
   installEntitlementRefresh();
@@ -1653,6 +1654,28 @@ function bindEvents() {
       footer.appendChild(userInfo);
     }
   }
+}
+
+function hydrateStudioFormFields() {
+  const fields = {
+    'f-name': portfolioData.name || '',
+    'f-profession': portfolioData.profession || '',
+    'f-tagline': portfolioData.tagline || '',
+    'f-bio': portfolioData.bio || '',
+    'f-location': portfolioData.location || '',
+    'f-contact': portfolioData.contactMessage || '',
+    'f-github': portfolioData.social?.github || '',
+    'f-linkedin': portfolioData.social?.linkedin || '',
+    'f-twitter': portfolioData.social?.twitter || '',
+    'f-email': portfolioData.social?.email || '',
+    'f-website': portfolioData.social?.website || ''
+  };
+  for (const [id, value] of Object.entries(fields)) {
+    const field = document.getElementById(id);
+    if (field && field.value !== String(value)) field.value = String(value);
+  }
+  const availability = document.getElementById('f-availability-status');
+  if (availability && portfolioData.availability?.status) availability.value = portfolioData.availability.status;
 }
 
 // ─── PROFESSION CHANGE ──────────────────────

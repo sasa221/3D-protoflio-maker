@@ -39,14 +39,14 @@ export async function fetchUserProfileAndEntitlements(user) {
       .from('profiles')
       .select('*')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     // 2. Fetch Subscription (Entitlement Source of Truth)
     const { data: sub } = await supabase
       .from('subscriptions')
       .select('*')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
     const planId = sub?.plan_id || 'free';
 
