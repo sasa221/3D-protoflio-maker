@@ -88,3 +88,34 @@ node scripts/test_local_career_rls.mjs
 ```
 
 The fixture creates synthetic users only, verifies owner CRUD, cross-account denial, anonymous denial, CV isolation, then deletes the fixtures. Passing a Production URL fails before any network request. No Production database has been contacted or changed.
+
+## PR-4 local Admin settings
+
+PR-4 adds `cv_template_settings` and `career_studio_admin_audit_log` to the local
+schema. They contain only template/limit metadata and settings actions; they do
+not contain CV content, profile content, email, phone, or portfolio data. RLS
+denies direct `anon`/`authenticated` access. The server-only Admin route accepts
+only the existing allow-listed `ats-basic` template, requires the
+`CAREER_STUDIO` flag, and rejects every non-loopback Supabase URL.
+
+The update is performed by one local-only Postgres function so the setting and
+its audit row commit atomically. The local Free limit is a test control, not a
+published pricing decision. When the feature flag is off, the Admin tab and
+settings requests are absent and the legacy product remains unchanged.
+
+Run the PR-4 contract and authenticated local checks:
+
+```powershell
+npm run test:career-admin-contract
+$status = npx --yes supabase@latest status -o env 2>$null
+foreach ($line in $status) {
+  if ($line -match '^ANON_KEY="(.*)"$') { $env:SUPABASE_LOCAL_ANON_KEY = $matches[1] }
+  if ($line -match '^SERVICE_ROLE_KEY="(.*)"$') { $env:SUPABASE_LOCAL_SERVICE_ROLE_KEY = $matches[1] }
+  if ($line -match '^API_URL="(.*)"$') { $env:SUPABASE_LOCAL_URL = $matches[1] }
+}
+npm run test:career-admin-settings
+```
+
+The fixture creates two synthetic accounts, verifies server authorization,
+direct RLS denial, the atomic allow-listed update, feature-flag hiding, and a
+metadata-only audit sample. It removes the synthetic accounts and audit rows.

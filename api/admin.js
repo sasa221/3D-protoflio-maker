@@ -121,6 +121,68 @@ export default async function handler(req, res) {
   const context = await requireAdmin(req, res);
   if (!context?.admin) return;
 
+  // Career Studio settings are deliberately local-only. This route exposes
+  // configuration metadata, never CV/Profile content or user contact data.
+  const careerSettingsAction = action === 'career-settings' || action === 'career-settings-update' || action === 'career-settings-audit';
+  if (careerSettingsAction) {
+    const localUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
+    const localOnly = process.env.SUPABASE_ENV === 'local' && /^http:\/\/(127\.0\.0\.1|localhost):54321$/.test(localUrl);
+    const enabled = process.env.FF_CAREER_STUDIO === 'true' || process.env.FF_CAREER_STUDIO === '1';
+    if (!enabled) return res.status(404).json({ error: 'Career Studio is not enabled.' });
+    if (!localOnly) return res.status(403).json({ error: 'Career Studio admin settings are local-only.' });
+
+    if (req.method === 'GET' && action === 'career-settings') {
+      const { data, error } = await context.admin
+        .from('cv_template_settings')
+        .select('template_id,display_name,enabled,free_export_limit,updated_at,updated_by')
+        .order('template_id');
+      if (error) return res.status(500).json({ error: 'Career Studio settings unavailable.' });
+      return res.status(200).json({ settings: (data || []).map(row => ({
+        template_id: row.template_id,
+        display_name: row.display_name,
+        enabled: Boolean(row.enabled),
+        free_export_limit: row.free_export_limit,
+        updated_at: row.updated_at,
+        updated_by: row.updated_by
+      })) });
+    }
+
+    if (req.method === 'GET' && action === 'career-settings-audit') {
+      const limit = Math.min(Math.max(Number.parseInt(req.query.limit || '50', 10) || 50, 1), 100);
+      const { data, error } = await context.admin
+        .from('career_studio_admin_audit_log')
+        .select('admin_user_id,action,template_id,limit_value,result,created_at')
+        .order('created_at', { ascending: false }).limit(limit);
+      if (error) return res.status(500).json({ error: 'Career Studio audit unavailable.' });
+      return res.status(200).json({ logs: data || [] });
+    }
+
+    if (req.method === 'POST' && action === 'career-settings-update') {
+      const { templateId, enabled: nextEnabled, freeExportLimit } = req.body || {};
+      const limit = Number(freeExportLimit);
+      if (templateId !== 'ats-basic' || typeof nextEnabled !== 'boolean' || !Number.isInteger(limit) || limit < 0 || limit > 100) {
+        return res.status(400).json({ error: 'Only the local ATS Basic template and a limit from 0 to 100 may be changed.' });
+      }
+      const { data, error } = await context.admin.rpc('admin_update_cv_template_setting', {
+        p_template_id: templateId,
+        p_enabled: nextEnabled,
+        p_free_export_limit: limit,
+        p_admin_user_id: context.user.id
+      });
+      if (error || !data) return res.status(500).json({ error: 'Career Studio setting was not changed.' });
+      const row = Array.isArray(data) ? data[0] : data;
+      return res.status(200).json({ success: true, setting: {
+        template_id: row.template_id,
+        display_name: row.display_name,
+        enabled: Boolean(row.enabled),
+        free_export_limit: row.free_export_limit,
+        updated_at: row.updated_at,
+        updated_by: row.updated_by
+      } });
+    }
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   if (req.method === 'GET' && action === 'me') {
     return res.status(200).json({ isAdmin: true, user: { id: context.user.id, email: context.user.email } });
   }
@@ -620,7 +682,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'A mandatory audit reason is required for hosting override.' });
     }
 
-    const { data: existingPf } = await context.admin.from('portfolios').select('*').eq('id', portfolioId).maybeSingle();
+    // Hosting overrides only need ownership/publication metadata. Never load
+    // master_profile_json or any Career Studio content into the Admin path.
+    const { data: existingPf } = await context.admin.from('portfolios').select('id,owner_user_id,published_at').eq('id', portfolioId).maybeSingle();
     if (!existingPf) return res.status(404).json({ error: 'Portfolio not found' });
 
     const newPublishedAt = hostingAction === 'restore' ? new Date().toISOString() : null;

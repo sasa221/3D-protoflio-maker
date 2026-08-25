@@ -6,6 +6,8 @@ import {
   adminGetPromos,
   adminGetAuditLog,
   adminGetSystemInfo,
+  adminGetCareerSettings,
+  adminGetCareerSettingsAudit,
   adminGetPaymentRequests,
   adminReviewPayment,
   adminOverrideUserPlan,
@@ -19,6 +21,8 @@ import {
 import { getAllThemes } from './three/ProceduralTheme.js';
 import { getThemeTier, getThemeBadge } from './config/ThemeTierConfig.js';
 import { PLANS, formatPrice } from './config/PlanConfig.js';
+import { isFeatureEnabled } from './config/FeatureFlags.js';
+import { renderCareerSettingsTab, installCareerSettingsHandlers } from './ui/CareerStudioAdminSettings.js';
 
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (char) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
@@ -33,6 +37,8 @@ let cachedData = {
   promos: [],
   payments: [],
   auditLogs: [],
+  careerSettings: [],
+  careerSettingsAudit: [],
   system: null
 };
 
@@ -80,6 +86,7 @@ export async function renderAdminPage() {
           <button class="admin-tab" data-tab="themes">🎨 Themes (15)</button>
           <button class="admin-tab" data-tab="audit">🛡️ Audit Log</button>
           <button class="admin-tab" data-tab="system">⚙️ System & Flags</button>
+          ${isFeatureEnabled('CAREER_STUDIO') ? '<button class="admin-tab" data-tab="career-settings">🧾 Career Studio</button>' : ''}
         </div>
 
         <div id="admin-status" class="admin-status" style="display:none;padding:16px;background:rgba(255,255,255,0.05);border-radius:10px;margin-bottom:18px">Loading platform data…</div>
@@ -167,7 +174,8 @@ async function loadAllData() {
   };
 
   try {
-    const [overviewData, usersData, portfoliosData, groupsData, promosData, paymentsData, auditData, systemData] = await Promise.all([
+    const careerEnabled = isFeatureEnabled('CAREER_STUDIO');
+    const [overviewData, usersData, portfoliosData, groupsData, promosData, paymentsData, auditData, systemData, careerSettingsData, careerSettingsAuditData] = await Promise.all([
       safeCall(adminGetOverview, 'Overview', { stats: null, error: true }),
       safeCall(adminGetUsers, 'Users', { users: [] }),
       safeCall(adminGetPortfolios, 'Portfolios', { portfolios: [] }),
@@ -175,7 +183,9 @@ async function loadAllData() {
       safeCall(adminGetPromos, 'Promos', { promos: [] }),
       safeCall(() => adminGetPaymentRequests('all'), 'Payment Requests', { requests: [] }),
       safeCall(() => adminGetAuditLog(150), 'Audit Log', { logs: [] }),
-      safeCall(adminGetSystemInfo, 'System Info', { featureFlags: {}, pricingReference: {} })
+      safeCall(adminGetSystemInfo, 'System Info', { featureFlags: {}, pricingReference: {} }),
+      careerEnabled ? safeCall(adminGetCareerSettings, 'Career Studio settings', { settings: [] }) : Promise.resolve({ settings: [] }),
+      careerEnabled ? safeCall(() => adminGetCareerSettingsAudit(50), 'Career Studio audit', { logs: [] }) : Promise.resolve({ logs: [] })
     ]);
 
     cachedData = {
@@ -186,6 +196,8 @@ async function loadAllData() {
       promos: promosData.promos || [],
       payments: paymentsData.requests || [],
       auditLogs: auditData.logs || [],
+      careerSettings: careerSettingsData.settings || [],
+      careerSettingsAudit: careerSettingsAuditData.logs || [],
       system: systemData
     };
 
@@ -252,6 +264,11 @@ function renderCurrentTab() {
       break;
     case 'system':
       container.innerHTML = renderSystemTab(cachedData.system);
+      break;
+    case 'career-settings':
+      if (!isFeatureEnabled('CAREER_STUDIO')) { currentTab = 'overview'; renderCurrentTab(); break; }
+      container.innerHTML = renderCareerSettingsTab(cachedData.careerSettings, cachedData.careerSettingsAudit);
+      installCareerSettingsHandlers({ onSaved: loadAllData });
       break;
   }
 }

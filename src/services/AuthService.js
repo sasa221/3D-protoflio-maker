@@ -325,6 +325,21 @@ export function adminGetSystemInfo() {
   return adminRequest('/api/admin?action=system');
 }
 
+export function adminGetCareerSettings() {
+  return adminRequest('/api/admin?action=career-settings');
+}
+
+export function adminGetCareerSettingsAudit(limit = 50) {
+  return adminRequest(`/api/admin?action=career-settings-audit&limit=${limit}`);
+}
+
+export function adminUpdateCareerSettings({ templateId, enabled, freeExportLimit }) {
+  return adminRequest('/api/admin?action=career-settings-update', {
+    method: 'POST',
+    body: JSON.stringify({ templateId, enabled, freeExportLimit })
+  });
+}
+
 export function adminOverrideUserPlan({ userId, targetPlanId, status = 'active', durationDays = 30, startDate = null, endDate = null, groupSeats = 2, expiryDate = null, reason }) {
   return adminRequest('/api/admin?action=user-plan-override', {
     method: 'POST',

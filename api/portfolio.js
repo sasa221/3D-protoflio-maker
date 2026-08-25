@@ -97,6 +97,14 @@ function localCareerPlanOverride() {
   return ['free', 'pro', 'premium', 'premium_group'].includes(value) ? value : '';
 }
 
+async function resolveLocalCVTemplateSetting(adminClient) {
+  if (process.env.SUPABASE_ENV !== 'local') return null;
+  const { data, error } = await adminClient.from('cv_template_settings')
+    .select('template_id,enabled,free_export_limit').eq('template_id', 'ats-basic').maybeSingle();
+  if (error || !data) return null;
+  return { enabled: Boolean(data.enabled), freeExportLimit: Number(data.free_export_limit) };
+}
+
 async function resolveCareerExportPlan(adminClient, userId) {
   const override = localCareerPlanOverride();
   if (override) return override;
@@ -252,8 +260,14 @@ export default async function handler(req, res) {
       if (existingEvent) return res.status(200).json({ success: true, duplicate: true, eventId: existingEvent.id, pageCount: existingEvent.page_count, plan: await resolveCareerExportPlan(adminClient, userId) });
 
       const plan = await resolveCareerExportPlan(adminClient, userId);
+      const localTemplateSetting = await resolveLocalCVTemplateSetting(adminClient);
+      if (localTemplateSetting && !localTemplateSetting.enabled) {
+        return res.status(403).json({ error: 'The local ATS Basic template is currently unavailable.' });
+      }
       if (plan === 'free') {
-        const configuredLimit = Number.parseInt(process.env.CV_FREE_EXPORT_LIMIT || '2', 10);
+        const configuredLimit = process.env.CV_FREE_EXPORT_LIMIT !== undefined
+          ? Number.parseInt(process.env.CV_FREE_EXPORT_LIMIT, 10)
+          : Number.parseInt(String(localTemplateSetting?.freeExportLimit ?? 2), 10);
         const limit = Number.isFinite(configuredLimit) && configuredLimit >= 0 ? configuredLimit : 2;
         const monthStart = new Date();
         monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0);
