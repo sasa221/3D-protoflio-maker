@@ -389,7 +389,10 @@ async function router() {
       });
       return;
     }
-    initStudio();
+    // Keep the route pending until the server-backed Portfolio snapshot has
+    // been loaded and bound to the form. This prevents a new browser context
+    // from observing the shell/cache before Studio hydration finishes.
+    await initStudio();
     return;
   }
 
