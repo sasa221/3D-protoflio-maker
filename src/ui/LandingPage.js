@@ -16,6 +16,8 @@ import { globalEntitlements } from '../services/EntitlementService.js';
 import { PLANS, GROUP_SEAT_PRICING } from '../config/PlanConfig.js';
 import { LANDING_GALLERY_FILTERS, LANDING_GALLERY_ITEMS } from '../config/LandingGalleryConfig.js';
 import { getThemeTier } from '../config/ThemeTierConfig.js';
+import { isFeatureEnabled } from '../config/FeatureFlags.js';
+import { getCareerEntryPaths } from '../services/CareerEntryPathService.js';
 
 let demoEngine = null;
 let currentDemoThemeId = 'code';
@@ -38,6 +40,8 @@ export async function renderLandingPage(container) {
 
   const authUser = await getCurrentAuthUser().catch(() => null);
   const isAuthenticated = Boolean(authUser && authUser.id && authUser.id !== 'usr_guest');
+  const careerStudioEnabled = isFeatureEnabled('CAREER_STUDIO');
+  const careerPaths = getCareerEntryPaths(isAuthenticated);
   // Load the authoritative subscription before rendering the CTA. A paid
   // Premium Group owner should manage invitations, not submit payment again.
   let isPremiumGroupOwner = false;
@@ -112,11 +116,25 @@ export async function renderLandingPage(container) {
       </nav>
 
       <div id="landing-auth-actions" style="display: flex; align-items: center; gap: 14px;">
-        ${isAuthenticated ? `
+        ${careerStudioEnabled && isAuthenticated ? `
+          <a href="/cv/new" style="
+            padding: 10px 16px; min-height: 44px; display: inline-flex; align-items: center; background: rgba(6,182,212,.1); border: 1px solid rgba(6,182,212,.3); border-radius: 10px;
+            color: #67e8f9; font-size: 0.82rem; font-weight: 800; text-decoration: none;
+          ">Build My CV</a>
           <a href="/studio" style="
             padding: 10px 20px; min-height: 44px; display: inline-flex; align-items: center; background: linear-gradient(135deg, #7c3aed, #06b6d4); border-radius: 10px;
             color: #fff; font-size: 0.85rem; font-weight: 700; text-decoration: none; box-shadow: 0 4px 15px rgba(124,58,237,0.3);
           ">⚡ Open Studio</a>
+        ` : careerStudioEnabled ? `
+          <a href="/login" style="color: rgba(255,255,255,0.85); min-height: 44px; display: inline-flex; align-items: center; font-size: 0.85rem; font-weight: 600; text-decoration: none; margin-right: 6px;">Sign In</a>
+          <a href="${careerPaths.buildCV}" style="
+            padding: 10px 16px; min-height: 44px; display: inline-flex; align-items: center; background: rgba(6,182,212,.1); border: 1px solid rgba(6,182,212,.3); border-radius: 10px;
+            color: #67e8f9; font-size: 0.82rem; font-weight: 800; text-decoration: none;
+          ">Build My CV</a>
+          <a href="/login?next=%2Fstart" style="
+            padding: 10px 20px; min-height: 44px; display: inline-flex; align-items: center; background: linear-gradient(135deg, #7c3aed, #06b6d4); border-radius: 10px;
+            color: #fff; font-size: 0.85rem; font-weight: 700; text-decoration: none; box-shadow: 0 4px 15px rgba(124,58,237,0.3);
+          ">Build My Portfolio</a>
         ` : `
           <a href="/login" style="color: rgba(255,255,255,0.85); min-height: 44px; display: inline-flex; align-items: center; font-size: 0.85rem; font-weight: 600; text-decoration: none; margin-right: 6px;">Sign In</a>
           <a href="/login?next=%2Fstart" style="
@@ -158,14 +176,20 @@ export async function renderLandingPage(container) {
           </p>
 
           <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-bottom: 24px;">
-            <a href="${isAuthenticated ? '/studio' : '/login?next=%2Fstart'}" style="
+            <a href="${careerStudioEnabled ? careerPaths.buildCV : careerPaths.portfolio}" style="
               padding: 16px 32px; background: linear-gradient(135deg, #7c3aed, #06b6d4); border-radius: 12px;
               color: #fff; font-size: 1rem; font-weight: 800; text-decoration: none; box-shadow: 0 10px 30px rgba(124,58,237,0.4);
               transition: transform 0.2s; display: inline-flex; align-items: center; gap: 10px;
             " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
-              <span>⚡ ${isAuthenticated ? 'Open Studio Workspace' : 'Build My Portfolio'}</span>
+              <span>⚡ ${careerStudioEnabled ? 'Build My CV' : (isAuthenticated ? 'Open Studio Workspace' : 'Build My Portfolio')}</span>
               <span>➔</span>
             </a>
+
+            ${careerStudioEnabled ? `<a href="${careerPaths.portfolio}" style="
+              padding: 16px 24px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+              border-radius: 12px; color: #fff; font-size: 0.95rem; font-weight: 700; text-decoration: none;
+              backdrop-filter: blur(10px); transition: background 0.2s;
+            ">Create 3D Portfolio</a><a href="${careerPaths.importCV}" style="padding: 10px 4px;color:#67e8f9;font-size:.82rem;font-weight:800;text-decoration:none;">Import Existing CV →</a>` : ''}
 
             <a href="#hero-demo" style="
               padding: 16px 24px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);

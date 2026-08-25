@@ -297,7 +297,8 @@ async function router() {
     }
     const cvParts = path.split('/').filter(Boolean);
     const profileId = cvParts[1] && cvParts[1] !== 'new' && cvParts[2] !== 'preview' ? cvParts[1] : null;
-    renderCVBuilderPage(getAppContainer(), { ownerUserId: (cvUser || localMockUser).id, profileId });
+    const cvMode = new URLSearchParams(window.location.search).get('mode');
+    renderCVBuilderPage(getAppContainer(), { ownerUserId: (cvUser || localMockUser).id, profileId, openImport: cvMode === 'import' });
     return;
   }
 

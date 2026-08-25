@@ -9,11 +9,12 @@ import { saveCareerProfile } from '../services/CareerProfileService.js';
 
 const escape = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
 
-export function renderCVImportReviewPanel(container, { ownerUserId = 'local-dev-user', getBaseProfile, onSaved } = {}) {
+export function renderCVImportReviewPanel(container, { ownerUserId = 'local-dev-user', getBaseProfile, onSaved, autoOpen = false } = {}) {
   if (!container) return;
   container.innerHTML = `<button type="button" data-open-cv-import style="width:100%;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.3);color:#67e8f9;border-radius:10px;padding:11px;font-weight:800;cursor:pointer">Import PDF/DOCX locally → Review fields</button>`;
   const open = () => renderImportDialog();
   container.querySelector('[data-open-cv-import]').addEventListener('click', open);
+  if (autoOpen) setTimeout(open, 0);
 
   function renderImportDialog() {
     const overlay = document.createElement('div');

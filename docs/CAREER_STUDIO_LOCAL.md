@@ -185,3 +185,28 @@ console errors. Temporary fixtures must be removed after the run. PR-6 does
 not alter production schemas, billing, Portfolio routes, or the legacy import
 modal; disabling `CAREER_STUDIO` hides the new panel with the old product
 unchanged.
+
+## PR-7A local Career entry and CV checklist
+
+When `CAREER_STUDIO` is enabled locally, Home exposes separate `Build My CV`,
+`Import Existing CV`, and `Create 3D Portfolio` actions. Authenticated users go
+to `/cv/new` or `/cv/new?mode=import`; unauthenticated users are sent through
+Login with the encoded return path. When the flag is off, the original Studio
+CTA remains the only Career entry.
+
+The CV Builder now gives stage-specific factual guidance. Student profiles lead
+with Education, Projects, Training, and Skills; Professional profiles lead with
+Summary and Experience. The guidance does not create data or treat coursework
+as full-time employment.
+
+`CVQualityScoreService` provides a deterministic “CV completeness check” with a
+breakdown and `Fix this` focus actions. It is not an ATS promise, hiring score,
+AI feature, or network call. It does not persist new data and does not modify
+the existing Portfolio Quality Score.
+
+Local checks:
+
+```powershell
+npm run test:cv-quality
+npm run test:pr7a-browser
+```

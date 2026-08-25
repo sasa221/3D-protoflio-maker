@@ -3,12 +3,14 @@ import { getCVTemplate } from '../config/CVTemplateConfig.js';
 import { buildCVExportModel, exportCareerProfilePdf, downloadPdfBytes, recordCareerPdfExport, safeCVFileName } from '../services/CVExportService.js';
 import { renderCVTargetedVariantsPanel } from './CVTargetedVariantsPanel.js';
 import { renderCVImportReviewPanel } from './CVImportReviewPanel.js';
+import { renderCVQualityChecklistPanel } from './CVQualityChecklistPanel.js';
+import { getCVStageGuidance } from '../services/CVQualityScoreService.js';
 
 function escape(value = '') {
   return String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
 }
 
-export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user', profileId = null } = {}) {
+export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user', profileId = null, openImport = false } = {}) {
   const profile = profileId
     ? listCareerProfiles(ownerUserId).find(item => item.id === profileId)
     : listCareerProfiles(ownerUserId)[0];
@@ -31,6 +33,7 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
           <label>Career stage
             <select name="careerStage"><option value="student" ${active.careerStage === 'student' ? 'selected' : ''}>Student / early career</option><option value="professional" ${active.careerStage === 'professional' ? 'selected' : ''}>Working professional</option></select>
           </label>
+          <p id="cv-stage-guidance" class="cv-stage-guidance" aria-live="polite"></p>
           <label>Full name<input name="name" value="${escape(active.content.contact.name)}" autocomplete="name" required></label>
           <label>Email<input name="email" type="email" value="${escape(active.content.contact.email)}" autocomplete="email"></label>
           <label>Phone<input name="phone" value="${escape(active.content.contact.phone)}" autocomplete="tel"></label>
@@ -40,6 +43,7 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
           <label>Professional summary<textarea name="summary" rows="5" placeholder="Write only what is true about your experience.">${escape(active.content.summary)}</textarea></label>
           <label>Skills<input name="skills" value="${escape(active.content.skills.join(', '))}" placeholder="JavaScript, Figma, SQL"></label>
           <label>Education<textarea name="education" rows="4" placeholder="Degree — Institution — dates">${escape(active.content.education.map(item => item.text || '').join('\n'))}</textarea></label>
+          <label>Projects<textarea name="projects" rows="5" placeholder="One real project per line">${escape(active.content.projects.map(item => item.text || '').join('\n'))}</textarea></label>
           <label>Experience / training<textarea name="experience" rows="6" placeholder="One role or training item per line">${escape(active.content.experience.map(item => item.text || '').join('\n'))}</textarea></label>
           <div class="career-studio-actions"><button type="submit">Save draft</button><button type="button" data-preview>ATS Preview</button><button type="button" data-export>Export PDF</button><span id="career-save-status" aria-live="polite">Draft</span></div>
           <div class="career-sync-cta"><strong>Optional next step</strong><span>Review selected CV fields before adding anything to a Portfolio.</span><a href="${syncUrl}">Create Portfolio From My CV →</a></div>
@@ -50,6 +54,7 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
           <small>Template: ${escape(getCVTemplate('ats-basic').name)} · private draft</small>
         </aside>
       </section>
+      <section id="cv-quality-container" aria-label="CV completeness checklist"></section>
       <section id="cv-targeted-variants-container" aria-label="Private targeted CV variants"></section>
     </main>`;
 
@@ -58,7 +63,7 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
   const collect = () => {
     const data = new FormData(form);
     const lines = key => String(data.get(key) || '').split('\n').map(text => text.trim()).filter(Boolean).map(text => ({ text }));
-    return { ...active, careerStage: data.get('careerStage'), content: { ...active.content, contact: { ...active.content.contact, name: data.get('name') || '', email: data.get('email') || '', phone: data.get('phone') || '', location: data.get('location') || '', linkedin: data.get('linkedin') || '', github: data.get('github') || '' }, summary: data.get('summary') || '', skills: String(data.get('skills') || '').split(',').map(item => item.trim()).filter(Boolean), education: lines('education'), experience: lines('experience') } };
+    return { ...active, careerStage: data.get('careerStage'), content: { ...active.content, contact: { ...active.content.contact, name: data.get('name') || '', email: data.get('email') || '', phone: data.get('phone') || '', location: data.get('location') || '', linkedin: data.get('linkedin') || '', github: data.get('github') || '' }, summary: data.get('summary') || '', skills: String(data.get('skills') || '').split(',').map(item => item.trim()).filter(Boolean), education: lines('education'), projects: lines('projects'), experience: lines('experience') } };
   };
   const updatePreview = () => {
     const next = collect();
@@ -66,8 +71,21 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => { saveCareerProfile(next, ownerUserId); status.textContent = 'Autosaved locally'; }, 500);
   };
-  form.addEventListener('input', updatePreview);
-  form.addEventListener('change', updatePreview);
+  const qualityPanel = renderCVQualityChecklistPanel(container.querySelector('#cv-quality-container'), {
+    getProfile: collect,
+    onFix: section => {
+      const target = form.elements.namedItem(section) || form.elements.namedItem(section === 'linkedin' ? 'github' : 'summary');
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      target?.focus();
+    }
+  });
+  const updateStageGuidance = () => {
+    const guidance = getCVStageGuidance(form.elements.namedItem('careerStage')?.value);
+    const target = container.querySelector('#cv-stage-guidance');
+    if (target) target.textContent = guidance.message;
+  };
+  form.addEventListener('input', () => { updatePreview(); qualityPanel.refresh(); });
+  form.addEventListener('change', () => { updatePreview(); qualityPanel.refresh(); updateStageGuidance(); });
   form.addEventListener('submit', event => { event.preventDefault(); saveCareerProfile(collect(), ownerUserId); status.textContent = 'Saved locally'; });
   container.querySelector('[data-preview]').addEventListener('click', () => container.querySelector('#career-ats-preview').scrollIntoView({ behavior: 'smooth', block: 'center' }));
   let exportBusy = false;
@@ -110,10 +128,12 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
     }
   };
   renderPreview(active);
+  updateStageGuidance();
   if (!profile) saveCareerProfile(active, ownerUserId);
   renderCVImportReviewPanel(container.querySelector('#cv-import-review-container'), {
     ownerUserId,
     getBaseProfile: collect,
+    autoOpen: openImport,
     onSaved: saved => { window.location.href = `/cv?profile=${encodeURIComponent(saved.id)}`; }
   });
   renderCVTargetedVariantsPanel(container.querySelector('#cv-targeted-variants-container'), {
