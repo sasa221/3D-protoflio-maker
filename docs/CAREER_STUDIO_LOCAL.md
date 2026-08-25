@@ -210,3 +210,12 @@ Local checks:
 npm run test:cv-quality
 npm run test:pr7a-browser
 ```
+
+## Portfolio-first Home hierarchy
+
+The Portfolio remains the primary product. Home uses `Build My Portfolio` as
+the main Hero CTA and preserves the existing `/start` onboarding path. `Build
+My CV` and `Import Existing CV` are secondary independent services; neither is
+required before creating a Portfolio, and the CV Builder does not require a
+Portfolio. Import remains private and review-first, while `Create Portfolio
+From My CV` remains an explicit Review/Diff action.

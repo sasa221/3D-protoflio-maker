@@ -47,11 +47,13 @@ try {
   home.on('console', message => { if (message.type() === 'error') homeErrors.push(message.text()); });
   home.on('pageerror', error => homeErrors.push(error.message));
   await home.goto(`http://127.0.0.1:${port}/tmp/pr7a-browser/home.html`, { waitUntil: 'domcontentloaded' });
-  await home.getByText('Build My CV', { exact: true }).first().waitFor({ state: 'visible', timeout: 15000 });
-  const buildHref = await home.getByText('Build My CV', { exact: true }).first().getAttribute('href');
-  const importHref = await home.locator('a').filter({ hasText: 'Import Existing CV' }).first().getAttribute('href');
-  if (buildHref !== '/login?next=%2Fcv%2Fnew' || importHref !== '/login?next=%2Fcv%2Fnew%3Fmode%3Dimport') throw new Error(`Unexpected unauthenticated Home paths: ${buildHref} / ${importHref}`);
-  if (!await home.getByText('Create 3D Portfolio', { exact: true }).count()) throw new Error('Portfolio CTA disappeared from Home.');
+  const hero = home.locator('[data-career-hero]');
+  await hero.waitFor({ state: 'visible', timeout: 15000 });
+  const portfolioHref = await home.locator('[data-career-cta="portfolio"]').getAttribute('href');
+  const buildHref = await home.locator('[data-career-cta="cv"]').getAttribute('href');
+  const importHref = await home.locator('[data-career-cta="import"]').getAttribute('href');
+  if (portfolioHref !== '/login?next=%2Fstart' || buildHref !== '/login?next=%2Fcv%2Fnew' || importHref !== '/login?next=%2Fcv%2Fnew%3Fmode%3Dimport') throw new Error(`Unexpected unauthenticated Home paths: ${portfolioHref} / ${buildHref} / ${importHref}`);
+  if (!/Build My Portfolio/.test(await home.locator('[data-career-cta="portfolio"]').innerText()) || !/Build My CV/.test(await home.locator('[data-career-cta="cv"]').innerText()) || !/Import Existing CV/.test(await home.locator('[data-career-cta="import"]').innerText())) throw new Error('Portfolio-first Home CTA hierarchy is incomplete.');
   await home.screenshot({ path: homeScreenshotPath, fullPage: false });
   if (homeErrors.length) throw new Error(`Home browser console errors: ${homeErrors.join(' | ')}`);
   await home.close();

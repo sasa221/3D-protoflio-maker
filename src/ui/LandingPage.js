@@ -117,24 +117,24 @@ export async function renderLandingPage(container) {
 
       <div id="landing-auth-actions" style="display: flex; align-items: center; gap: 14px;">
         ${careerStudioEnabled && isAuthenticated ? `
-          <a href="/cv/new" style="
-            padding: 10px 16px; min-height: 44px; display: inline-flex; align-items: center; background: rgba(6,182,212,.1); border: 1px solid rgba(6,182,212,.3); border-radius: 10px;
-            color: #67e8f9; font-size: 0.82rem; font-weight: 800; text-decoration: none;
-          ">Build My CV</a>
           <a href="/studio" style="
             padding: 10px 20px; min-height: 44px; display: inline-flex; align-items: center; background: linear-gradient(135deg, #7c3aed, #06b6d4); border-radius: 10px;
             color: #fff; font-size: 0.85rem; font-weight: 700; text-decoration: none; box-shadow: 0 4px 15px rgba(124,58,237,0.3);
           ">⚡ Open Studio</a>
-        ` : careerStudioEnabled ? `
-          <a href="/login" style="color: rgba(255,255,255,0.85); min-height: 44px; display: inline-flex; align-items: center; font-size: 0.85rem; font-weight: 600; text-decoration: none; margin-right: 6px;">Sign In</a>
-          <a href="${careerPaths.buildCV}" style="
+          <a href="/cv/new" style="
             padding: 10px 16px; min-height: 44px; display: inline-flex; align-items: center; background: rgba(6,182,212,.1); border: 1px solid rgba(6,182,212,.3); border-radius: 10px;
             color: #67e8f9; font-size: 0.82rem; font-weight: 800; text-decoration: none;
           ">Build My CV</a>
+        ` : careerStudioEnabled ? `
+          <a href="/login" style="color: rgba(255,255,255,0.85); min-height: 44px; display: inline-flex; align-items: center; font-size: 0.85rem; font-weight: 600; text-decoration: none; margin-right: 6px;">Sign In</a>
           <a href="/login?next=%2Fstart" style="
             padding: 10px 20px; min-height: 44px; display: inline-flex; align-items: center; background: linear-gradient(135deg, #7c3aed, #06b6d4); border-radius: 10px;
             color: #fff; font-size: 0.85rem; font-weight: 700; text-decoration: none; box-shadow: 0 4px 15px rgba(124,58,237,0.3);
           ">Build My Portfolio</a>
+          <a href="${careerPaths.buildCV}" style="
+            padding: 10px 16px; min-height: 44px; display: inline-flex; align-items: center; background: rgba(6,182,212,.1); border: 1px solid rgba(6,182,212,.3); border-radius: 10px;
+            color: #67e8f9; font-size: 0.82rem; font-weight: 800; text-decoration: none;
+          ">Build My CV</a>
         ` : `
           <a href="/login" style="color: rgba(255,255,255,0.85); min-height: 44px; display: inline-flex; align-items: center; font-size: 0.85rem; font-weight: 600; text-decoration: none; margin-right: 6px;">Sign In</a>
           <a href="/login?next=%2Fstart" style="
@@ -160,7 +160,7 @@ export async function renderLandingPage(container) {
             background: rgba(124,58,237,0.12); border: 1px solid rgba(124,58,237,0.3); color: #a855f7;
             font-size: 0.8rem; font-weight: 700; margin-bottom: 20px; font-family: 'JetBrains Mono', monospace;
           ">
-            <span>✨ Transform PDF CV into Interactive 3D</span>
+            <span>✨ Build and share a 3D portfolio</span>
           </div>
 
           <h1 style="
@@ -168,28 +168,28 @@ export async function renderLandingPage(container) {
             line-height: 1.1; margin-bottom: 18px; background: linear-gradient(135deg, #ffffff 40%, var(--primary, #a855f7) 100%);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -1px;
           ">
-            Turn your CV into a portfolio recruiters remember.
+            Build a 3D portfolio recruiters remember.
           </h1>
 
           <p style="font-size: 1.05rem; color: rgba(255,255,255,0.7); line-height: 1.6; max-width: 540px; margin-bottom: 28px;">
-            Build a cinematic 3D portfolio, tailor it for specific jobs, and see what visitors actually engage with in real time.
+            Build your Portfolio directly from scratch, import an existing CV to speed up your data entry, or create a standalone CV when you need one. CV-to-Portfolio transfer is always optional and reviewed by you.
           </p>
 
           <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-bottom: 24px;">
-            <a href="${careerStudioEnabled ? careerPaths.buildCV : careerPaths.portfolio}" style="
+            <a data-career-hero data-career-cta="portfolio" href="${careerPaths.portfolio}" style="
               padding: 16px 32px; background: linear-gradient(135deg, #7c3aed, #06b6d4); border-radius: 12px;
               color: #fff; font-size: 1rem; font-weight: 800; text-decoration: none; box-shadow: 0 10px 30px rgba(124,58,237,0.4);
               transition: transform 0.2s; display: inline-flex; align-items: center; gap: 10px;
             " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
-              <span>⚡ ${careerStudioEnabled ? 'Build My CV' : (isAuthenticated ? 'Open Studio Workspace' : 'Build My Portfolio')}</span>
+              <span>⚡ Build My Portfolio</span>
               <span>➔</span>
             </a>
 
-            ${careerStudioEnabled ? `<a href="${careerPaths.portfolio}" style="
+            ${careerStudioEnabled ? `<a data-career-cta="cv" href="${careerPaths.buildCV}" style="
               padding: 16px 24px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
               border-radius: 12px; color: #fff; font-size: 0.95rem; font-weight: 700; text-decoration: none;
               backdrop-filter: blur(10px); transition: background 0.2s;
-            ">Create 3D Portfolio</a><a href="${careerPaths.importCV}" style="padding: 10px 4px;color:#67e8f9;font-size:.82rem;font-weight:800;text-decoration:none;">Import Existing CV →</a>` : ''}
+            ">Build My CV</a><a data-career-cta="import" href="${careerPaths.importCV}" style="padding: 10px 4px;color:#67e8f9;font-size:.82rem;font-weight:800;text-decoration:none;">Import Existing CV →</a>` : ''}
 
             <a href="#hero-demo" style="
               padding: 16px 24px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
