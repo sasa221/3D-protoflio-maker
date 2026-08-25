@@ -62,6 +62,14 @@ Synthetic visual samples can be regenerated outside the repository:
 node scripts/generate_local_cv_samples.mjs
 ```
 
+PR-3 CV-to-Portfolio transfer is opt-in. Saving a CV never syncs anything.
+The `Create Portfolio From My CV` link opens a review dialog where all fields
+start unchecked; contact details and location require a separate confirmation,
+existing scalar values stay in place unless replacement is explicitly enabled,
+and list fields (including projects and experience) are merged without deletion.
+The target Portfolio is checked against the signed-in owner by Supabase RLS;
+there is no public CV route and no automatic publish.
+
 Run the real authenticated RLS fixture with local keys held only in the current process:
 
 ```powershell

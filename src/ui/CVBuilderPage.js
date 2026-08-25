@@ -12,12 +12,16 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
     : listCareerProfiles(ownerUserId)[0];
   const active = profile || createEmptyCareerProfile({ ownerUserId });
   let saveTimer;
+  const syncUrl = `/studio?cv_sync_profile=${encodeURIComponent(active.id)}`;
 
   container.innerHTML = `
     <main class="career-studio-page" data-career-studio>
+      <nav class="career-product-nav" aria-label="Product navigation">
+        <a href="/">Home</a><a href="/cv">CV Builder</a><a href="/studio">Portfolio Studio</a><a href="/pricing">Pricing</a><a href="/studio?account=1">Account</a>
+      </nav>
       <header class="career-studio-header">
         <a href="/" class="career-studio-back">← Home</a>
-        <div><span class="career-studio-kicker">CAREER STUDIO</span><h1>Build your ATS-ready CV</h1><p>Your information stays private while you edit.</p></div>
+        <div><span class="career-studio-kicker">CAREER STUDIO</span><h1>Build your ATS-ready CV</h1><p>Your information stays private while you edit. Nothing is published from this page.</p></div>
         <a href="/studio" class="career-studio-link">Open Portfolio Studio</a>
       </header>
       <section class="career-studio-grid">
@@ -36,6 +40,7 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
           <label>Education<textarea name="education" rows="4" placeholder="Degree — Institution — dates">${escape(active.content.education.map(item => item.text || '').join('\n'))}</textarea></label>
           <label>Experience / training<textarea name="experience" rows="6" placeholder="One role or training item per line">${escape(active.content.experience.map(item => item.text || '').join('\n'))}</textarea></label>
           <div class="career-studio-actions"><button type="submit">Save draft</button><button type="button" data-preview>ATS Preview</button><button type="button" data-export>Export PDF</button><span id="career-save-status" aria-live="polite">Draft</span></div>
+          <div class="career-sync-cta"><strong>Optional next step</strong><span>Review selected CV fields before adding anything to a Portfolio.</span><a href="${syncUrl}">Create Portfolio From My CV →</a></div>
         </form>
         <aside class="career-studio-preview" id="career-ats-preview" aria-label="ATS preview">
           <div class="ats-paper"><h2 data-preview-name>Your Name</h2><p data-preview-contact class="ats-contact"></p><div data-preview-sections></div></div>

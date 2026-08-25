@@ -8,6 +8,8 @@
     "build": "node scripts/assert_local_safety.mjs && vite build --mode development",
     "test:career-local": "node src/tests/CareerProfileLocalTestSuite.mjs",
     "test:cv-export": "node src/tests/CVExportServiceTestSuite.mjs",
+    "test:cv-sync": "node src/tests/CVPortfolioSyncServiceTestSuite.mjs",
+    "test:cv-sync-api": "node src/tests/CVPortfolioSyncApiContractTestSuite.mjs",
     "preview": "vite preview",
     "test:core": "node scripts/core-tests.mjs",
     "check": "npm run test:core && npm run build"

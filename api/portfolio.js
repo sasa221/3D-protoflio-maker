@@ -117,6 +117,32 @@ async function resolveCareerExportPlan(adminClient, userId) {
   return ['pro', 'premium', 'premium_group'].includes(plan) ? plan : 'free';
 }
 
+function cleanSyncText(value, max = 2400) {
+  return String(value || '').replace(/[\u0000-\u001F\u007F]/g, '').trim().slice(0, max);
+}
+
+function cleanSyncList(value, kind) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 100).map(item => {
+    if (kind === 'skills') {
+      const name = cleanSyncText(typeof item === 'string' ? item : item?.name, 120);
+      return name ? { name } : null;
+    }
+    const description = cleanSyncText(typeof item === 'string' ? item : item?.description || item?.text || item?.name, 2400);
+    return description ? { description } : null;
+  }).filter(Boolean);
+}
+
+function mergeSyncList(existing, incoming) {
+  const output = Array.isArray(existing) ? existing.map(item => ({ ...item })) : [];
+  const keys = new Set(output.map(item => cleanSyncText(item?.name || item?.role || item?.degree || item?.description, 2400).toLowerCase()).filter(Boolean));
+  for (const item of incoming) {
+    const key = cleanSyncText(item?.name || item?.description, 2400).toLowerCase();
+    if (key && !keys.has(key)) { output.push(item); keys.add(key); }
+  }
+  return output;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -129,6 +155,72 @@ export default async function handler(req, res) {
   const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseAnonKey;
 
   // Career Studio is opt-in and local/development-only until a separate release approval.
+  if (action === 'cv-sync') {
+    if (!isServerFeatureEnabled('CAREER_STUDIO')) return res.status(404).json({ error: 'Career Studio is not enabled.' });
+    if (process.env.SUPABASE_ENV === 'local' && !/^http:\/\/(127\.0\.0\.1|localhost):54321$/.test(supabaseUrl)) {
+      return res.status(500).json({ error: 'Local Career Studio blocked: non-local Supabase URL configured.' });
+    }
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+    const authHeader = req.headers.authorization || req.headers.Authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized — Auth token required' });
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    try {
+      const userClient = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: `Bearer ${token}` } } });
+      const { data: userData, error: userErr } = await userClient.auth.getUser();
+      if (userErr || !userData.user) return res.status(401).json({ error: 'Unauthorized user session' });
+      const userId = userData.user.id;
+      const { portfolioId, careerProfileId, sourceOwnerId, selectedFields = [], patch = {}, overwriteExisting = false, confirmSensitive = false } = req.body || {};
+      if (!portfolioId || !/^[A-Za-z0-9_-]{3,160}$/.test(String(portfolioId))) return res.status(400).json({ error: 'Invalid Portfolio.' });
+      if (sourceOwnerId && sourceOwnerId !== userId) return res.status(403).json({ error: 'Forbidden — Career profile owner mismatch.' });
+      const allowedFields = new Set(['name', 'bio', 'location', 'social.email', 'social.phone', 'social.linkedin', 'social.github', 'skills', 'education', 'experience', 'projects']);
+      const fields = [...new Set(Array.isArray(selectedFields) ? selectedFields.map(String) : [])];
+      if (!fields.length || fields.some(field => !allowedFields.has(field))) return res.status(400).json({ error: 'Select valid CV fields before syncing.' });
+      const sensitiveFields = fields.filter(field => ['location', 'social.email', 'social.phone', 'social.linkedin', 'social.github'].includes(field));
+      if (sensitiveFields.length && confirmSensitive !== true) return res.status(400).json({ error: 'Sensitive CV fields require explicit confirmation.' });
+      const adminClient = createClient(supabaseUrl, supabaseSecretKey);
+      if (careerProfileId) {
+        const { data: sourceProfile, error: sourceErr } = await adminClient.from('career_profiles').select('owner_user_id').eq('id', String(careerProfileId)).maybeSingle();
+        if (sourceErr) return res.status(500).json({ error: 'Career profile ownership lookup failed.' });
+        if (!sourceProfile || sourceProfile.owner_user_id !== userId) return res.status(403).json({ error: 'Forbidden — Career profile is not owned by this account.' });
+      }
+      const { data: portfolio, error: portfolioErr } = await adminClient.from('portfolios').select('id,owner_user_id,name,bio,master_profile_json').eq('id', String(portfolioId)).maybeSingle();
+      if (portfolioErr) return res.status(500).json({ error: 'Portfolio ownership lookup failed.' });
+      if (!portfolio) return res.status(404).json({ error: 'Portfolio not found.' });
+      if (portfolio.owner_user_id !== userId) return res.status(403).json({ error: 'Forbidden — Portfolio is not owned by this account.' });
+      const current = portfolio.master_profile_json && typeof portfolio.master_profile_json === 'object' ? portfolio.master_profile_json : {};
+      const next = JSON.parse(JSON.stringify(current));
+      next.social = { ...(next.social || {}) };
+      const changedFields = [];
+      const skippedFields = [];
+      const scalarValues = { name: cleanSyncText(patch.name, 180), bio: cleanSyncText(patch.bio), location: cleanSyncText(patch.location, 180) };
+      for (const field of fields) {
+        if (field.startsWith('social.')) {
+          const key = field.slice(7);
+          const value = cleanSyncText(patch.social?.[key], 320);
+          if (!value) continue;
+          if (next.social[key] && !overwriteExisting) { skippedFields.push(field); continue; }
+          next.social[key] = value; changedFields.push(field);
+        } else if (['name', 'bio', 'location'].includes(field)) {
+          const value = scalarValues[field];
+          if (!value) continue;
+          if (next[field] && !overwriteExisting) { skippedFields.push(field); continue; }
+          next[field] = value; changedFields.push(field);
+        } else {
+          const values = cleanSyncList(patch[field], field === 'skills' ? 'skills' : 'text');
+          if (!values.length) continue;
+          const merged = mergeSyncList(next[field], values);
+          if (JSON.stringify(merged) !== JSON.stringify(next[field] || [])) { next[field] = merged; changedFields.push(field); }
+        }
+      }
+      if (!changedFields.length) return res.status(200).json({ success: true, changedFields, skippedFields, unchanged: true });
+      const { error: updateErr } = await adminClient.from('portfolios').update({ name: next.name || portfolio.name || '', bio: next.bio || portfolio.bio || '', master_profile_json: next, updated_at: new Date().toISOString() }).eq('id', String(portfolioId)).eq('owner_user_id', userId);
+      if (updateErr) return res.status(500).json({ error: 'Portfolio sync could not be saved.' });
+      return res.status(200).json({ success: true, changedFields, skippedFields, portfolio: { id: portfolio.id, owner_user_id: userId, ...next } });
+    } catch (_) {
+      return res.status(500).json({ error: 'Portfolio sync service is temporarily unavailable.' });
+    }
+  }
+
   if (action === 'cv-export') {
     if (!isServerFeatureEnabled('CAREER_STUDIO')) return res.status(404).json({ error: 'Career Studio is not enabled.' });
     if (process.env.SUPABASE_ENV === 'local' && !/^http:\/\/(127\.0\.0\.1|localhost):54321$/.test(supabaseUrl)) {

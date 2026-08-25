@@ -10,6 +10,7 @@ import { isLoggedIn, getCurrentUser, getCurrentAuthUser, isPro, logout, upgradeT
 
 window.supabase = supabase;
 window.getCurrentAuthUser = getCurrentAuthUser;
+window.openAccountSettingsModal = openAccountSettingsModal;
 window.uploadAvatar = uploadAvatar;
 import { HyperEngine } from './three/HyperEngine.js';
 import { classifyProfession, getThemeById, getAllThemes } from './three/ProceduralTheme.js';
@@ -48,6 +49,9 @@ import { renderProductionReadinessPanel } from './ui/ProductionReadinessPanel.js
 import { renderPricingPage, getPricingStyles } from './ui/PricingPage.js';
 import { renderPortfolioQualityScore, getPortfolioQualityScoreStyles } from './ui/PortfolioQualityScore.js';
 import { renderCVBuilderPage } from './ui/CVBuilderPage.js';
+import { getCareerProfile } from './services/CareerProfileService.js';
+import { openCVPortfolioSyncReview } from './ui/CVPortfolioSyncPanel.js';
+import { persistPortfolioSync } from './services/CVPortfolioSyncService.js';
 import { isLocalAuthMockEnabled } from './config/RuntimeSafety.js';
 import confetti from 'canvas-confetti';
 
@@ -555,8 +559,10 @@ export function resetStudioState() {
 async function initStudio() {
   resetStudioState();
   let pendingGroupInvites = [];
+  let currentAuthUser = null;
   try {
     const authUser = await getCurrentAuthUser();
+    currentAuthUser = authUser;
     if (authUser) {
       const { profile } = await fetchUserProfileAndEntitlements(authUser);
       const inviteGroupId = new URLSearchParams(window.location.search).get('group_invite');
@@ -628,6 +634,28 @@ async function initStudio() {
   installEntitlementRefresh();
   window.initStudio = initStudio;
   showToast('info', '⚡', 'Studio Ready! Synced with Supabase Postgres.');
+  const requestedCVProfileId = new URLSearchParams(window.location.search).get('cv_sync_profile');
+  if (requestedCVProfileId) {
+    const cvProfile = currentAuthUser ? getCareerProfile(requestedCVProfileId, currentAuthUser.id) : null;
+    if (!cvProfile) {
+      setTimeout(() => showToast('error', '🔒', 'That private CV is not available to this account. No Portfolio was changed.'), 250);
+    } else {
+      setTimeout(() => openCVPortfolioSyncReview({
+        careerProfile: cvProfile,
+        portfolio: portfolioData,
+        onApplied: async ({ portfolio: nextPortfolio, changedFields }) => {
+          if (!currentAuthUser?.id) throw new Error('Sign in is required before applying a Portfolio update.');
+          await persistPortfolioSync(nextPortfolio, currentAuthUser.id);
+          portfolioData = nextPortfolio;
+          renderAll();
+          showToast('success', '✓', `Portfolio updated after review: ${changedFields.join(', ')}.`);
+        }
+      }), 300);
+    }
+  }
+  if (new URLSearchParams(window.location.search).get('account') === '1') {
+    setTimeout(() => openAccountSettingsModal(), 300);
+  }
   if (new URLSearchParams(window.location.search).get('manage_group') === '1' && globalEntitlements.getEffectivePlanId() === 'premium_group') {
     setTimeout(() => openGroupManagementModal(), 500);
   }
@@ -742,6 +770,9 @@ function buildHTML() {
 
 <!-- STUDIO APP -->
 <div id="app" data-studio-surface="edit">
+  <nav class="studio-product-nav" aria-label="Product navigation">
+    <a href="/">Home</a><a href="/cv">CV Builder</a><a href="/studio" aria-current="page">Portfolio Studio</a><a href="/pricing">Pricing</a><button type="button" onclick="window.openAccountSettingsModal()">Account</button>
+  </nav>
   <div class="mobile-studio-switch" role="tablist" aria-label="Studio view">
     <button type="button" id="studio-edit-btn" class="mobile-studio-switch__btn active" role="tab" aria-selected="true" onclick="setStudioSurface('edit')">✏️ Edit</button>
     <button type="button" id="studio-preview-btn" class="mobile-studio-switch__btn" role="tab" aria-selected="false" onclick="setStudioSurface('preview')">✨ Preview</button>
