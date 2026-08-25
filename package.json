@@ -16,8 +16,10 @@
     "test:cv-variants": "node src/tests/CVTargetedVariantServiceTestSuite.mjs",
     "test:cv-variants-api": "node src/tests/CVTargetedVariantApiContractTestSuite.mjs",
     "test:cv-variants-local": "node scripts/test_local_cv_targeted_variants_api.mjs",
+    "test:cv-import": "node src/tests/CVImportReviewServiceTestSuite.mjs",
+    "test:cv-import-browser": "node scripts/test_local_cv_import_browser.mjs",
     "preview": "vite preview",
-    "test:core": "node scripts/core-tests.mjs",
+    "test:core": "node scripts/core-tests.mjs && npm run test:cv-import",
     "check": "npm run test:core && npm run build"
   },
   "devDependencies": {
@@ -28,6 +30,7 @@
     "@sentry/browser": "^10.70.0",
     "@supabase/supabase-js": "^2.112.3",
     "canvas-confetti": "^1.9.4",
+    "fflate": "^0.8.3",
     "gsap": "^3.15.0",
     "lucide": "^1.31.0",
     "pdf-lib": "^1.17.1",

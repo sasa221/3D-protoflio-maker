@@ -2,6 +2,7 @@ import { createEmptyCareerProfile, listCareerProfiles, saveCareerProfile } from 
 import { getCVTemplate } from '../config/CVTemplateConfig.js';
 import { buildCVExportModel, exportCareerProfilePdf, downloadPdfBytes, recordCareerPdfExport, safeCVFileName } from '../services/CVExportService.js';
 import { renderCVTargetedVariantsPanel } from './CVTargetedVariantsPanel.js';
+import { renderCVImportReviewPanel } from './CVImportReviewPanel.js';
 
 function escape(value = '') {
   return String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
@@ -42,6 +43,7 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
           <label>Experience / training<textarea name="experience" rows="6" placeholder="One role or training item per line">${escape(active.content.experience.map(item => item.text || '').join('\n'))}</textarea></label>
           <div class="career-studio-actions"><button type="submit">Save draft</button><button type="button" data-preview>ATS Preview</button><button type="button" data-export>Export PDF</button><span id="career-save-status" aria-live="polite">Draft</span></div>
           <div class="career-sync-cta"><strong>Optional next step</strong><span>Review selected CV fields before adding anything to a Portfolio.</span><a href="${syncUrl}">Create Portfolio From My CV →</a></div>
+          <div id="cv-import-review-container" aria-label="Private CV import"></div>
         </form>
         <aside class="career-studio-preview" id="career-ats-preview" aria-label="ATS preview">
           <div class="ats-paper"><h2 data-preview-name>Your Name</h2><p data-preview-contact class="ats-contact"></p><div data-preview-sections></div></div>
@@ -109,6 +111,11 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
   };
   renderPreview(active);
   if (!profile) saveCareerProfile(active, ownerUserId);
+  renderCVImportReviewPanel(container.querySelector('#cv-import-review-container'), {
+    ownerUserId,
+    getBaseProfile: collect,
+    onSaved: saved => { window.location.href = `/cv?profile=${encodeURIComponent(saved.id)}`; }
+  });
   renderCVTargetedVariantsPanel(container.querySelector('#cv-targeted-variants-container'), {
     ownerUserId,
     getBaseProfile: collect

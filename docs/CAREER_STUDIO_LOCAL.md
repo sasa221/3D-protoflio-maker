@@ -154,3 +154,34 @@ The local API fixture verifies Base CV immutability, cross-account and
 anonymous denial, server-side Free denial, local Pro creation, idempotent
 retries, URL rejection, and owner-only deletion. It removes all synthetic
 rows/accounts after completion.
+
+## PR-6 local CV Import and Review
+
+PR-6 adds a private, review-first importer to the CV Builder. PDF extraction
+uses the existing local `pdfjs-dist` worker in the browser; DOCX extraction uses
+the local `fflate` ZIP reader and reads only `word/document.xml`. Neither
+parser uploads files, calls an API, invokes AI, or imports the legacy portfolio
+mapper. The original file and full extracted text are held only for the active
+review session, then nulled on cancel or save. Only fields explicitly selected
+by the user are written through the existing owner-scoped Career Profile
+service; no public import/CV route is created.
+
+Local safety limits are 10 MB per file, 12 PDF pages, 120,000 extracted
+characters, and a 6 MB DOCX document XML part. DOCX macro content (`vbaProject`,
+`.bin`, or macro entries), corrupt ZIPs, unsupported extensions, empty text, and
+oversized inputs are rejected. Missing sections remain missing/marked for
+review; no default copy, guessed dates, skills, links, or numbers are added.
+
+Run the deterministic local parser/security checks with synthetic data only:
+
+```powershell
+npm run test:cv-import
+```
+
+The browser smoke test (when run) should use only locally generated PDF/DOCX
+fixtures and a loopback Vite server. It should verify parsing progress, the
+field-by-field review, cancel-without-save, mobile/tablet layout, and no
+console errors. Temporary fixtures must be removed after the run. PR-6 does
+not alter production schemas, billing, Portfolio routes, or the legacy import
+modal; disabling `CAREER_STUDIO` hides the new panel with the old product
+unchanged.

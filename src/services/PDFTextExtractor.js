@@ -1,7 +1,7 @@
 /**
  * PDFTextExtractor.js - Client-Side PDF Text Extraction & Diagnostics
  * Extracts plain text from PDF files preserving line structures and diagnostics.
- * Logs ONLY non-sensitive statistics: text length and line count.
+ * Deliberately emits no document content or extraction logs.
  */
 
 import { normalizeCVText } from './CVTextNormalizer.js';
@@ -10,7 +10,7 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
-export async function extractTextFromPDF(file) {
+export async function extractTextFromPDF(file, { maxPages = 12, maxTextLength = 120000 } = {}) {
   if (!file) throw new Error('No PDF file provided.');
 
   if (file.size === 0) {
@@ -28,12 +28,15 @@ export async function extractTextFromPDF(file) {
   }
 
   const arrayBuffer = await file.arrayBuffer();
+  const magic = new TextDecoder('latin1').decode(new Uint8Array(arrayBuffer).slice(0, 5));
+  if (magic !== '%PDF-') throw new Error('The file is not a valid PDF document.');
   let rawText = '';
 
   // 1. Attempt PDF.js extraction
   try {
     if (pdfjsLib) {
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      if (pdf.numPages < 1 || pdf.numPages > maxPages) throw new Error(`PDF page count exceeds the local ${maxPages}-page limit.`);
       let pageTexts = [];
 
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
@@ -69,10 +72,10 @@ export async function extractTextFromPDF(file) {
       rawText = pageTexts.join('\n\n');
     }
   } catch (err) {
+    if (/page count exceeds|character limit/i.test(String(err.message || ''))) throw err;
     if (err.name === 'PasswordException' || String(err.message).toLowerCase().includes('password')) {
       throw new Error('This PDF is password-protected. Please upload an unlocked PDF CV.');
     }
-    console.warn('[PDFTextExtractor] PDF.js extraction notice:', err.message);
   }
 
   // 2. Fallback PDF stream decoding if PDF.js is unavailable or returned empty text
@@ -80,6 +83,8 @@ export async function extractTextFromPDF(file) {
     const bytes = new Uint8Array(arrayBuffer);
     const rawDecoder = new TextDecoder('latin1');
     const streamStr = rawDecoder.decode(bytes);
+    const pageMarkers = streamStr.match(/\/Type\s*\/Page\b/g) || [];
+    if (pageMarkers.length > maxPages) throw new Error(`PDF page count exceeds the local ${maxPages}-page limit.`);
 
     // Extract text strings enclosed in BT ... ET blocks and handle line breaks
     const btBlocks = streamStr.match(/BT[\s\S]*?ET/g) || [];
@@ -112,13 +117,10 @@ export async function extractTextFromPDF(file) {
   // 3. Normalize text structure
   const normalized = normalizeCVText(rawText);
 
-  // 4. Non-sensitive Development Diagnostics Log
-  console.log(`[CV] extracted text length: ${normalized.text.length}`);
-  console.log(`[CV] line count: ${normalized.lines.length}`);
-
   if (!normalized.text || normalized.text.trim().length < 20) {
     throw new Error('Extracted text is empty or unreadable. Please upload a standard text-based PDF CV.');
   }
+  if (normalized.text.length > maxTextLength) throw new Error(`Extracted text exceeds the local ${maxTextLength}-character limit.`);
 
   return normalized;
 }
