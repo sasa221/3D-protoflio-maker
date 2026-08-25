@@ -1,6 +1,7 @@
 import { createEmptyCareerProfile, listCareerProfiles, saveCareerProfile } from '../services/CareerProfileService.js';
 import { getCVTemplate } from '../config/CVTemplateConfig.js';
 import { buildCVExportModel, exportCareerProfilePdf, downloadPdfBytes, recordCareerPdfExport, safeCVFileName } from '../services/CVExportService.js';
+import { renderCVTargetedVariantsPanel } from './CVTargetedVariantsPanel.js';
 
 function escape(value = '') {
   return String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
@@ -47,6 +48,7 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
           <small>Template: ${escape(getCVTemplate('ats-basic').name)} · private draft</small>
         </aside>
       </section>
+      <section id="cv-targeted-variants-container" aria-label="Private targeted CV variants"></section>
     </main>`;
 
   const form = container.querySelector('#career-profile-form');
@@ -107,4 +109,8 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
   };
   renderPreview(active);
   if (!profile) saveCareerProfile(active, ownerUserId);
+  renderCVTargetedVariantsPanel(container.querySelector('#cv-targeted-variants-container'), {
+    ownerUserId,
+    getBaseProfile: collect
+  });
 }

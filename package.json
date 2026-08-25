@@ -13,6 +13,9 @@
     "test:cv-sync-local": "node scripts/test_local_cv_sync_api.mjs",
     "test:career-admin-settings": "node scripts/test_local_career_studio_admin_settings.mjs",
     "test:career-admin-contract": "node src/tests/CareerStudioAdminSettingsTestSuite.mjs",
+    "test:cv-variants": "node src/tests/CVTargetedVariantServiceTestSuite.mjs",
+    "test:cv-variants-api": "node src/tests/CVTargetedVariantApiContractTestSuite.mjs",
+    "test:cv-variants-local": "node scripts/test_local_cv_targeted_variants_api.mjs",
     "preview": "vite preview",
     "test:core": "node scripts/core-tests.mjs",
     "check": "npm run test:core && npm run build"

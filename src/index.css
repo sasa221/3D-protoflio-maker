@@ -1353,7 +1353,9 @@ html:has(.admin-forbidden) {
 .ats-paper h3 { margin: 20px 0 5px; padding-bottom: 3px; border-bottom: 1px solid #111827; font-size: .82rem; text-transform: uppercase; letter-spacing: .08em; }
 .ats-paper p, .ats-paper div { margin: 0; white-space: pre-line; font-size: .86rem; }
 .career-studio-preview small { display: block; max-width: 700px; margin: 10px auto 0; color: #4b5563; }
+.cv-targeted-variants { max-width: 1180px; margin: 0 auto; }
 @media (max-width: 820px) { .career-studio-grid { grid-template-columns: 1fr; } .career-studio-preview { position: static; } }
+@media (max-width: 820px) { .cv-targeted-variants > div:nth-child(2) { grid-template-columns: 1fr !important; } }
 @media (max-width: 480px) { .career-studio-page { padding: 20px 12px; } .career-studio-form, .career-studio-preview { padding: 14px; border-radius: 16px; } .career-studio-actions button { flex: 1; } #career-save-status { width: 100%; margin-left: 0; } }
 .career-product-nav { max-width: 1180px; margin: 0 auto 18px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .career-product-nav a, .career-product-nav button { border: 1px solid rgba(167,139,250,.25); border-radius: 999px; padding: 8px 12px; background: rgba(255,255,255,.04); color: #ddd6fe; text-decoration: none; font: inherit; font-size: .76rem; font-weight: 800; cursor: pointer; }

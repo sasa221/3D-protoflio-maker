@@ -119,3 +119,38 @@ npm run test:career-admin-settings
 The fixture creates two synthetic accounts, verifies server authorization,
 direct RLS denial, the atomic allow-listed update, feature-flag hiding, and a
 metadata-only audit sample. It removes the synthetic accounts and audit rows.
+
+## PR-5 local targeted CV variants
+
+PR-5 adds `career_targeted_variants` as a private server-side draft ledger.
+It is separate from the existing public Portfolio Variants table and has no
+public route or Admin endpoint. Direct browser table access is revoked; the
+existing `api/portfolio.js` router performs ownership checks and the local-only
+Pro entitlement check. Job descriptions are pasted text only; no Job URL fetch,
+scraping, AI, Brevo, or external service is used.
+
+The Base CV is read-only during analysis and draft creation. A draft starts with
+the Base CV content, and only an explicitly confirmed summary or highlights of
+skills already present in the Base CV can be applied. The Job Fit result is a
+small, explainable private object containing evidence-found, keyword-without-
+evidence, or missing-evidence states; the raw job description is not returned
+by analysis responses or written to logs.
+
+Run the PR-5 local checks with synthetic accounts only:
+
+```powershell
+npm run test:cv-variants
+npm run test:cv-variants-api
+$status = npx --yes supabase@latest status -o env 2>$null
+foreach ($line in $status) {
+  if ($line -match '^ANON_KEY="(.*)"$') { $env:SUPABASE_LOCAL_ANON_KEY = $matches[1] }
+  if ($line -match '^SERVICE_ROLE_KEY="(.*)"$') { $env:SUPABASE_LOCAL_SERVICE_ROLE_KEY = $matches[1] }
+  if ($line -match '^API_URL="(.*)"$') { $env:SUPABASE_LOCAL_URL = $matches[1] }
+}
+npm run test:cv-variants-local
+```
+
+The local API fixture verifies Base CV immutability, cross-account and
+anonymous denial, server-side Free denial, local Pro creation, idempotent
+retries, URL rejection, and owner-only deletion. It removes all synthetic
+rows/accounts after completion.

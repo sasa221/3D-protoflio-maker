@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { buildTargetedJobFit, applyConfirmedVariantChanges, buildVariantDiff } from '../src/services/CVTargetedVariantService.js';
 
 export const config = {
   api: {
@@ -91,6 +92,27 @@ function isServerFeatureEnabled(flagName) {
   return val === 'true' || val === '1';
 }
 
+function isLocalCareerRequest(supabaseUrl) {
+  return process.env.SUPABASE_ENV === 'local' && /^http:\/\/(127\.0\.0\.1|localhost):54321$/.test(supabaseUrl);
+}
+
+function safeVariantRow(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    career_profile_id: row.career_profile_id,
+    owner_user_id: row.owner_user_id,
+    title: row.title,
+    target_role: row.target_role,
+    company_name: row.company_name,
+    job_fit_json: row.job_fit_json,
+    content_json: row.content_json,
+    status: row.status,
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  };
+}
+
 function localCareerPlanOverride() {
   if (process.env.SUPABASE_ENV !== 'local') return '';
   const value = String(process.env.CV_LOCAL_PLAN_OVERRIDE || '').trim().toLowerCase();
@@ -161,6 +183,113 @@ export default async function handler(req, res) {
   const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://kupxhrfijkdlcteniqfp.supabase.co';
   const supabaseAnonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseAnonKey;
+
+  // PR-5: private targeted CV analysis/drafts. This is deliberately separate
+  // from public Portfolio Variants and accepts pasted text only (never a URL).
+  if (['cv-variant-analyze', 'cv-variant-create', 'cv-variants', 'cv-variant-delete'].includes(action)) {
+    if (!isServerFeatureEnabled('CAREER_STUDIO')) return res.status(404).json({ error: 'Career Studio is not enabled.' });
+    if (!isLocalCareerRequest(supabaseUrl)) return res.status(403).json({ error: 'Targeted CV Variants are local-only.' });
+    const authHeader = req.headers.authorization || req.headers.Authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized — Auth token required' });
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    try {
+      const userClient = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: `Bearer ${token}` } } });
+      const { data: userData, error: userErr } = await userClient.auth.getUser();
+      if (userErr || !userData.user) return res.status(401).json({ error: 'Unauthorized user session' });
+      const userId = userData.user.id;
+      const adminClient = createClient(supabaseUrl, supabaseSecretKey);
+      const plan = await resolveCareerExportPlan(adminClient, userId);
+
+      if (plan === 'free') {
+        return res.status(403).json({ error: 'Targeted CV Variants require a local Pro entitlement.' });
+      }
+
+      if (action === 'cv-variant-delete') {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+        const variantId = String(req.body?.variantId || '');
+        if (!/^[A-Za-z0-9_-]{3,160}$/.test(variantId)) return res.status(400).json({ error: 'Invalid targeted variant.' });
+        const { data: deleted, error: deleteErr } = await adminClient.from('career_targeted_variants')
+          .delete().eq('id', variantId).eq('owner_user_id', userId).select('id').maybeSingle();
+        if (deleteErr) return res.status(500).json({ error: 'Targeted variant could not be deleted.' });
+        if (!deleted) return res.status(404).json({ error: 'Targeted variant not found.' });
+        return res.status(200).json({ success: true, deletedId: deleted.id });
+      }
+
+      if (action === 'cv-variants') {
+        if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+        const profileId = String(req.query.profileId || '');
+        if (!/^[A-Za-z0-9_-]{3,160}$/.test(profileId)) return res.status(400).json({ error: 'Invalid Base CV.' });
+        const { data: listProfile, error: listProfileErr } = await adminClient.from('career_profiles').select('id,owner_user_id').eq('id', profileId).maybeSingle();
+        if (listProfileErr) return res.status(500).json({ error: 'Base CV lookup failed.' });
+        if (!listProfile) return res.status(404).json({ error: 'Base CV not found.' });
+        if (listProfile.owner_user_id !== userId) return res.status(403).json({ error: 'Forbidden — Base CV is not owned by this account.' });
+        const { data, error } = await adminClient.from('career_targeted_variants')
+          .select('id,career_profile_id,owner_user_id,title,target_role,company_name,job_fit_json,content_json,status,created_at,updated_at')
+          .eq('career_profile_id', profileId).eq('owner_user_id', userId).order('updated_at', { ascending: false });
+        if (error) return res.status(500).json({ error: 'Targeted variants could not be loaded.' });
+        return res.status(200).json({ variants: (data || []).map(safeVariantRow) });
+      }
+
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+      const body = req.body || {};
+      const careerProfileId = String(body.careerProfileId || '');
+      const role = String(body.role || '').trim().slice(0, 160);
+      const company = String(body.company || '').trim().slice(0, 160);
+      const jobDescription = String(body.jobDescription || '').trim();
+      if (!/^[A-Za-z0-9_-]{3,160}$/.test(careerProfileId)) return res.status(400).json({ error: 'Invalid Base CV.' });
+      if (String(body.jobUrl || '').trim()) return res.status(400).json({ error: 'Paste the job description; external Job URL fetching is disabled for targeted CVs.' });
+      if (jobDescription.length < 15 || jobDescription.length > 30000) return res.status(400).json({ error: 'Paste the full job description (15–30000 characters).' });
+      const { data: profile, error: profileErr } = await adminClient.from('career_profiles')
+        .select('id,owner_user_id,career_stage,content_json').eq('id', careerProfileId).maybeSingle();
+      if (profileErr) return res.status(500).json({ error: 'Base CV lookup failed.' });
+      if (!profile) return res.status(404).json({ error: 'Base CV not found.' });
+      if (profile.owner_user_id !== userId) return res.status(403).json({ error: 'Forbidden — Base CV is not owned by this account.' });
+
+      const fit = buildTargetedJobFit({ id: profile.id, careerStage: profile.career_stage, content: profile.content_json || {} }, { role, company, jobDescription });
+      if (action === 'cv-variant-analyze') {
+        return res.status(200).json({ analysis: fit, diff: buildVariantDiff({ content: profile.content_json || {} }, profile.content_json || {}) });
+      }
+      if (!fit.hasRequirements) return res.status(422).json({ error: fit.reason || 'Not enough requirements for a reliable analysis.', analysis: fit });
+      const idempotencyKey = String(body.idempotencyKey || '');
+      if (!/^[A-Za-z0-9_-]{8,160}$/.test(idempotencyKey)) return res.status(400).json({ error: 'Invalid draft request key.' });
+      const { data: duplicate } = await adminClient.from('career_targeted_variants')
+        .select('id,career_profile_id,owner_user_id,title,target_role,company_name,job_fit_json,content_json,status,created_at,updated_at')
+        .eq('owner_user_id', userId).eq('idempotency_key', idempotencyKey).maybeSingle();
+      if (duplicate) return res.status(200).json({ success: true, duplicate: true, variant: safeVariantRow(duplicate), diff: buildVariantDiff({ content: profile.content_json || {} }, duplicate.content_json || {}) });
+
+      const configuredVariantLimit = Number.parseInt(process.env.CV_LOCAL_VARIANT_LIMIT || '5', 10);
+      const variantLimit = plan === 'pro' && Number.isFinite(configuredVariantLimit) && configuredVariantLimit >= 0 ? configuredVariantLimit : -1;
+      if (variantLimit >= 0) {
+        const { count, error: countErr } = await adminClient.from('career_targeted_variants')
+          .select('id', { count: 'exact', head: true }).eq('owner_user_id', userId);
+        if (countErr) return res.status(500).json({ error: 'Targeted variant limit lookup failed.' });
+        if ((count || 0) >= variantLimit) return res.status(429).json({ error: 'The local Pro targeted variant limit has been reached.', limit: variantLimit, used: count || 0 });
+      }
+
+      let variantContent;
+      try {
+        variantContent = applyConfirmedVariantChanges({ content: profile.content_json || {} }, body.acceptedChanges || {}).content;
+      } catch (_) {
+        return res.status(400).json({ error: 'Accepted changes could not be validated.' });
+      }
+      const title = String(body.title || role || 'Targeted CV Draft').trim().slice(0, 120) || 'Targeted CV Draft';
+      const { data: variant, error: insertErr } = await adminClient.from('career_targeted_variants').insert({
+        id: `cvv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        career_profile_id: profile.id, owner_user_id: userId, title, target_role: role, company_name: company,
+        job_description: jobDescription, job_fit_json: fit, content_json: variantContent, idempotency_key: idempotencyKey
+      }).select('id,career_profile_id,owner_user_id,title,target_role,company_name,job_fit_json,content_json,status,created_at,updated_at').single();
+      if (insertErr) {
+        if (insertErr.code === '23505') {
+          const { data: retry } = await adminClient.from('career_targeted_variants').select('id,career_profile_id,owner_user_id,title,target_role,company_name,job_fit_json,content_json,status,created_at,updated_at').eq('owner_user_id', userId).eq('idempotency_key', idempotencyKey).maybeSingle();
+          if (retry) return res.status(200).json({ success: true, duplicate: true, variant: safeVariantRow(retry), diff: buildVariantDiff({ content: profile.content_json || {} }, retry.content_json || {}) });
+        }
+        return res.status(500).json({ error: 'Targeted CV draft could not be saved.' });
+      }
+      return res.status(200).json({ success: true, duplicate: false, variant: safeVariantRow(variant), diff: buildVariantDiff({ content: profile.content_json || {} }, variant.content_json || {}) });
+    } catch (_) {
+      return res.status(500).json({ error: 'Targeted CV service is temporarily unavailable.' });
+    }
+  }
 
   // Career Studio is opt-in and local/development-only until a separate release approval.
   if (action === 'cv-sync') {
