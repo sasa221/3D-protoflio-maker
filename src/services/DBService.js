@@ -14,6 +14,21 @@ import { migrateLegacyBase64Assets } from './AssetStorageService.js';
 
 let saveDebounceTimer = null;
 let currentServerUpdatedAt = null;
+const portfolioInitializationInFlight = new Map();
+
+const EMPTY_PORTFOLIO_SOCIAL = Object.freeze({ github: '', linkedin: '', twitter: '', email: '', phone: '', website: '' });
+
+export function normalizePortfolioMasterProfile(value = {}) {
+  const source = value && typeof value === 'object' ? value : {};
+  const storedSocial = source.social && typeof source.social === 'object' ? source.social : {};
+  const social = { ...EMPTY_PORTFOLIO_SOCIAL, ...storedSocial };
+  // A few legacy imports stored contact values at the root. Promote them only
+  // when the canonical social field is empty; never overwrite an explicit
+  // user choice or any visibility setting.
+  if (!social.email && source.email) social.email = source.email;
+  if (!social.phone && source.phone) social.phone = source.phone;
+  return { ...source, social };
+}
 
 export async function fetchUserProfileAndEntitlements(user) {
   if (!user) return { profile: null, planId: 'free' };
@@ -126,7 +141,10 @@ export async function loadUserPortfoliosFromSupabase(user) {
       // 1. Existing portfolio found in Supabase
       const pRow = portfolios[0];
       currentServerUpdatedAt = pRow.updated_at;
-      let masterData = pRow.master_profile_json || {};
+      // Keep contact data in the legacy master JSON stable across reloads. A
+      // few older rows have a partial `social` object, so normalize it before
+      // the Studio binds inputs and before any autosave can run.
+      let masterData = normalizePortfolioMasterProfile(pRow.master_profile_json);
 
       const defaultName = user.user_metadata?.full_name || user.user_metadata?.name || 'Your Portfolio';
       masterData.id = pRow.id;
@@ -167,8 +185,10 @@ export async function loadUserPortfoliosFromSupabase(user) {
       return masterData;
     } else {
       // 2. No portfolio exists -> Initialize initial Master Portfolio in Supabase
-      console.log('No Supabase portfolio found for user. Creating initial Master Portfolio in Supabase...');
-      return await createInitialSupabasePortfolio(user);
+      if (portfolioInitializationInFlight.has(user.id)) return portfolioInitializationInFlight.get(user.id);
+      const initialization = createInitialSupabasePortfolio(user).finally(() => portfolioInitializationInFlight.delete(user.id));
+      portfolioInitializationInFlight.set(user.id, initialization);
+      return await initialization;
     }
   } catch (e) {
     console.error('Error fetching Supabase portfolios:', e);
@@ -199,14 +219,17 @@ export async function createInitialSupabasePortfolio(user) {
 
   ensureStableIDs(initialMaster);
 
-  const defaultVariant = createDefaultVariant(initialMaster);
+  // Variant ids are scoped to a portfolio. The old global
+  // `var_default_general` id caused a duplicate-key failure when a second
+  // account initialized its first Portfolio.
+  const defaultVariant = { ...createDefaultVariant(initialMaster), id: `var_${portfolioId}_default` };
   initialMaster.portfolioVariants = [defaultVariant];
   initialMaster.activeVariantId = defaultVariant.id;
 
   // Insert Portfolio into Supabase
   const { error: pErr } = await supabase
     .from('portfolios')
-    .insert([
+    .upsert([
       {
         id: portfolioId,
         owner_user_id: user.id,
@@ -219,9 +242,9 @@ export async function createInitialSupabasePortfolio(user) {
         default_variant_id: defaultVariant.id,
         updated_at: new Date().toISOString()
       }
-    ]);
+    ], { onConflict: 'id' });
 
-  if (pErr) console.warn('Supabase portfolio insert warning:', pErr.message);
+  if (pErr) throw new Error('Failed to initialize portfolio in database: ' + pErr.message);
 
   // Insert Default Variant into public.portfolio_variants
   const { error: vErr } = await supabase
@@ -239,7 +262,7 @@ export async function createInitialSupabasePortfolio(user) {
       }
     ]);
 
-  if (vErr) console.warn('Supabase variant insert warning:', vErr.message);
+  if (vErr) throw new Error('Failed to initialize portfolio variant: ' + vErr.message);
 
   return initialMaster;
 }
@@ -290,19 +313,32 @@ export function savePortfolioDebounced(masterProfile, onStatusChange) {
 
       const updatedAt = new Date().toISOString();
 
+      const row = {
+        id: masterProfile.id,
+        owner_user_id: user.data.user.id,
+        slug: masterProfile.slug || ('user-' + user.data.user.id.substr(0, 8)),
+        name: masterProfile.name,
+        profession: masterProfile.profession,
+        bio: masterProfile.bio,
+        theme: masterProfile.theme,
+        master_profile_json: masterProfile,
+        default_variant_id: masterProfile.activeVariantId,
+        updated_at: updatedAt
+      };
+
+      // Verify ownership before an upsert. This removes the old update-only
+      // no-op path for a missing row while keeping cross-account writes denied.
+      const { data: existing, error: ownershipError } = await supabase
+        .from('portfolios')
+        .select('id,owner_user_id')
+        .eq('id', masterProfile.id)
+        .maybeSingle();
+      if (ownershipError) throw ownershipError;
+      if (existing && existing.owner_user_id !== user.data.user.id) throw new Error('Portfolio ownership mismatch.');
+
       const { error } = await supabase
         .from('portfolios')
-        .update({
-          name: masterProfile.name,
-          profession: masterProfile.profession,
-          bio: masterProfile.bio,
-          theme: masterProfile.theme,
-          master_profile_json: masterProfile,
-          default_variant_id: masterProfile.activeVariantId,
-          updated_at: updatedAt
-        })
-        .eq('id', masterProfile.id)
-        .eq('owner_user_id', user.data.user.id);
+        .upsert(row, { onConflict: 'id' });
 
       if (error) {
         console.warn('Supabase autosave error:', error.message);
@@ -342,7 +378,7 @@ export async function createPortfolio(data = {}) {
 
   const portfolioId = data.id || ('pf_' + Date.now());
   const slug = data.slug || ('user-' + user.id.substr(0, 8));
-  const masterJson = data.master_profile_json || data;
+  const masterJson = normalizePortfolioMasterProfile(data.master_profile_json || data);
   masterJson.id = portfolioId;
 
   const row = {
@@ -358,25 +394,25 @@ export async function createPortfolio(data = {}) {
     updated_at: new Date().toISOString()
   };
 
-  const { data: inserted, error } = await supabase
+  const { data: existing, error: lookupError } = await supabase
     .from('portfolios')
-    .insert([row])
+    .select('id,owner_user_id')
+    .eq('id', portfolioId)
+    .maybeSingle();
+  if (lookupError) throw new Error('Failed to check portfolio ownership: ' + lookupError.message);
+  if (existing && existing.owner_user_id !== user.id) throw new Error('Portfolio ownership mismatch.');
+
+  // Upsert is intentional here: the Studio initializes a draft before the
+  // first Save Draft click, so inserting the same id again created a noisy
+  // duplicate-key warning. Ownership is checked above and RLS remains active.
+  const { data: saved, error } = await supabase
+    .from('portfolios')
+    .upsert(row, { onConflict: 'id' })
     .select()
     .single();
+  if (error) throw new Error('Failed to save portfolio in database: ' + error.message);
 
-  if (error) {
-    console.warn('Supabase createPortfolio insert error:', error.message);
-    if (error.code === '23505') { // duplicate primary key
-      const { data: updated, error: updErr } = await supabase
-        .from('portfolios')
-        .update(row)
-        .eq('id', portfolioId)
-        .select()
-        .single();
-      if (!updErr && updated) return updated;
-    }
-    throw new Error('Failed to create portfolio in database: ' + error.message);
-  }
+  if (existing) return saved || row;
 
   // Record portfolio creation in history for entitlement tracking
   try {
@@ -387,7 +423,7 @@ export async function createPortfolio(data = {}) {
     }]);
   } catch (_) {}
 
-  return inserted || row;
+  return saved || row;
 }
 export function getAllPortfolios() {
   return [];

@@ -179,7 +179,18 @@ export function normalizeCareerProfile(profile, ownerUserId = profile?.ownerUser
   if (!profile?.id) throw new Error('Career profile id is required.');
   const owner = ownerKey(ownerUserId);
   if (profile.ownerUserId !== owner) throw new Error('Career profile ownership mismatch.');
-  const content = { ...clone(EMPTY_CAREER_CONTENT), ...(profile.content || {}) };
+  const incoming = profile.content && typeof profile.content === 'object' ? profile.content : {};
+  // Merge nested contact data as well as top-level sections. A shallow merge
+  // leaves older rows with a partial contact object, which made the server
+  // value visible in Preview/PDF but blank in the edit form after hydration.
+  const content = {
+    ...clone(EMPTY_CAREER_CONTENT),
+    ...clone(incoming),
+    contact: {
+      ...clone(EMPTY_CAREER_CONTENT.contact),
+      ...(incoming.contact && typeof incoming.contact === 'object' ? clone(incoming.contact) : {})
+    }
+  };
   for (const key of Object.keys(EMPTY_CAREER_CONTENT)) {
     if (Array.isArray(EMPTY_CAREER_CONTENT[key]) && !Array.isArray(content[key])) content[key] = [];
   }

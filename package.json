@@ -8,7 +8,9 @@
     "build": "node scripts/assert_local_safety.mjs && vite build --mode development",
     "test:career-local": "node src/tests/CareerProfileLocalTestSuite.mjs",
     "test:career-persistence-contract": "node src/tests/CareerPersistenceContractTestSuite.mjs",
+    "test:contact-persistence": "node src/tests/ContactPersistenceRegressionTestSuite.mjs",
     "test:career-persistence-local": "node scripts/test_local_career_persistence.mjs",
+    "test:contact-persistence-local": "node scripts/test_local_contact_persistence.mjs",
     "test:cv-export": "node src/tests/CVExportServiceTestSuite.mjs",
     "test:cv-sync": "node src/tests/CVPortfolioSyncServiceTestSuite.mjs",
     "test:cv-sync-api": "node src/tests/CVPortfolioSyncApiContractTestSuite.mjs",
@@ -23,7 +25,7 @@
     "test:cv-quality": "node src/tests/CVQualityScoreServiceTestSuite.mjs",
     "test:pr7a-browser": "node scripts/test_local_pr7a_browser.mjs",
     "preview": "vite preview",
-    "test:core": "node scripts/core-tests.mjs && npm run test:cv-import && npm run test:cv-quality",
+    "test:core": "node scripts/core-tests.mjs && npm run test:cv-import && npm run test:cv-quality && npm run test:contact-persistence",
     "check": "npm run test:core && npm run build"
   },
   "devDependencies": {

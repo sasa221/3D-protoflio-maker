@@ -1,4 +1,4 @@
-import { createEmptyCareerProfile, listCareerProfiles, saveCareerProfile } from '../services/CareerProfileService.js';
+import { createEmptyCareerProfile, listCareerProfiles, normalizeCareerProfile, saveCareerProfile } from '../services/CareerProfileService.js';
 import { getCVTemplate } from '../config/CVTemplateConfig.js';
 import { buildCVExportModel, exportCareerProfilePdf, downloadPdfBytes, recordCareerPdfExport, safeCVFileName } from '../services/CVExportService.js';
 import { renderCVTargetedVariantsPanel } from './CVTargetedVariantsPanel.js';
@@ -14,7 +14,10 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
   const profile = profileId
     ? listCareerProfiles(ownerUserId).find(item => item.id === profileId)
     : listCareerProfiles(ownerUserId)[0];
-  const active = profile || createEmptyCareerProfile({ ownerUserId });
+  // Normalize again at the UI boundary so a hydrated row with a partial
+  // contact object can never render blank Email/Phone inputs while Preview
+  // still sees the stored values.
+  const active = normalizeCareerProfile(profile || createEmptyCareerProfile({ ownerUserId }), ownerUserId);
   let saveTimer;
   const syncUrl = `/studio?cv_sync_profile=${encodeURIComponent(active.id)}`;
 
