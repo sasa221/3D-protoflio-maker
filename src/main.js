@@ -3,8 +3,6 @@
  */
 
 import './index.css';
-import { renderAuthPage, renderResetPasswordPage } from './AuthPage.js';
-import { renderAdminPage } from './AdminPage.js';
 import { supabase } from './services/SupabaseClient.js';
 import { isLoggedIn, getCurrentUser, getCurrentAuthUser, isPro, logout, upgradeToPro, isAdmin, redeemPromoCode, subscribeToAuthStateChange, isEmailVerified, acceptGroupInvitation, getGroupManagement } from './services/AuthService.js';
 
@@ -30,7 +28,6 @@ import {
   publishPortfolio
 } from './services/DBService.js';
 import { uploadAvatar, uploadResume, uploadProjectMedia, getResumeAccessUrl, deleteAsset } from './services/AssetStorageService.js';
-import { initCVImportModal, openCVImportModal } from './ui/CVImportModal.js';
 import { mapCVToPortfolioData } from './services/CVPortfolioMapper.js';
 import { renderJobTargetPanel } from './ui/JobTargetPanel.js';
 import { resolvePortfolioVariant } from './services/PortfolioVariantService.js';
@@ -46,9 +43,7 @@ import { isFeatureEnabled } from './config/FeatureFlags.js';
 import { PLANS } from './config/PlanConfig.js';
 import { renderCustomDomainPanel } from './ui/CustomDomainPanel.js';
 import { renderProductionReadinessPanel } from './ui/ProductionReadinessPanel.js';
-import { renderPricingPage, getPricingStyles } from './ui/PricingPage.js';
 import { renderPortfolioQualityScore, getPortfolioQualityScoreStyles } from './ui/PortfolioQualityScore.js';
-import { renderCVBuilderPage } from './ui/CVBuilderPage.js';
 import { getCareerProfile, hydrateCareerProfiles } from './services/CareerProfileService.js';
 import { openCVPortfolioSyncReview } from './ui/CVPortfolioSyncPanel.js';
 import { persistPortfolioSync } from './services/CVPortfolioSyncService.js';
@@ -210,12 +205,9 @@ const PRESETS = {
   }
 };
 
-import { renderLandingPage } from './ui/LandingPage.js';
 import { renderOnboardingWizard } from './ui/OnboardingWizard.js';
 import { renderFirstRunChecklist } from './ui/FirstRunChecklist.js';
 import { renderWorkspaceNav, renderWorkspaceHeader, setActiveWorkspace } from './ui/StudioWorkspaceLayout.js';
-import { renderPrivacyPage } from './ui/PrivacyPage.js';
-import { renderTermsPage } from './ui/TermsPage.js';
 import { openAccountSettingsModal } from './ui/AccountSettingsModal.js';
 import { setPageTitle } from './config/ProductConfig.js';
 
@@ -253,6 +245,7 @@ async function router() {
                          window.location.search.includes('code=');
 
   if (isRecoveryMode) {
+    const { renderResetPasswordPage } = await import('./AuthPage.js');
     setPageTitle('Set New Password');
     renderResetPasswordPage(() => {
       window.location.href = '/login';
@@ -262,6 +255,7 @@ async function router() {
 
   // 3. Marketing Landing Page Route
   if (path === '/' || path === '/index.html') {
+    const { renderLandingPage } = await import('./ui/LandingPage.js');
     setPageTitle('');
     renderLandingPage(getAppContainer());
     return;
@@ -269,6 +263,7 @@ async function router() {
 
   // 3. Privacy Policy Route
   if (path === '/privacy') {
+    const { renderPrivacyPage } = await import('./ui/PrivacyPage.js');
     setPageTitle('Privacy Policy');
     renderPrivacyPage(getAppContainer());
     return;
@@ -276,6 +271,7 @@ async function router() {
 
   // 4. Terms of Service Route
   if (path === '/terms') {
+    const { renderTermsPage } = await import('./ui/TermsPage.js');
     setPageTitle('Terms of Service');
     renderTermsPage(getAppContainer());
     return;
@@ -283,6 +279,7 @@ async function router() {
 
   // Career Studio is opt-in and local/development-only until separately approved.
   if (path === '/cv' || path === '/cv/new' || path.startsWith('/cv/')) {
+    const { renderCVBuilderPage } = await import('./ui/CVBuilderPage.js');
     if (!isFeatureEnabled('CAREER_STUDIO')) {
       setPageTitle('Page Not Found');
       render404Page(path);
@@ -319,6 +316,7 @@ async function router() {
 
   // 5. Public Pricing Route
   if (path === '/pricing') {
+    const { renderPricingPage, getPricingStyles } = await import('./ui/PricingPage.js');
     setPageTitle('Pricing');
     const pricingUser = await getCurrentAuthUser().catch(() => null);
     if (pricingUser) await fetchUserProfileAndEntitlements(pricingUser).catch(() => null);
@@ -360,6 +358,7 @@ async function router() {
       return;
     }
     if (!isEmailVerified(startUser)) {
+      const { renderAuthPage } = await import('./AuthPage.js');
       renderAuthPage(() => { window.location.href = '/start'; });
       return;
     }
@@ -369,6 +368,7 @@ async function router() {
 
   // 6. Login Route
   if (path === '/login') {
+    const { renderAuthPage } = await import('./AuthPage.js');
     setPageTitle('Sign In');
     renderAuthPage((user) => {
       const requestedNext = new URLSearchParams(window.location.search).get('next');
@@ -390,6 +390,7 @@ async function router() {
       return;
     }
     if (!isEmailVerified(authUser)) {
+      const { renderAuthPage } = await import('./AuthPage.js');
       renderAuthPage(() => {
         window.location.href = `/studio${window.location.search}`;
       });
@@ -414,6 +415,7 @@ async function router() {
       renderAdminForbidden();
       return;
     }
+    const { renderAdminPage } = await import('./AdminPage.js');
     await renderAdminPage();
     return;
   }
@@ -543,9 +545,10 @@ function render404Page(target) {
 function init() {
   router();
 
-  subscribeToAuthStateChange((event, session) => {
+  subscribeToAuthStateChange(async (event, session) => {
     if (event === 'PASSWORD_RECOVERY') {
       setPageTitle('Set New Password');
+      const { renderResetPasswordPage } = await import('./AuthPage.js');
       renderResetPasswordPage(() => {
         window.location.href = '/login';
       });
@@ -1398,8 +1401,12 @@ function initEngine() {
     renderAnalyticsDashboard(analyticsContainer, portfolioData);
   }
 
-  initCVImportModal(handleCVImportData);
-  window.openCVImportModal = openCVImportModal;
+  let cvImportModule;
+  window.openCVImportModal = async () => {
+    cvImportModule ||= await import('./ui/CVImportModal.js');
+    cvImportModule.initCVImportModal(handleCVImportData);
+    cvImportModule.openCVImportModal();
+  };
   window.openBillingModal = async (arg) => {
     const authUser = await getCurrentAuthUser();
     if (!authUser?.id || authUser.id === 'usr_guest') {
