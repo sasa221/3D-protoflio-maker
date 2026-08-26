@@ -5,11 +5,7 @@
  */
 
 import { MARKETING_DEMO_PORTFOLIO } from '../demo/MarketingDemoPortfolio.js';
-import { HyperEngine } from '../three/HyperEngine.js';
 import { getThemeById } from '../three/ProceduralTheme.js';
-import { generatePortfolioCSS, generatePortfolioHTMLBody } from '../renderer/PortfolioRenderer.js';
-import { installProjectCinemaControls } from '../renderer/ProjectCinema.js';
-import { resolvePortfolioVariant } from '../services/PortfolioVariantService.js';
 import { getCurrentAuthUser } from '../services/AuthService.js';
 import { fetchUserProfileAndEntitlements } from '../services/DBService.js';
 import { globalEntitlements } from '../services/EntitlementService.js';
@@ -22,6 +18,25 @@ import { getCareerEntryPaths } from '../services/CareerEntryPathService.js';
 let demoEngine = null;
 let currentDemoThemeId = 'code';
 let landingDemoInitScheduled = false;
+let demoRuntimePromise;
+let HyperEngine;
+let generatePortfolioCSS;
+let generatePortfolioHTMLBody;
+let installProjectCinemaControls;
+
+function loadDemoRuntime() {
+  demoRuntimePromise ||= Promise.all([
+    import('../three/HyperEngine.js'),
+    import('../renderer/PortfolioRenderer.js'),
+    import('../renderer/ProjectCinema.js')
+  ]).then(([engine, renderer, cinema]) => {
+    HyperEngine = engine.HyperEngine;
+    generatePortfolioCSS = renderer.generatePortfolioCSS;
+    generatePortfolioHTMLBody = renderer.generatePortfolioHTMLBody;
+    installProjectCinemaControls = cinema.installProjectCinemaControls;
+  });
+  return demoRuntimePromise;
+}
 
 export async function renderLandingPage(container) {
   if (!container) return;
@@ -977,13 +992,14 @@ function initThemeShowcaseWhenVisible(theme) {
   observer.observe(canvas);
 }
 
-function initLandingHeroDemo() {
+async function initLandingHeroDemo() {
   const canvas = document.getElementById('landing-hero-canvas');
   const viewport = document.getElementById('landing-hero-viewport');
 
   if (!canvas || !viewport) return;
 
   try {
+    await loadDemoRuntime();
     // Hero demo is FIXED to Code Matrix ('code') and is completely independent
     const heroTheme = getThemeById('code');
 
@@ -1015,7 +1031,8 @@ function initLandingHeroDemo() {
   }
 }
 
-window.switchDemoTheme = function(themeId) {
+window.switchDemoTheme = async function(themeId) {
+  await loadDemoRuntime();
   const normalizedThemeId = themeId === 'cyber' ? 'hacker' : themeId;
   const theme = getThemeById(normalizedThemeId);
 
