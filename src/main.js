@@ -576,6 +576,15 @@ export function resetStudioState() {
 }
 
 async function initStudio() {
+  // The editor is the only full-viewport route. Reset any document-page
+  // scroll/layout overrides before rebuilding its two-panel workspace.
+  document.documentElement.style.height = '100%';
+  document.documentElement.style.minHeight = '0';
+  document.documentElement.style.overflow = 'hidden';
+  document.body.style.height = '100vh';
+  document.body.style.minHeight = '0';
+  document.body.style.width = '100vw';
+  document.body.style.overflow = 'hidden';
   resetStudioState();
   let pendingGroupInvites = [];
   let currentAuthUser = null;

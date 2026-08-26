@@ -11,6 +11,25 @@ function escape(value = '') {
 }
 
 export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user', profileId = null, openImport = false } = {}) {
+  // Studio intentionally locks the viewport because its editor owns its own
+  // scroll regions. Career Studio is a document page, so explicitly undo
+  // those global constraints before rendering; otherwise the lower form and
+  // checklist are clipped on direct navigation and wide screens.
+  document.documentElement.style.height = 'auto';
+  document.documentElement.style.minHeight = '100%';
+  document.documentElement.style.overflowX = 'hidden';
+  document.documentElement.style.overflowY = 'auto';
+  document.body.style.height = 'auto';
+  document.body.style.minHeight = '100vh';
+  document.body.style.width = '100%';
+  document.body.style.overflowX = 'hidden';
+  document.body.style.overflowY = 'auto';
+  container.style.display = 'block';
+  container.style.width = '100%';
+  container.style.maxWidth = 'none';
+  container.style.height = 'auto';
+  container.style.minHeight = '100vh';
+  container.style.overflow = 'visible';
   const profile = profileId
     ? listCareerProfiles(ownerUserId).find(item => item.id === profileId)
     : listCareerProfiles(ownerUserId)[0];
