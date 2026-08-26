@@ -55,6 +55,32 @@ assert.equal(review.summary.value, 'Frontend engineer with verified React experi
 assert.equal('rawText' in review, false);
 assert.equal('originalText' in review, false);
 assert.ok(review.warnings.length === 0, 'complete synthetic fixture should not need structural warnings');
+const salehPdfText = `SALEH MOHAMED ABOREHAB LinkedIn Portfolio
+Giza, Egypt | eng.salehmohammedd@gmail.com | +201270024222
+| www.linkedin.com/in/saleh-mohammedd/ | https://github.com/sasa221
+OBJECTIVES
+Front-End Developer skilled in JavaScript, HTML5, and CSS3, with additional experience in PHP, Laravel, and MySQL.
+PROFESSIONAL EXPERIENCE
+National Telecommunication Institute - NTI
+Web developer Trainee, sept 2025 - oct 2025
+EDUCATION
+Helwan University
+Bachelor, Computer Science and Artificial Intelligence, sept 2023 - June 2027
+PROJECTS
+Clothe Website, May 2024
+Built a responsive website.
+SKILLS
+JavaScript, HTML5, CSS3`;
+const salehReview = buildImportReview(salehPdfText, { format: 'pdf', fileName: 'SalehResume (1).pdf' });
+assert.equal(salehReview.contact.name.value, 'SALEH MOHAMED ABOREHAB');
+assert.equal(salehReview.contact.location.value, 'Giza, Egypt');
+assert.equal(salehReview.contact.email.value, 'eng.salehmohammedd@gmail.com');
+assert.equal(salehReview.contact.phone.value, '+201270024222');
+assert.equal(salehReview.contact.linkedin.value, 'https://www.linkedin.com/in/saleh-mohammedd/');
+assert.equal(salehReview.contact.github.value, 'https://github.com/sasa221');
+assert.match(salehReview.summary.value, /^Front-End Developer skilled/);
+assert.doesNotMatch(salehReview.contact.name.value, /LinkedIn|Portfolio/);
+assert.doesNotMatch(salehReview.contact.location.value, /Front-End Developer/);
 const maliciousReview = buildImportReview('<img src=x onerror=alert(1)>\nattacker@example.test\nSKILLS\n<script>alert(2)</script>', { format: 'docx' });
 assert.equal(maliciousReview.contact.name.value, '<img src=x onerror=alert(1)>');
 assert.match(fs.readFileSync(new URL('../ui/CVImportReviewPanel.js', import.meta.url), 'utf8'), /escape\(item\.value\)/, 'review UI escapes extracted values before HTML insertion');

@@ -2,7 +2,7 @@ import { unzipSync } from 'fflate';
 
 export const CV_IMPORT_LIMITS = Object.freeze({ maxBytes: 10 * 1024 * 1024, maxPages: 12, maxTextLength: 120000, maxDocxXmlLength: 6000000 });
 const SECTION_NAMES = ['summary', 'experience', 'education', 'skills', 'projects', 'certifications', 'languages', 'training', 'activities'];
-const SECTION_RE = /^(summary|profile|about me|professional summary|objective|experience|work experience|professional experience|employment|career history|education|academic background|qualifications|academics|skills|technical skills|core skills|tools(?:\s*&\s*technologies)?|technologies|competencies|projects|selected projects|featured projects|certifications|certificates|licenses|courses|languages|foreign languages|training|activities|volunteering|volunteer experience|community involvement)\s*:??$/i;
+const SECTION_RE = /^(summary|profile|about me|professional summary|objectives?|experience|work experience|professional experience|employment|career history|education|academic background|qualifications|academics|skills|technical skills|core skills|tools(?:\s*&\s*technologies)?|technologies|competencies|projects|selected projects|featured projects|certifications|certificates|licenses|courses|languages|foreign languages|training|activities|volunteering|volunteer experience|community involvement)\s*:??$/i;
 
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
 function clean(value, max = 2400) { return String(value || '').replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max); }
@@ -24,6 +24,11 @@ function sectionKey(line) {
 
 function decodeXml(value) {
   return String(value || '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)));
+}
+
+function normalizeWebLink(value) {
+  const link = clean(value, 600).replace(/[),.;]+$/, '');
+  return /^www\./i.test(link) ? `https://${link}` : link;
 }
 
 function extractDocxText(buffer) {
@@ -83,11 +88,14 @@ export function buildImportReview(text, { format = 'text', fileName = '' } = {})
   const headingIndexes = lines.map((line, index) => isHeading(line) ? { index, key: sectionKey(line) } : null).filter(Boolean);
   const firstSection = headingIndexes[0]?.index ?? lines.length;
   const header = lines.slice(0, firstSection);
-  const email = header.join(' ').match(/[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0] || '';
-  const phone = header.join(' ').match(/(?:\+?\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)\d{3,4}[\s-]?\d{3,4}/)?.[0] || '';
-  const links = header.join(' ').match(/https?:\/\/[^\s|]+/gi) || [];
-  const name = header.find(line => line !== email && line !== phone && !/^https?:\/\//i.test(line) && !/^(resume|cv|curriculum vitae)$/i.test(line)) || '';
-  const location = header.find(line => line !== name && line.includes(',') && !/@/.test(line)) || '';
+  const headerText = header.join(' ');
+  const headerParts = header.flatMap(line => line.split(/\s*\|\s*/)).map(part => clean(part)).filter(Boolean);
+  const email = headerText.match(/[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0] || '';
+  const phone = headerText.match(/(?:\+?\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)\d{3,4}[\s-]?\d{3,4}/)?.[0] || '';
+  const links = headerText.match(/(?:https?:\/\/|www\.)[^\s|]+/gi) || [];
+  const nameCandidate = header.find(line => !/@/.test(line) && !/\+?\d[\d\s()-]{7,}/.test(line) && !/(?:https?:\/\/|www\.)/i.test(line) && !/^(resume|cv|curriculum vitae|linkedin|portfolio|linkedin portfolio)$/i.test(line)) || '';
+  const name = clean(nameCandidate.replace(/\s+(?:linkedin\s+)?portfolio\s*$/i, ''), 160);
+  const location = headerParts.find(part => /^[A-Za-zÀ-ÿ.' -]+,\s*[A-Za-zÀ-ÿ.' -]+$/.test(part) && !/@/.test(part)) || '';
   // Nothing is persisted by default. The reviewer must explicitly select
   // each field, including contact details, before saving it.
   const field = (value, source = 'extracted') => ({ value: clean(value), source, needsReview: true, selected: false });
@@ -98,7 +106,7 @@ export function buildImportReview(text, { format = 'text', fileName = '' } = {})
   });
   const review = {
     source: { format, fileName: clean(fileName, 160) },
-    contact: { name: field(name), email: field(email), phone: field(phone), location: field(location), linkedin: field(links.find(link => /linkedin\.com/i.test(link)) || ''), github: field(links.find(link => /github\.com/i.test(link)) || '') },
+    contact: { name: field(name), email: field(email), phone: field(phone), location: field(location), linkedin: field(normalizeWebLink(links.find(link => /linkedin\.com/i.test(link)) || '')), github: field(normalizeWebLink(links.find(link => /github\.com/i.test(link)) || '')) },
     summary: field(sections.summary.join(' ')),
     experience: sections.experience.map(value => field(value)), education: sections.education.map(value => field(value)), skills: sections.skills.flatMap(value => value.split(/[,;|•·]/).map(item => field(item))).filter(item => item.value),
     projects: sections.projects.map(value => field(value)), certifications: sections.certifications.map(value => field(value)), languages: sections.languages.map(value => field(value)), training: sections.training.map(value => field(value)), activities: sections.activities.map(value => field(value)),

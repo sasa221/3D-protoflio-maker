@@ -1366,6 +1366,8 @@ html:has(.admin-forbidden) {
 .ats-paper h2 { margin: 0 0 8px; font-size: 1.65rem; color: #111827; }
 .ats-paper h3 { margin: 20px 0 5px; padding-bottom: 3px; border-bottom: 1px solid #111827; font-size: .82rem; text-transform: uppercase; letter-spacing: .08em; }
 .ats-paper p, .ats-paper div { margin: 0; white-space: pre-line; font-size: .86rem; }
+.ats-section-body { display: grid; gap: 7px; }
+.ats-section-body > p { margin: 0; white-space: pre-wrap; }
 .career-studio-preview small { display: block; max-width: 700px; margin: 10px auto 0; color: #4b5563; }
 .cv-targeted-variants { max-width: 1680px; margin: 0 auto; }
 .cv-job-tailor-summary { display:flex; align-items:center; justify-content:space-between; gap:18px; cursor:pointer; list-style:none; }

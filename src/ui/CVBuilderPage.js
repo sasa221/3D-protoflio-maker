@@ -204,7 +204,11 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
       heading.textContent = section.title;
       const body = document.createElement('div');
       body.className = 'ats-section-body';
-      body.textContent = section.lines.join(' | ');
+      for (const line of section.lines) {
+        const row = document.createElement('p');
+        row.textContent = line;
+        body.append(row);
+      }
       sections.append(heading, body);
     }
   };
