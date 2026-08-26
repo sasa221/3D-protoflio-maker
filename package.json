@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/assert_local_safety.mjs && vite --mode development",
-    "build": "node scripts/assert_local_safety.mjs && vite build --mode development",
+    "build": "vite build --mode production",
+    "build:local": "node scripts/assert_local_safety.mjs && vite build --mode development",
     "test:career-local": "node src/tests/CareerProfileLocalTestSuite.mjs",
     "test:career-persistence-contract": "node src/tests/CareerPersistenceContractTestSuite.mjs",
     "test:contact-persistence": "node src/tests/ContactPersistenceRegressionTestSuite.mjs",
@@ -28,7 +29,7 @@
     "test:pr7a-browser": "node scripts/test_local_pr7a_browser.mjs",
     "preview": "vite preview",
     "test:core": "node scripts/core-tests.mjs && npm run test:cv-import && npm run test:cv-quality && npm run test:contact-persistence",
-    "check": "npm run test:core && npm run build"
+    "check": "npm run test:core && npm run build:local"
   },
   "devDependencies": {
     "playwright": "^1.62.1",
