@@ -104,13 +104,15 @@ export function validateImportFile(file) {
 export async function extractImportText(file, { onProgress } = {}) {
   const meta = validateImportFile(file);
   onProgress?.({ stage: 'reading', percent: 15, label: 'Reading locally…' });
-  let text;
+  let text; let embeddedLinks = [];
   if (meta.format === 'pdf') {
     onProgress?.({ stage: 'pdf', percent: 45, label: 'Extracting PDF text locally…' });
     // Load the browser-only PDF.js worker lazily so local Node tests can
     // exercise DOCX parsing and review logic without a Vite worker URL.
     const { extractTextFromPDF } = await import('./PDFTextExtractor.js');
-    text = (await extractTextFromPDF(file, { maxPages: CV_IMPORT_LIMITS.maxPages, maxTextLength: CV_IMPORT_LIMITS.maxTextLength })).text;
+    const extractedPdf = await extractTextFromPDF(file, { maxPages: CV_IMPORT_LIMITS.maxPages, maxTextLength: CV_IMPORT_LIMITS.maxTextLength });
+    text = extractedPdf.text;
+    embeddedLinks = Array.isArray(extractedPdf.embeddedLinks) ? extractedPdf.embeddedLinks : [];
   } else {
     onProgress?.({ stage: 'docx', percent: 45, label: 'Extracting DOCX text locally…' });
     text = extractDocxText(await file.arrayBuffer());
@@ -119,10 +121,10 @@ export async function extractImportText(file, { onProgress } = {}) {
   if (normalized.length < 20) throw new Error('The file contains too little readable text.');
   if (normalized.length > CV_IMPORT_LIMITS.maxTextLength) throw new Error('Extracted text exceeds the local character limit.');
   onProgress?.({ stage: 'review', percent: 100, label: 'Ready for field-by-field review.' });
-  return { ...meta, text: normalized };
+  return { ...meta, text: normalized, embeddedLinks };
 }
 
-export function buildImportReview(text, { format = 'text', fileName = '' } = {}) {
+export function buildImportReview(text, { format = 'text', fileName = '', embeddedLinks = [] } = {}) {
   const lines = String(text || '').split('\n').map(cleanLine).filter(Boolean);
   if (!lines.length) throw new Error('No readable text was found.');
   const headingIndexes = lines.map((line, index) => isHeading(line) ? { index, key: sectionKey(line) } : null).filter(Boolean);
@@ -138,18 +140,20 @@ export function buildImportReview(text, { format = 'text', fileName = '' } = {})
   const location = headerParts.find(part => /^[A-Za-zÀ-ÿ.' -]+,\s*[A-Za-zÀ-ÿ.' -]+$/.test(part) && !/@/.test(part)) || '';
   // Nothing is persisted by default. The reviewer must explicitly select
   // each field, including contact details, before saving it.
-  const field = (value, source = 'extracted') => ({ value: clean(value), source, needsReview: true, selected: false });
+  const field = (value, source = 'extracted') => ({ value: clean(value), source, needsReview: true, selected: Boolean(clean(value)) });
   const sections = Object.fromEntries(SECTION_NAMES.map(key => [key, []]));
   headingIndexes.forEach((heading, index) => {
     const end = headingIndexes[index + 1]?.index ?? lines.length;
     sections[heading.key].push(...lines.slice(heading.index + 1, end).map(value => clean(value)).filter(Boolean));
   });
+  const projectLinks = embeddedLinks.map(normalizeWebLink).filter(link => link && !/linkedin\.com|github\.com/i.test(link));
+  const groupedProjects = groupResumeEntries(sections.projects, 'projects').map((value, index) => /view\s+(?:my\s+)?website/i.test(value) && projectLinks[index] ? `${value} | ${projectLinks[index]}` : value);
   const review = {
     source: { format, fileName: clean(fileName, 160) },
     contact: { name: field(name), email: field(email), phone: field(phone), location: field(location), linkedin: field(normalizeWebLink(links.find(link => /linkedin\.com/i.test(link)) || '')), github: field(normalizeWebLink(links.find(link => /github\.com/i.test(link)) || '')) },
     summary: field(sections.summary.join(' ')),
     experience: groupResumeEntries(sections.experience, 'experience').map(value => field(value)), education: groupResumeEntries(sections.education, 'education').map(value => field(value)), skills: sections.skills.flatMap(value => value.split(/[,;|•·]/).map(item => field(item))).filter(item => item.value),
-    projects: groupResumeEntries(sections.projects, 'projects').map(value => field(value)), certifications: sections.certifications.map(value => field(value)), languages: sections.languages.map(value => field(value)), training: groupResumeEntries(sections.training, 'training').map(value => field(value)), activities: groupResumeEntries(sections.activities, 'activities').map(value => field(value)),
+    projects: groupedProjects.map(value => field(value)), certifications: sections.certifications.map(value => field(value)), languages: sections.languages.map(value => field(value)), training: groupResumeEntries(sections.training, 'training').map(value => field(value)), activities: groupResumeEntries(sections.activities, 'activities').map(value => field(value)),
     warnings: []
   };
   if (!name) review.warnings.push('Name was not clearly identified.');
@@ -190,9 +194,10 @@ function parseImportedStructuredEntry(kind, value) {
   }
   if (kind === 'projects') {
     const date = text.match(MONTH_YEAR_RE)?.[0] || '';
-    const before = date ? clean(text.slice(0, text.indexOf(date)).replace(/[,\s-]+$/, '')) : '';
-    const after = date ? clean(text.slice(text.indexOf(date) + date.length)) : text;
-    return { name: before || clean(text, 120), role: '', startDate: date, endDate: date, url: normalizeWebLink(text.match(/(?:https?:\/\/|www\.)[^\s)]+/i)?.[0] || ''), details: after };
+    const url = normalizeWebLink(text.match(/(?:https?:\/\/|www\.)[^\s|)]+/i)?.[0] || '');
+    const before = date ? clean(text.slice(0, text.indexOf(date)).replace(/\(?\s*view\s+(?:my\s+)?website\s*\)?/ig, '').replace(/[,\s-]+$/, '')) : '';
+    const after = clean((date ? text.slice(text.indexOf(date) + date.length) : text).replace(url, '').replace(/\(?\s*view\s+(?:my\s+)?website\s*\)?/ig, '').replace(/^\s*\|\s*|\s*\|\s*$/g, ''));
+    return { name: before || clean(text, 120), role: '', startDate: date, endDate: date, url, details: after };
   }
   if (kind === 'training') return { name: text, provider: '', startDate: '', endDate: '', details: '' };
   return { text };

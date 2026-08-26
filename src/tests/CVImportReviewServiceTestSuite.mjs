@@ -89,7 +89,7 @@ assert.equal(maliciousReview.contact.name.value, '<img src=x onerror=alert(1)>')
 assert.match(fs.readFileSync(new URL('../ui/CVImportReviewPanel.js', import.meta.url), 'utf8'), /escape\(item\.value\)/, 'review UI escapes extracted values before HTML insertion');
 
 const selection = createImportSelection(review);
-assert.equal(selection.contact.name.selected, false, 'import fields start unchecked until explicitly chosen');
+assert.equal(selection.contact.name.selected, true, 'clearly extracted fields start selected for a one-click import review');
 selection.contact.name.selected = true;
 selection.summary.selected = true;
 selection.experience[0].selected = true;

@@ -195,7 +195,14 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
     const model = buildCVExportModel(next);
     container.querySelector('[data-preview-name]').textContent = model.name;
     const contact = container.querySelector('[data-preview-contact]');
-    contact.textContent = model.contactLines.join(' · ');
+    contact.replaceChildren();
+    const contactParts = [model.contact.email, model.contact.phone, model.contact.location].filter(Boolean);
+    contact.append(document.createTextNode(contactParts.join(' · ')));
+    for (const [label, url] of [['GitHub', model.contact.github], ['LinkedIn', model.contact.linkedin], ['Website', model.contact.website]]) {
+      if (!url) continue;
+      if (contact.childNodes.length) contact.append(document.createTextNode(' · '));
+      const link = document.createElement('a'); link.href = url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = label; contact.append(link);
+    }
     contact.hidden = !model.contactLines.length;
     const sections = container.querySelector('[data-preview-sections]');
     sections.replaceChildren();
@@ -204,9 +211,17 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
       heading.textContent = section.title;
       const body = document.createElement('div');
       body.className = 'ats-section-body';
-      for (const line of section.lines) {
-        const row = document.createElement('p');
-        row.textContent = line;
+      for (const entry of section.entries) {
+        const row = document.createElement('article'); row.className = 'ats-entry';
+        if (entry.title || entry.dates) {
+          const header = document.createElement('div'); header.className = 'ats-entry-header';
+          const title = document.createElement('strong'); title.textContent = entry.title;
+          const dates = document.createElement('span'); dates.textContent = entry.dates;
+          header.append(title, dates); row.append(header);
+        }
+        if (entry.meta) { const meta = document.createElement('div'); meta.className = 'ats-entry-meta'; meta.textContent = entry.meta; row.append(meta); }
+        if (entry.details) { const details = document.createElement('p'); details.textContent = entry.details; row.append(details); }
+        if (entry.url) { const link = document.createElement('a'); link.href = entry.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'View project'; row.append(link); }
         body.append(row);
       }
       sections.append(heading, body);

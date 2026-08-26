@@ -40,6 +40,18 @@ function itemText(item) {
   return [title, organization, field, dates, details, link].filter(Boolean).join(' | ');
 }
 
+function itemEntry(item) {
+  if (typeof item === 'string') return { title: '', meta: '', dates: '', details: safeText(item), url: '' };
+  if (!item || typeof item !== 'object') return null;
+  return {
+    title: safeText(item.name || item.degree || item.title || ''),
+    meta: [safeText(item.institution || item.provider || item.role || ''), safeText(item.field || '')].filter(Boolean).join(' · '),
+    dates: [safeText(item.startDate || ''), safeText(item.endDate || '')].filter(Boolean).join(' – '),
+    details: safeText(item.details || item.description || item.text || ''),
+    url: safeUrl(item.url || '', 'web')
+  };
+}
+
 function itemsToLines(items = []) {
   return Array.isArray(items) ? items.map(itemText).filter(Boolean) : [];
 }
@@ -71,11 +83,16 @@ function normalizedContent(profile = {}) {
     training: itemsToLines(content.training),
     activities: itemsToLines(content.activities)
   };
+  const entries = Object.fromEntries(Object.entries(sections).map(([key, lines]) => [key,
+    ['education', 'projects', 'training'].includes(key)
+      ? (Array.isArray(content[key]) ? content[key].map(itemEntry).filter(Boolean) : [])
+      : lines.map(line => ({ title: '', meta: '', dates: '', details: line, url: '' }))
+  ]));
   const student = profile.careerStage === 'student';
   const order = student
     ? ['summary', 'education', 'projects', 'training', 'experience', 'skills', 'certifications', 'languages', 'activities']
     : ['summary', 'experience', 'projects', 'education', 'skills', 'certifications', 'languages', 'training', 'activities'];
-  return { name: safeText(contact.name) || 'My CV', contactLines, sections, order };
+  return { name: safeText(contact.name) || 'My CV', contactLines, contact: { email: safeText(contact.email), phone: safeText(contact.phone), location: safeText(contact.location), github, linkedin, website }, sections, entries, order };
 }
 
 function splitLongWord(word, font, size, width) {
@@ -116,7 +133,7 @@ export function buildCVExportModel(profile) {
     ...data,
     sections: data.order
       .filter(section => data.sections[section]?.length)
-      .map(section => ({ id: section, title: section === 'summary' ? 'Professional Summary' : section[0].toUpperCase() + section.slice(1), lines: data.sections[section] }))
+      .map(section => ({ id: section, title: section === 'summary' ? 'Professional Summary' : section[0].toUpperCase() + section.slice(1), lines: data.sections[section], entries: data.entries[section] || [] }))
   };
 }
 
@@ -155,13 +172,26 @@ export async function exportCareerProfilePdf(profile) {
   y -= 8;
 
   for (const section of model.sections) {
-    const wrapped = section.lines.flatMap(line => wrapLine(line, regular, bodySize, width));
     ensure(18 + bodyLineHeight);
     page.drawText(section.title, { x: margin, y, size: 11.5, font: bold, color: rgb(0.08, 0.1, 0.14), maxWidth: width });
     y -= 5;
     page.drawLine({ start: { x: margin, y }, end: { x: margin + width, y }, thickness: 0.7, color: rgb(0.12, 0.14, 0.18) });
     y -= 12;
-    drawLines(wrapped, regular, bodySize, bodyLineHeight);
+    for (const entry of section.entries) {
+      if (entry.title || entry.dates) {
+        ensure(bodyLineHeight * 2);
+        if (entry.title) page.drawText(entry.title, { x: margin, y, size: bodySize, font: bold, color: rgb(0.08, 0.1, 0.14), maxWidth: width * 0.72 });
+        if (entry.dates) {
+          const dateWidth = regular.widthOfTextAtSize(entry.dates, 9.5);
+          page.drawText(entry.dates, { x: Math.max(margin, margin + width - dateWidth), y, size: 9.5, font: regular, color: rgb(0.25, 0.29, 0.36) });
+        }
+        y -= bodyLineHeight;
+      }
+      if (entry.meta) drawLines(wrapLine(entry.meta, bold, 9.5, width), bold, 9.5, 12);
+      if (entry.details) drawLines(wrapLine(entry.details, regular, bodySize, width));
+      if (entry.url) drawLines(wrapLine(entry.url, regular, 9, width), regular, 9, 11);
+      y -= 4;
+    }
     y -= sectionGap;
   }
 

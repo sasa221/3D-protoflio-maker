@@ -31,6 +31,7 @@ export async function extractTextFromPDF(file, { maxPages = 12, maxTextLength = 
   const magic = new TextDecoder('latin1').decode(new Uint8Array(arrayBuffer).slice(0, 5));
   if (magic !== '%PDF-') throw new Error('The file is not a valid PDF document.');
   let rawText = '';
+  const embeddedLinks = [];
 
   // 1. Attempt PDF.js extraction
   try {
@@ -41,6 +42,11 @@ export async function extractTextFromPDF(file, { maxPages = 12, maxTextLength = 
 
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         const page = await pdf.getPage(pageNum);
+        const annotations = await page.getAnnotations().catch(() => []);
+        annotations.forEach(annotation => {
+          const url = String(annotation?.url || annotation?.unsafeUrl || '').trim();
+          if (/^https:\/\//i.test(url) && !embeddedLinks.includes(url)) embeddedLinks.push(url);
+        });
         const textContent = await page.getTextContent();
 
         // Reconstruct line breaks using item Y positions
@@ -122,5 +128,5 @@ export async function extractTextFromPDF(file, { maxPages = 12, maxTextLength = 
   }
   if (normalized.text.length > maxTextLength) throw new Error(`Extracted text exceeds the local ${maxTextLength}-character limit.`);
 
-  return normalized;
+  return { ...normalized, embeddedLinks };
 }

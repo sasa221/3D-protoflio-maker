@@ -1368,6 +1368,13 @@ html:has(.admin-forbidden) {
 .ats-paper p, .ats-paper div { margin: 0; white-space: pre-line; font-size: .86rem; }
 .ats-section-body { display: grid; gap: 7px; }
 .ats-section-body > p { margin: 0; white-space: pre-wrap; }
+.ats-entry { margin: 0 0 10px; break-inside: avoid; }
+.ats-entry-header { display:flex; justify-content:space-between; gap:18px; align-items:baseline; }
+.ats-entry-header strong { font-size: 13px; }
+.ats-entry-header span { white-space:nowrap; font-size:11px; color:#475569; }
+.ats-entry-meta { font-size:11.5px; font-weight:600; color:#334155; margin-top:2px; }
+.ats-entry p { margin:3px 0 0; white-space:pre-wrap; }
+.ats-entry a, .ats-contact a { color:#075985; text-decoration:underline; }
 .career-studio-preview small { display: block; max-width: 700px; margin: 10px auto 0; color: #4b5563; }
 .cv-targeted-variants { max-width: 1680px; margin: 0 auto; }
 .cv-job-tailor-summary { display:flex; align-items:center; justify-content:space-between; gap:18px; cursor:pointer; list-style:none; }
