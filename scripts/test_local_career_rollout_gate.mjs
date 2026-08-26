@@ -95,6 +95,18 @@ try {
 
   result = await call(portfolioHandler, 'POST', 'cv-variant-analyze', userB.token, { careerProfileId: profileId, role: 'Engineer', jobDescription: 'Engineer role requiring JavaScript and React.' });
   assert.equal(result.status, 403, 'User B outside cohort must be denied by API');
+
+  // Public mode admits every authenticated owner while preserving owner RLS.
+  result = await call(adminHandler, 'POST', 'career-rollout-access-mode', adminUser.token, { accessMode: 'all' });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.accessMode, 'all');
+  direct = await userB.client.from('career_profiles').insert({ id: `cp_b_${suffix}`, owner_user_id: userB.user.id, label: 'Public B', career_stage: 'student', content_json: {} }).select().single();
+  assert.ifError(direct.error);
+  direct = await userA.client.from('career_profiles').select('*').eq('id', `cp_b_${suffix}`);
+  assert.equal(direct.data?.length, 0, 'public mode must not weaken cross-account owner isolation');
+  await admin.from('career_profiles').delete().eq('id', `cp_b_${suffix}`);
+  result = await call(adminHandler, 'POST', 'career-rollout-access-mode', adminUser.token, { accessMode: 'allowlist' });
+  assert.equal(result.status, 200);
   result = await call(portfolioHandler, 'POST', 'cv-variant-analyze', '', { careerProfileId: profileId, role: 'Engineer', jobDescription: 'Engineer role requiring JavaScript and React.' });
   assert.equal(result.status, 401, 'Anonymous must be denied by API');
 

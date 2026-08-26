@@ -124,11 +124,12 @@ export default async function handler(req, res) {
   // Career Studio rollout controls are metadata-only and admin-authorized.
   // They never return CV/Profile content or a user list to ordinary callers.
   const careerRolloutAction = action === 'career-rollout' || action === 'career-rollout-update'
-    || action === 'career-rollout-master-switch' || action === 'career-rollout-audit';
+    || action === 'career-rollout-master-switch' || action === 'career-rollout-access-mode'
+    || action === 'career-rollout-audit';
   if (careerRolloutAction) {
     if (req.method === 'GET' && action === 'career-rollout') {
       const { data: config, error: configError } = await context.admin
-        .from('career_studio_rollout_config').select('enabled,updated_at,updated_by').eq('id', true).maybeSingle();
+        .from('career_studio_rollout_config').select('enabled,access_mode,updated_at,updated_by').eq('id', true).maybeSingle();
       if (configError) return res.status(500).json({ error: 'Career Studio rollout status unavailable.' });
       const targetUserId = String(req.query.userId || '').trim();
       let target = null;
@@ -139,7 +140,7 @@ export default async function handler(req, res) {
         if (error) return res.status(500).json({ error: 'Career Studio rollout user unavailable.' });
         target = data || null;
       }
-      return res.status(200).json({ masterSwitch: Boolean(config?.enabled), targetUser: target });
+      return res.status(200).json({ masterSwitch: Boolean(config?.enabled), accessMode: config?.access_mode || 'allowlist', targetUser: target });
     }
 
     if (req.method === 'GET' && action === 'career-rollout-audit') {
@@ -160,6 +161,17 @@ export default async function handler(req, res) {
       if (error || !data) return res.status(500).json({ error: 'Career Studio master switch was not changed.' });
       const row = Array.isArray(data) ? data[0] : data;
       return res.status(200).json({ success: true, masterSwitch: Boolean(row.enabled), updatedAt: row.updated_at });
+    }
+
+    if (action === 'career-rollout-access-mode') {
+      const accessMode = String(req.body?.accessMode || '').trim();
+      if (!['allowlist', 'all'].includes(accessMode)) return res.status(400).json({ error: 'Access mode must be allowlist or all.' });
+      const { data, error } = await context.admin.rpc('admin_set_career_studio_access_mode', {
+        p_access_mode: accessMode, p_admin_user_id: context.user.id
+      });
+      if (error || !data) return res.status(500).json({ error: 'Career Studio access mode was not changed.' });
+      const row = Array.isArray(data) ? data[0] : data;
+      return res.status(200).json({ success: true, accessMode: row.access_mode, updatedAt: row.updated_at });
     }
 
     const targetUserId = String(req.body?.userId || '').trim();
