@@ -92,10 +92,6 @@ function isServerFeatureEnabled(flagName) {
   return val === 'true' || val === '1';
 }
 
-function isLocalCareerRequest(supabaseUrl) {
-  return process.env.SUPABASE_ENV === 'local' && /^http:\/\/(127\.0\.0\.1|localhost):54321$/.test(supabaseUrl);
-}
-
 function safeVariantRow(row) {
   if (!row) return null;
   return {
@@ -193,7 +189,6 @@ export default async function handler(req, res) {
   // from public Portfolio Variants and accepts pasted text only (never a URL).
   if (['cv-variant-analyze', 'cv-variant-create', 'cv-variants', 'cv-variant-delete'].includes(action)) {
     if (!isServerFeatureEnabled('CAREER_STUDIO')) return res.status(404).json({ error: 'Career Studio is not enabled.' });
-    if (!isLocalCareerRequest(supabaseUrl)) return res.status(403).json({ error: 'Targeted CV Variants are local-only.' });
     const authHeader = req.headers.authorization || req.headers.Authorization;
     if (!authHeader) return res.status(401).json({ error: 'Unauthorized — Auth token required' });
     const token = authHeader.replace(/^Bearer\s+/i, '');
@@ -209,7 +204,7 @@ export default async function handler(req, res) {
       const plan = await resolveCareerExportPlan(adminClient, userId);
 
       if (plan === 'free') {
-        return res.status(403).json({ error: 'Targeted CV Variants require a local Pro entitlement.' });
+        return res.status(403).json({ error: 'Targeted CV Variants require a Pro entitlement.' });
       }
 
       if (action === 'cv-variant-delete') {
@@ -265,13 +260,13 @@ export default async function handler(req, res) {
         .eq('owner_user_id', userId).eq('idempotency_key', idempotencyKey).maybeSingle();
       if (duplicate) return res.status(200).json({ success: true, duplicate: true, variant: safeVariantRow(duplicate), diff: buildVariantDiff({ content: profile.content_json || {} }, duplicate.content_json || {}) });
 
-      const configuredVariantLimit = Number.parseInt(process.env.CV_LOCAL_VARIANT_LIMIT || '5', 10);
+      const configuredVariantLimit = Number.parseInt(process.env.CV_VARIANT_LIMIT || process.env.CV_LOCAL_VARIANT_LIMIT || '5', 10);
       const variantLimit = plan === 'pro' && Number.isFinite(configuredVariantLimit) && configuredVariantLimit >= 0 ? configuredVariantLimit : -1;
       if (variantLimit >= 0) {
         const { count, error: countErr } = await adminClient.from('career_targeted_variants')
           .select('id', { count: 'exact', head: true }).eq('owner_user_id', userId);
         if (countErr) return res.status(500).json({ error: 'Targeted variant limit lookup failed.' });
-        if ((count || 0) >= variantLimit) return res.status(429).json({ error: 'The local Pro targeted variant limit has been reached.', limit: variantLimit, used: count || 0 });
+        if ((count || 0) >= variantLimit) return res.status(429).json({ error: 'The Pro targeted variant limit has been reached.', limit: variantLimit, used: count || 0 });
       }
 
       let variantContent;

@@ -6,8 +6,9 @@ const migration = fs.readFileSync(new URL('../../supabase/migrations/20260825043
 const ui = fs.readFileSync(new URL('../ui/CVTargetedVariantsPanel.js', import.meta.url), 'utf8');
 
 for (const action of ['cv-variant-analyze', 'cv-variant-create', 'cv-variants', 'cv-variant-delete']) assert.match(api, new RegExp(action));
-assert.match(api, /Targeted CV Variants are local-only/);
-assert.match(api, /Targeted CV Variants require a local Pro entitlement/);
+assert.doesNotMatch(api, /Targeted CV Variants are local-only/);
+assert.match(api, /Targeted CV Variants require a Pro entitlement/);
+assert.match(api, /isCareerStudioUserAllowed/);
 assert.match(api, /career_targeted_variants/);
 assert.match(api, /owner_user_id/);
 assert.match(api, /jobUrl.*external Job URL fetching is disabled/s);
@@ -18,7 +19,8 @@ assert.doesNotMatch(migration, /CREATE POLICY/);
 assert.match(ui, /Base CV and public Portfolio never change/);
 assert.match(ui, /Paste job description only/);
 assert.match(ui, /evidence_found/);
-assert.match(ui, /local Pro entitlement/);
+assert.match(ui, /Pro entitlement/);
+assert.doesNotMatch(ui, /local Pro entitlement/);
 assert.doesNotMatch(ui, /Fetch Posting|extract-job|jobUrl/);
 
-console.log('CVTargetedVariantApiContractTestSuite: passed (local Pro gate, private ownership API, no URL fetch/public route, RLS isolation, and truthful UI).');
+console.log('CVTargetedVariantApiContractTestSuite: passed (server flag, rollout/Pro gate, private ownership API, no URL fetch/public route, RLS isolation, and truthful UI).');

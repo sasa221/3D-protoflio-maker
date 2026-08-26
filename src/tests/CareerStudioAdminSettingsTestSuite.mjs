@@ -7,8 +7,9 @@ const migration = fs.readFileSync(new URL('../../supabase/migrations/20260825032
 
 assert.match(api, /career-settings-update/);
 assert.match(api, /admin_update_cv_template_setting/);
-assert.match(api, /SUPABASE_ENV === 'local'/);
 assert.match(api, /FF_CAREER_STUDIO/);
+assert.match(api, /requireAdmin/);
+assert.doesNotMatch(api, /Career Studio admin settings are local-only/);
 assert.doesNotMatch(api, /career-settings[^\n]*career_profiles/);
 assert.doesNotMatch(api, /career-settings[^\n]*content_json/);
 assert.match(ui, /free_export_limit/);
@@ -20,4 +21,4 @@ assert.match(migration, /REVOKE ALL ON public\.career_studio_admin_audit_log FRO
 assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.admin_update_cv_template_setting.*service_role/s);
 assert.match(migration, /template_id <> 'ats-basic'/);
 
-console.log('Career Studio admin settings contract tests passed: local gate, metadata-only API/UI, allow-listed template, and RLS grants.');
+console.log('Career Studio admin settings contract tests passed: admin/feature gate, metadata-only API/UI, allow-listed template, and RLS grants.');

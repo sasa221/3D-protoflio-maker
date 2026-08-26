@@ -176,15 +176,12 @@ export default async function handler(req, res) {
     } });
   }
 
-  // Career Studio settings are deliberately local-only. This route exposes
-  // configuration metadata, never CV/Profile content or user contact data.
+  // Career Studio settings expose configuration metadata only, never
+  // CV/Profile content or user contact data. requireAdmin is enforced above.
   const careerSettingsAction = action === 'career-settings' || action === 'career-settings-update' || action === 'career-settings-audit';
   if (careerSettingsAction) {
-    const localUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
-    const localOnly = process.env.SUPABASE_ENV === 'local' && /^http:\/\/(127\.0\.0\.1|localhost):54321$/.test(localUrl);
     const enabled = process.env.FF_CAREER_STUDIO === 'true' || process.env.FF_CAREER_STUDIO === '1';
     if (!enabled) return res.status(404).json({ error: 'Career Studio is not enabled.' });
-    if (!localOnly) return res.status(403).json({ error: 'Career Studio admin settings are local-only.' });
 
     if (req.method === 'GET' && action === 'career-settings') {
       const { data, error } = await context.admin

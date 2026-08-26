@@ -90,7 +90,7 @@ export function renderCVTargetedVariantsPanel(container, { ownerUserId = 'local-
   form.addEventListener('submit', async event => {
     event.preventDefault();
     if (busy || !latestAnalysis?.hasRequirements) return;
-    if (globalEntitlements.getEffectivePlanId() === 'free') { status.textContent = 'A local Pro entitlement is required to save targeted variants.'; status.style.color = '#fde68a'; return; }
+    if (globalEntitlements.getEffectivePlanId() === 'free') { status.textContent = 'A Pro entitlement is required to save targeted variants.'; status.style.color = '#fde68a'; return; }
     busy = true; createButton.disabled = true; analyzeButton.disabled = true;
     try {
       const input = values();
