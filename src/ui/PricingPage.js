@@ -15,8 +15,21 @@ import { isFeatureEnabled } from '../config/FeatureFlags.js';
 export function renderPricingPage(container, options = {}) {
   const { currentPlan = 'free', onSelectPlan } = options;
 
+  document.documentElement.style.height = 'auto';
+  document.documentElement.style.overflowY = 'auto';
+  document.body.style.height = 'auto';
+  document.body.style.minHeight = '100vh';
+  document.body.style.overflowX = 'hidden';
+  document.body.style.overflowY = 'auto';
+  container.style.display = 'block';
+  container.style.width = '100%';
+  container.style.height = 'auto';
+  container.style.minHeight = '100vh';
+  container.style.overflow = 'visible';
+
   container.innerHTML = `
     <div class="pricing-page">
+      <nav class="pricing-product-nav" aria-label="Product navigation"><a href="/">← Home</a><a href="/studio">Portfolio Studio</a><a href="/cv">CV Builder</a><a href="/pricing" aria-current="page">Pricing</a></nav>
       <div class="pricing-header">
         <h1>Choose Your Plan</h1>
         <p class="pricing-subtitle">Build a portfolio that gets you noticed. Start free, upgrade when you're ready.</p>
@@ -247,6 +260,10 @@ export function getPricingStyles() {
       padding: 3rem 1.5rem;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
+
+    .pricing-product-nav { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:2rem; }
+    .pricing-product-nav a { color:#ddd6fe; text-decoration:none; border:1px solid rgba(167,139,250,.3); border-radius:999px; padding:.55rem .8rem; font-weight:700; font-size:.8rem; }
+    .pricing-product-nav a:hover, .pricing-product-nav a[aria-current='page'] { background:rgba(124,58,237,.2); color:#fff; }
 
     .pricing-header {
       text-align: center;

@@ -10,6 +10,26 @@ function escape(value = '') {
   return String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
 }
 
+const COLLECTIONS = {
+  education: { title: 'Education', add: '+ Add education', fields: [['institution', 'University / institution', 'e.g. Helwan University'], ['degree', 'Degree', 'e.g. Bachelor of Computer Science'], ['field', 'Field of study', 'e.g. Computer Science'], ['startDate', 'From', 'e.g. 2022'], ['endDate', 'To', 'e.g. 2026 or Present'], ['details', 'Details / grade', 'GPA, coursework or achievements', 'textarea']] },
+  projects: { title: 'Projects', add: '+ Add project', fields: [['name', 'Project name', 'e.g. E-commerce website'], ['role', 'Your role', 'e.g. Front-End Developer'], ['startDate', 'From', 'e.g. Jan 2025'], ['endDate', 'To', 'e.g. Mar 2025'], ['url', 'Project link', 'https://...'], ['details', 'Details and results', 'What you built, used and achieved', 'textarea']] },
+  training: { title: 'Training & courses', add: '+ Add training', fields: [['name', 'Training / course name', 'e.g. Front-End Development'], ['provider', 'Provider / organization', 'e.g. NTI'], ['startDate', 'From', 'e.g. Jul 2025'], ['endDate', 'To', 'e.g. Aug 2025'], ['details', 'Details', 'Topics, practical work and achievements', 'textarea']] }
+};
+
+function collectionRows(items = []) {
+  return (Array.isArray(items) ? items : []).map(item => typeof item === 'string' ? { details: item } : { ...item, details: item?.details || item?.text || item?.description || '' });
+}
+
+function renderEntry(type, row = {}, index = 0) {
+  const config = COLLECTIONS[type];
+  return `<article class="cv-entry-card" data-entry><div class="cv-entry-card-head"><strong>${config.title} #${index + 1}</strong><button type="button" data-remove-entry>Remove</button></div><div class="cv-entry-fields">${config.fields.map(([key, label, placeholder, control]) => `<label>${label}${control === 'textarea' ? `<textarea data-entry-field="${key}" rows="3" placeholder="${placeholder}">${escape(row[key] || '')}</textarea>` : `<input data-entry-field="${key}" ${key === 'url' ? 'type="url"' : ''} value="${escape(row[key] || '')}" placeholder="${placeholder}">`}</label>`).join('')}</div></article>`;
+}
+
+function renderCollection(type, items) {
+  const config = COLLECTIONS[type];
+  return `<section class="cv-entry-section" data-collection="${type}"><input type="hidden" name="${type}" value="structured"><div class="cv-entry-heading"><div><h2>${config.title}</h2><p>Add each item separately so dates and details stay clear.</p></div><button type="button" data-add-entry="${type}">${config.add}</button></div><div class="cv-entry-list">${collectionRows(items).map((row, index) => renderEntry(type, row, index)).join('')}</div></section>`;
+}
+
 export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user', profileId = null, openImport = false } = {}) {
   // Studio intentionally locks the viewport because its editor owns its own
   // scroll regions. Career Studio is a document page, so explicitly undo
@@ -64,9 +84,10 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
           <label>GitHub URL<input name="github" type="url" value="${escape(active.content.contact.github)}" placeholder="https://github.com/you"></label>
           <label>Professional summary<textarea name="summary" rows="5" placeholder="Write only what is true about your experience.">${escape(active.content.summary)}</textarea></label>
           <label>Skills<input name="skills" value="${escape(active.content.skills.join(', '))}" placeholder="JavaScript, Figma, SQL"></label>
-          <label>Education<textarea name="education" rows="4" placeholder="Degree — Institution — dates">${escape(active.content.education.map(item => item.text || '').join('\n'))}</textarea></label>
-          <label>Projects<textarea name="projects" rows="5" placeholder="One real project per line">${escape(active.content.projects.map(item => item.text || '').join('\n'))}</textarea></label>
-          <label>Experience / training<textarea name="experience" rows="6" placeholder="One role or training item per line">${escape(active.content.experience.map(item => item.text || '').join('\n'))}</textarea></label>
+          ${renderCollection('education', active.content.education)}
+          ${renderCollection('projects', active.content.projects)}
+          ${renderCollection('training', active.content.training)}
+          <label>Work experience<textarea name="experience" rows="6" placeholder="One role per line. Keep training in the separate Training section.">${escape(active.content.experience.map(item => item.text || item.details || '').join('\n'))}</textarea></label>
           <div class="career-studio-actions"><button type="submit">Save draft</button><button type="button" data-preview>ATS Preview</button><button type="button" data-export>Export PDF</button><span id="career-save-status" aria-live="polite">Draft</span></div>
           <div class="career-sync-cta"><strong>Optional next step</strong><span>Review selected CV fields before adding anything to a Portfolio.</span><a href="${syncUrl}">Create Portfolio From My CV →</a></div>
           <div id="cv-import-review-container" aria-label="Private CV import"></div>
@@ -94,8 +115,6 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
       github: contact.github || '',
       summary: source?.content?.summary || '',
       skills: Array.isArray(source?.content?.skills) ? source.content.skills.map(item => typeof item === 'string' ? item : item?.text || '').filter(Boolean).join(', ') : '',
-      education: Array.isArray(source?.content?.education) ? source.content.education.map(item => item?.text || '').filter(Boolean).join('\n') : '',
-      projects: Array.isArray(source?.content?.projects) ? source.content.projects.map(item => item?.text || '').filter(Boolean).join('\n') : '',
       experience: Array.isArray(source?.content?.experience) ? source.content.experience.map(item => item?.text || '').filter(Boolean).join('\n') : ''
     };
     for (const [name, value] of Object.entries(values)) {
@@ -111,7 +130,8 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
   const collect = () => {
     const data = new FormData(form);
     const lines = key => String(data.get(key) || '').split('\n').map(text => text.trim()).filter(Boolean).map(text => ({ text }));
-    return { ...active, careerStage: data.get('careerStage'), content: { ...active.content, contact: { ...active.content.contact, name: data.get('name') || '', email: data.get('email') || '', phone: data.get('phone') || '', location: data.get('location') || '', linkedin: data.get('linkedin') || '', github: data.get('github') || '' }, summary: data.get('summary') || '', skills: String(data.get('skills') || '').split(',').map(item => item.trim()).filter(Boolean), education: lines('education'), projects: lines('projects'), experience: lines('experience') } };
+    const entries = type => Array.from(form.querySelectorAll(`[data-collection="${type}"] [data-entry]`)).map(card => Object.fromEntries(Array.from(card.querySelectorAll('[data-entry-field]')).map(field => [field.dataset.entryField, field.value.trim()]))).filter(row => Object.values(row).some(Boolean));
+    return { ...active, careerStage: data.get('careerStage'), content: { ...active.content, contact: { ...active.content.contact, name: data.get('name') || '', email: data.get('email') || '', phone: data.get('phone') || '', location: data.get('location') || '', linkedin: data.get('linkedin') || '', github: data.get('github') || '' }, summary: data.get('summary') || '', skills: String(data.get('skills') || '').split(',').map(item => item.trim()).filter(Boolean), education: entries('education'), projects: entries('projects'), training: entries('training'), experience: lines('experience') } };
   };
   const updatePreview = () => {
     const next = collect();
@@ -122,9 +142,9 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
   const qualityPanel = renderCVQualityChecklistPanel(container.querySelector('#cv-quality-container'), {
     getProfile: collect,
     onFix: section => {
-      const target = form.elements.namedItem(section) || form.elements.namedItem(section === 'linkedin' ? 'github' : 'summary');
+      const target = form.querySelector(`[data-collection="${section}"]`) || form.elements.namedItem(section) || form.elements.namedItem(section === 'linkedin' ? 'github' : 'summary');
       target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      target?.focus();
+      (target?.querySelector?.('input,textarea,button') || target)?.focus();
     }
   });
   const updateStageGuidance = () => {
@@ -134,6 +154,19 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
   };
   form.addEventListener('input', () => { updatePreview(); qualityPanel.refresh(); });
   form.addEventListener('change', () => { updatePreview(); qualityPanel.refresh(); updateStageGuidance(); });
+  form.addEventListener('click', event => {
+    const add = event.target.closest('[data-add-entry]');
+    if (add) {
+      const type = add.dataset.addEntry;
+      const list = form.querySelector(`[data-collection="${type}"] .cv-entry-list`);
+      list.insertAdjacentHTML('beforeend', renderEntry(type, {}, list.children.length));
+      list.lastElementChild?.querySelector('input,textarea')?.focus();
+      updatePreview(); qualityPanel.refresh();
+      return;
+    }
+    const remove = event.target.closest('[data-remove-entry]');
+    if (remove) { remove.closest('[data-entry]')?.remove(); updatePreview(); qualityPanel.refresh(); }
+  });
   form.addEventListener('submit', event => { event.preventDefault(); saveCareerProfile(collect(), ownerUserId); status.textContent = 'Saved locally'; });
   container.querySelector('[data-preview]').addEventListener('click', () => container.querySelector('#career-ats-preview').scrollIntoView({ behavior: 'smooth', block: 'center' }));
   let exportBusy = false;

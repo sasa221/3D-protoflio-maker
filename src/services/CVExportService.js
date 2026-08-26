@@ -30,7 +30,14 @@ function safeUrl(value, kind = 'web') {
 function itemText(item) {
   if (typeof item === 'string') return safeText(item);
   if (!item || typeof item !== 'object') return '';
-  return safeText(item.text || item.description || item.name || item.title || '');
+  if (item.text) return safeText(item.text);
+  const title = safeText(item.name || item.degree || item.title || '');
+  const organization = safeText(item.institution || item.provider || item.role || '');
+  const field = safeText(item.field || '');
+  const dates = [safeText(item.startDate || ''), safeText(item.endDate || '')].filter(Boolean).join(' – ');
+  const details = safeText(item.details || item.description || '');
+  const link = safeUrl(item.url || '', 'web');
+  return [title, organization, field, dates, details, link].filter(Boolean).join(' | ');
 }
 
 function itemsToLines(items = []) {

@@ -60,7 +60,10 @@ const entryPaths = fs.readFileSync(new URL('../services/CareerEntryPathService.j
 assert.match(entryPaths, /mode=import/);
 const builder = fs.readFileSync(new URL('../ui/CVBuilderPage.js', import.meta.url), 'utf8');
 assert.match(builder, /cv-quality-container/);
-assert.match(builder, /name="projects"/);
+assert.match(builder, /data-collection="\$\{type\}"/);
+assert.match(builder, /Project name/);
+assert.match(builder, /startDate/);
+assert.match(builder, /Training \/ course name/);
 const qualityPanel = fs.readFileSync(new URL('../ui/CVQualityChecklistPanel.js', import.meta.url), 'utf8');
 assert.match(qualityPanel, /data-cv-quality-fix/);
 const quality = fs.readFileSync(new URL('../services/CVQualityScoreService.js', import.meta.url), 'utf8');
