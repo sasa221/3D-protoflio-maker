@@ -6,7 +6,7 @@
 
 import { MARKETING_DEMO_PORTFOLIO } from '../demo/MarketingDemoPortfolio.js';
 import { getThemeById } from '../three/ProceduralTheme.js';
-import { getCurrentAuthUser } from '../services/AuthService.js';
+import { getCurrentUser } from '../services/AuthService.js';
 import { fetchUserProfileAndEntitlements } from '../services/DBService.js';
 import { globalEntitlements } from '../services/EntitlementService.js';
 import { PLANS, GROUP_SEAT_PRICING } from '../config/PlanConfig.js';
@@ -53,7 +53,9 @@ export async function renderLandingPage(container) {
   container.style.background = '#050508';
   container.style.color = '#fff';
 
-  const authUser = await getCurrentAuthUser().catch(() => null);
+  // Render from the safe session cache immediately. Network-backed account
+  // refresh must never hold the public hero behind a full-page loading shell.
+  const authUser = getCurrentUser();
   const isAuthenticated = Boolean(authUser && authUser.id && authUser.id !== 'usr_guest');
   const careerStudioEnabled = isFeatureEnabled('CAREER_STUDIO');
   const careerPaths = getCareerEntryPaths(isAuthenticated);
@@ -61,8 +63,8 @@ export async function renderLandingPage(container) {
   // Premium Group owner should manage invitations, not submit payment again.
   let isPremiumGroupOwner = false;
   if (isAuthenticated) {
-    await fetchUserProfileAndEntitlements(authUser).catch(() => null);
     isPremiumGroupOwner = globalEntitlements.getPlanId() === 'premium_group';
+    fetchUserProfileAndEntitlements(authUser).catch(() => null);
   }
   const planCheckoutPath = (planId) => isAuthenticated
     ? `/pricing?plan=${encodeURIComponent(planId)}`
