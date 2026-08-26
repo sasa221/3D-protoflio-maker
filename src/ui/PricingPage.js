@@ -39,8 +39,9 @@ export function renderPricingPage(container, options = {}) {
         ${renderPlanCard(PLANS.free, currentPlan, 'free')}
         ${renderPlanCard(PLANS.pro, currentPlan, 'pro')}
         ${renderPlanCard(PLANS.premium, currentPlan, 'premium')}
-        ${renderGroupCard(currentPlan)}
       </div>
+
+      <section class="pricing-team-section"><div><span class="pricing-team-kicker">FOR TEAMS</span><h2>Need accounts for 2–5 people?</h2><p>Each person gets a separate account and portfolio. One owner manages the subscription.</p></div>${renderGroupCard(currentPlan)}</section>
 
       <div class="pricing-keep-live">
         <div class="keep-live-card">
@@ -190,34 +191,28 @@ function getPlanFeatures(planId) {
   switch (planId) {
     case 'free':
       return [
-        '1 portfolio',
-        '3 basic themes',
-        'Interactive 3D portfolio',
-        'HTML download',
-        'Edit until finalization',
-        'CV import & review'
+        'Create one 3D portfolio',
+        'Choose from 3 starter designs',
+        'Download the portfolio as HTML',
+        'Import a CV and review it first'
       ];
     case 'pro':
       return [
-        '1 hosted portfolio',
-        'Shareable online link',
-        'Professional themes',
-        'Continuous editing',
-        'Job Fit Analyzer',
-        'Basic analytics',
-        'PDF export',
-        'New Pro themes'
+        'Publish one portfolio online',
+        'Share it with a simple link',
+        'Use professional designs',
+        'Keep editing after publishing',
+        'Compare your CV with a job',
+        'See basic visitor statistics'
       ];
     case 'premium':
       return [
-        'Create multiple portfolios',
-        'New slot every 7 days',
-        'All themes',
-        'Premium themes',
-        'Advanced analytics',
-        'Custom Domain connection',
-        'Remove branding',
-        'Hosting included'
+        'Create more than one portfolio',
+        'Use every available design',
+        'See detailed visitor statistics',
+        'Connect your own domain',
+        'Remove our branding',
+        'Hosting is included'
       ];
     default:
       return [];
@@ -287,10 +282,17 @@ export function getPricingStyles() {
 
     .pricing-cards {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 1.5rem;
       margin-bottom: 3rem;
     }
+
+    .pricing-team-section { display:grid; grid-template-columns:minmax(220px,.75fr) minmax(300px,1.25fr); gap:1.5rem; align-items:start; margin:0 0 3rem; padding:1.5rem; border:1px solid #2a2a2a; border-radius:16px; background:#111; }
+    .pricing-team-section > div:first-child { padding:1rem .5rem; }
+    .pricing-team-section h2 { margin:.35rem 0 .6rem; color:#f0f0f0; font-size:1.35rem; }
+    .pricing-team-section p { margin:0; color:#999; line-height:1.55; }
+    .pricing-team-kicker { color:#5eead4; font-size:.72rem; font-weight:800; letter-spacing:.13em; }
+    .pricing-team-section .pricing-card { min-height:0; }
 
     .pricing-card {
       background: #1a1a1a;
@@ -670,6 +672,7 @@ export function getPricingStyles() {
         flex-direction: column;
         text-align: center;
       }
+      .pricing-team-section { grid-template-columns:1fr; padding:1rem; }
     }
   `;
 }
