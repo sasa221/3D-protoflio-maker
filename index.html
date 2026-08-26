@@ -33,7 +33,14 @@
       <h1>3D Portfolio Maker — Create a cinematic portfolio from your CV</h1>
       <p>Build, publish, and share a recruiter-ready interactive 3D portfolio with no coding required.</p>
     </main>
-    <div id="app"></div>
+    <div id="app">
+      <div class="app-boot-shell" role="status" aria-live="polite">
+        <div class="app-boot-mark">⚡</div>
+        <strong>3D Portfolio Maker</strong>
+        <span>Opening your workspace…</span>
+        <i aria-hidden="true"></i>
+      </div>
+    </div>
     <style>
       .seo-fallback {
         position: absolute;
@@ -46,6 +53,25 @@
         white-space: nowrap;
         border: 0;
       }
+      .app-boot-shell {
+        position: fixed;
+        inset: 0;
+        z-index: 999999;
+        display: grid;
+        place-content: center;
+        justify-items: center;
+        gap: 10px;
+        background: radial-gradient(circle at 50% 40%, #17122c 0, #08080f 42%, #050508 100%);
+        color: #f8fafc;
+        font-family: Inter, system-ui, sans-serif;
+      }
+      .app-boot-mark { display:grid; place-items:center; width:52px; height:52px; border-radius:15px; background:linear-gradient(135deg,#7c3aed,#06b6d4); font-size:25px; box-shadow:0 12px 36px rgba(124,58,237,.35); }
+      .app-boot-shell strong { margin-top:4px; font-size:17px; letter-spacing:-.02em; }
+      .app-boot-shell span { color:rgba(255,255,255,.58); font-size:12px; }
+      .app-boot-shell i { width:150px; height:3px; margin-top:6px; overflow:hidden; border-radius:99px; background:rgba(255,255,255,.1); }
+      .app-boot-shell i::after { content:''; display:block; width:45%; height:100%; border-radius:inherit; background:linear-gradient(90deg,#8b5cf6,#22d3ee); animation:app-boot 1s ease-in-out infinite alternate; }
+      @keyframes app-boot { from { transform:translateX(-15%); } to { transform:translateX(135%); } }
+      @media (prefers-reduced-motion:reduce) { .app-boot-shell i::after { animation:none; width:100%; } }
     </style>
     <script type="module" src="/src/main.js"></script>
   </body>

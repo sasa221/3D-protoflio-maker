@@ -16,8 +16,8 @@ assert.doesNotMatch(api, /career_targeted_variants[\s\S]{0,3000}console\.(log|wa
 assert.match(migration, /ALTER TABLE public\.career_targeted_variants ENABLE ROW LEVEL SECURITY/);
 assert.match(migration, /REVOKE ALL ON public\.career_targeted_variants FROM anon, authenticated/);
 assert.doesNotMatch(migration, /CREATE POLICY/);
-assert.match(ui, /Base CV and public Portfolio never change/);
-assert.match(ui, /Paste job description only/);
+assert.match(ui, /Your main CV will not change/);
+assert.match(ui, /2\. Job description/);
 assert.match(ui, /evidence_found/);
 assert.match(ui, /Pro entitlement/);
 assert.doesNotMatch(ui, /local Pro entitlement/);
