@@ -31,6 +31,46 @@ function normalizeWebLink(value) {
   return /^www\./i.test(link) ? `https://${link}` : link;
 }
 
+const MONTH_YEAR_RE = /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{4}\b/i;
+const DATE_RANGE_RE = new RegExp(`${MONTH_YEAR_RE.source}\\s*(?:-|–|—|to)\\s*(?:${MONTH_YEAR_RE.source}|present|current)`, 'i');
+
+function joinWrappedLines(lines = []) {
+  return lines.reduce((out, raw) => {
+    const line = clean(raw);
+    if (!line) return out;
+    if (!out) return line;
+    return out.endsWith('-') ? `${out.slice(0, -1)}${line}` : `${out} ${line}`;
+  }, '');
+}
+
+function groupResumeEntries(lines = [], kind) {
+  const source = lines.map(value => clean(value)).filter(Boolean);
+  if (!source.length) return [];
+  if (kind === 'education' || kind === 'activities') return [source.join(' | ')];
+  if (kind === 'projects') {
+    const groups = []; let current = [];
+    for (const line of source) {
+      const startsProject = MONTH_YEAR_RE.test(line) && line.length < 150;
+      if (startsProject && current.length) { groups.push(joinWrappedLines(current)); current = []; }
+      current.push(line);
+    }
+    if (current.length) groups.push(joinWrappedLines(current));
+    return groups;
+  }
+  if (kind === 'experience') {
+    const groups = []; let current = [];
+    source.forEach((line, index) => {
+      const nextLooksLikeDatedRole = DATE_RANGE_RE.test(source[index + 1] || '');
+      const currentAlreadyHasRole = current.some(value => DATE_RANGE_RE.test(value));
+      if (nextLooksLikeDatedRole && currentAlreadyHasRole && current.length) { groups.push(joinWrappedLines(current)); current = []; }
+      current.push(line);
+    });
+    if (current.length) groups.push(joinWrappedLines(current));
+    return groups;
+  }
+  return source;
+}
+
 function extractDocxText(buffer) {
   const bytes = new Uint8Array(buffer);
   if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) throw new Error('The DOCX file is not a valid ZIP document.');
@@ -108,8 +148,8 @@ export function buildImportReview(text, { format = 'text', fileName = '' } = {})
     source: { format, fileName: clean(fileName, 160) },
     contact: { name: field(name), email: field(email), phone: field(phone), location: field(location), linkedin: field(normalizeWebLink(links.find(link => /linkedin\.com/i.test(link)) || '')), github: field(normalizeWebLink(links.find(link => /github\.com/i.test(link)) || '')) },
     summary: field(sections.summary.join(' ')),
-    experience: sections.experience.map(value => field(value)), education: sections.education.map(value => field(value)), skills: sections.skills.flatMap(value => value.split(/[,;|•·]/).map(item => field(item))).filter(item => item.value),
-    projects: sections.projects.map(value => field(value)), certifications: sections.certifications.map(value => field(value)), languages: sections.languages.map(value => field(value)), training: sections.training.map(value => field(value)), activities: sections.activities.map(value => field(value)),
+    experience: groupResumeEntries(sections.experience, 'experience').map(value => field(value)), education: groupResumeEntries(sections.education, 'education').map(value => field(value)), skills: sections.skills.flatMap(value => value.split(/[,;|•·]/).map(item => field(item))).filter(item => item.value),
+    projects: groupResumeEntries(sections.projects, 'projects').map(value => field(value)), certifications: sections.certifications.map(value => field(value)), languages: sections.languages.map(value => field(value)), training: groupResumeEntries(sections.training, 'training').map(value => field(value)), activities: groupResumeEntries(sections.activities, 'activities').map(value => field(value)),
     warnings: []
   };
   if (!name) review.warnings.push('Name was not clearly identified.');
@@ -139,6 +179,35 @@ function mergeArray(existing, incoming, overwrite) {
   return out;
 }
 
+function parseImportedStructuredEntry(kind, value) {
+  const text = clean(value);
+  if (kind === 'education') {
+    const parts = text.split(/\s*\|\s*/).map(value => clean(value)).filter(Boolean);
+    const dated = parts.find(part => MONTH_YEAR_RE.test(part)) || '';
+    const range = dated.match(new RegExp(`(${MONTH_YEAR_RE.source})\\s*(?:-|–|—|to)\\s*(${MONTH_YEAR_RE.source}|present|current)`, 'i'));
+    const degreeText = clean(dated.replace(range?.[0] || '', '').replace(/[,\s-]+$/, ''));
+    return { institution: parts[0] || '', degree: degreeText, field: '', startDate: range?.[1] || '', endDate: range?.[2] || '', details: parts.filter(part => part !== parts[0] && part !== dated).join(' · ') };
+  }
+  if (kind === 'projects') {
+    const date = text.match(MONTH_YEAR_RE)?.[0] || '';
+    const before = date ? clean(text.slice(0, text.indexOf(date)).replace(/[,\s-]+$/, '')) : '';
+    const after = date ? clean(text.slice(text.indexOf(date) + date.length)) : text;
+    return { name: before || clean(text, 120), role: '', startDate: date, endDate: date, url: normalizeWebLink(text.match(/(?:https?:\/\/|www\.)[^\s)]+/i)?.[0] || ''), details: after };
+  }
+  if (kind === 'training') return { name: text, provider: '', startDate: '', endDate: '', details: '' };
+  return { text };
+}
+
+function mergeStructuredArray(existing, incoming, kind, overwrite) {
+  const parsed = incoming.map(value => parseImportedStructuredEntry(kind, value));
+  if (overwrite) return parsed;
+  const out = Array.isArray(existing) ? clone(existing) : [];
+  const identity = item => clean(item?.name || item?.institution || item?.text || item?.details || '').toLowerCase();
+  const seen = new Set(out.map(identity).filter(Boolean));
+  parsed.forEach(item => { const key = identity(item); if (key && !seen.has(key)) { out.push(item); seen.add(key); } });
+  return out;
+}
+
 export function applyImportSelection(profile, review, selection, { overwriteExisting = false } = {}) {
   const next = clone(profile);
   next.content = { ...(next.content || {}) };
@@ -162,7 +231,9 @@ export function applyImportSelection(profile, review, selection, { overwriteExis
     const values = (selection?.[key] || []).map(selectedValue).filter(Boolean);
     if (!values.length) continue;
     const before = JSON.stringify(next.content[key] || []);
-    next.content[key] = mergeArray(next.content[key], values, overwriteExisting);
+    next.content[key] = ['education', 'projects', 'training'].includes(key)
+      ? mergeStructuredArray(next.content[key], values, key, overwriteExisting)
+      : mergeArray(next.content[key], values, overwriteExisting);
     if (JSON.stringify(next.content[key]) !== before) changedFields.push(key);
   }
   return { profile: next, changedFields, skippedFields };
