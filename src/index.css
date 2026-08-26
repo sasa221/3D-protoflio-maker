@@ -1431,7 +1431,23 @@ html:has(.admin-forbidden) {
     box-shadow: 0 8px 28px rgba(0,0,0,.28);
   }
 }
-@media (max-width: 900px) { .studio-product-nav { display: none; } }
+@media (max-width: 900px) {
+  .studio-product-nav {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 1650;
+    display: flex;
+    justify-content: flex-start;
+    height: calc(54px + env(safe-area-inset-bottom, 0px));
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid rgba(255,255,255,.1);
+    border-bottom: 0;
+    box-shadow: 0 -8px 24px rgba(0,0,0,.35);
+  }
+  .studio-product-nav a, .studio-product-nav button { padding: 7px 10px; font-size: .68rem; }
+  #sidebar .sidebar-footer { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+  #preview-panel { padding-bottom: calc(54px + env(safe-area-inset-bottom, 0px)); }
+}
 .cv-sync-overlay { position: fixed; inset: 0; z-index: 100001; display: grid; place-items: center; padding: 16px; background: rgba(0,0,0,.78); backdrop-filter: blur(8px); }
 .cv-sync-card { width: min(860px, 100%); max-height: 92vh; overflow-y: auto; border: 1px solid rgba(167,139,250,.3); border-radius: 22px; padding: 22px; background: #0d0d18; color: #f8fafc; box-shadow: 0 28px 80px rgba(0,0,0,.6); }
 .cv-sync-header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
