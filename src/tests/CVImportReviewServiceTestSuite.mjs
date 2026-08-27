@@ -84,6 +84,20 @@ assert.doesNotMatch(salehReview.contact.location.value, /Front-End Developer/);
 assert.equal(salehReview.experience.length, 1, 'one compact experience entry is produced for the short fixture');
 assert.equal(salehReview.education.length, 1, 'education lines are grouped into one review entry');
 assert.equal(salehReview.projects.length, 1, 'project title and details are grouped into one review entry');
+const inlineHeadingReview = buildImportReview(`INLINE TEST CANDIDATE
+inline@example.test
+SUMMARY: Frontend engineer focused on accessible interfaces.
+EXPERIENCE Example Labs
+Frontend Engineer, Jan 2024 - Present
+EDUCATION Example University, 2020 - 2024
+SKILLS JavaScript, Git, Accessibility`, { format: 'pdf', fileName: 'inline-headings.pdf' });
+assert.match(inlineHeadingReview.summary.value, /Frontend engineer/);
+assert.equal(inlineHeadingReview.experience.length, 1, 'uppercase inline experience heading is separated from its content');
+assert.equal(inlineHeadingReview.education.length, 1, 'uppercase inline education heading is separated from its content');
+assert.deepEqual(inlineHeadingReview.skills.map(item => item.value), ['JavaScript', 'Git', 'Accessibility']);
+
+const nonResumeReview = buildImportReview('Resume writing guide\nUse concise language and review every page before submitting.', { format: 'pdf', fileName: 'guide.pdf' });
+assert.ok(nonResumeReview.warnings.some(message => /does not look like a CV or resume/i.test(message)), 'non-resume documents receive a clear low-confidence warning');
 const maliciousReview = buildImportReview('<img src=x onerror=alert(1)>\nattacker@example.test\nSKILLS\n<script>alert(2)</script>', { format: 'docx' });
 assert.equal(maliciousReview.contact.name.value, '<img src=x onerror=alert(1)>');
 assert.match(fs.readFileSync(new URL('../ui/CVImportReviewPanel.js', import.meta.url), 'utf8'), /escape\(item\.value\)/, 'review UI escapes extracted values before HTML insertion');

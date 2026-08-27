@@ -2,7 +2,9 @@ import { unzipSync } from 'fflate';
 
 export const CV_IMPORT_LIMITS = Object.freeze({ maxBytes: 10 * 1024 * 1024, maxPages: 12, maxTextLength: 120000, maxDocxXmlLength: 6000000 });
 const SECTION_NAMES = ['summary', 'experience', 'education', 'skills', 'projects', 'certifications', 'languages', 'training', 'activities'];
-const SECTION_RE = /^(summary|profile|about me|professional summary|objectives?|experience|work experience|professional experience|employment|career history|education|academic background|qualifications|academics|skills|technical skills|core skills|tools(?:\s*&\s*technologies)?|technologies|competencies|projects|selected projects|featured projects|certifications|certificates|licenses|courses|languages|foreign languages|training|activities|volunteering|volunteer experience|community involvement)\s*:??$/i;
+const SECTION_RE = /^(summary|profile|about me|professional summary|objectives?|experience|work experience|professional experience|international experience|relevant experience|additional experience|research experience|employment|career history|education|academic background|qualifications|academics|skills|skills\s*&\s*languages|technical skills|core skills|tools(?:\s*&\s*technologies)?|technologies|competencies|projects|selected projects|featured projects|certifications|certificates|licenses|courses|languages|foreign languages|training|activities|leadership\s*&\s*activities|volunteering|volunteer experience|community involvement|presentations\s*&\s*conferences|publications|professional memberships)\s*:??$/i;
+const INLINE_SECTION_RE = /^(professional summary|about me|objectives?|work experience|professional experience|career history|academic background|technical skills|core skills|tools\s*&\s*technologies|selected projects|featured projects|volunteer experience|community involvement|summary|profile|experience|employment|education|qualifications|academics|skills|technologies|competencies|projects|certifications|certificates|licenses|courses|languages|training|activities|volunteering)\s*(?::|\s{2,})\s*(.+)$/i;
+const UPPER_INLINE_SECTION_RE = /^(PROFESSIONAL SUMMARY|OBJECTIVES?|WORK EXPERIENCE|PROFESSIONAL EXPERIENCE|INTERNATIONAL EXPERIENCE|RELEVANT EXPERIENCE|ADDITIONAL EXPERIENCE|RESEARCH EXPERIENCE|CAREER HISTORY|ACADEMIC BACKGROUND|TECHNICAL SKILLS|CORE SKILLS|SKILLS & LANGUAGES|SELECTED PROJECTS|FEATURED PROJECTS|VOLUNTEER EXPERIENCE|LEADERSHIP & ACTIVITIES|SUMMARY|PROFILE|EXPERIENCE|EMPLOYMENT|EDUCATION|QUALIFICATIONS|ACADEMICS|SKILLS|PROJECTS|CERTIFICATIONS|LANGUAGES|TRAINING|ACTIVITIES|VOLUNTEERING)\s+(.+)$/;
 
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
 function clean(value, max = 2400) { return String(value || '').replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max); }
@@ -125,7 +127,10 @@ export async function extractImportText(file, { onProgress } = {}) {
 }
 
 export function buildImportReview(text, { format = 'text', fileName = '', embeddedLinks = [] } = {}) {
-  const lines = String(text || '').split('\n').map(cleanLine).filter(Boolean);
+  const lines = String(text || '').split('\n').map(cleanLine).filter(Boolean).flatMap(line => {
+    const match = line.match(INLINE_SECTION_RE) || line.match(UPPER_INLINE_SECTION_RE);
+    return match && clean(match[2]) ? [clean(match[1]), clean(match[2])] : [line];
+  });
   if (!lines.length) throw new Error('No readable text was found.');
   const headingIndexes = lines.map((line, index) => isHeading(line) ? { index, key: sectionKey(line) } : null).filter(Boolean);
   const firstSection = headingIndexes[0]?.index ?? lines.length;
@@ -160,6 +165,8 @@ export function buildImportReview(text, { format = 'text', fileName = '', embedd
   if (!review.contact.email.value) review.warnings.push('Email was not found in the file.');
   if (!review.experience.length) review.warnings.push('No experience rows were clearly extracted.');
   if (!review.education.length) review.warnings.push('No education rows were clearly extracted.');
+  const coreSectionCount = ['summary', 'experience', 'education', 'skills', 'projects'].filter(key => key === 'summary' ? Boolean(review.summary.value) : review[key].length > 0).length;
+  if (!review.contact.email.value && coreSectionCount < 2) review.warnings.push('This document does not look like a CV or resume. Check the file before selecting anything.');
   return review;
 }
 
