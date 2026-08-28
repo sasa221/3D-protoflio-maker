@@ -222,6 +222,7 @@ await billingHandler(configReq, configRes);
 check('payment-config action returns HTTP 200', configRes.statusCode === 200);
 check('payment-config returns method INSTAPAY', configRes.body?.method === 'INSTAPAY');
 check('payment-config contains no leaked API keys or private credentials', !configRes.body?.apiKey && !configRes.body?.secretKey);
+check('payment-config fails closed when no payment destination is configured', configRes.body?.configured === false && !configRes.body?.instapayAddress);
 
 // Test 4.2: Unauthenticated manual payment submission is rejected with 401
 const { req: unauthReq, res: unauthRes } = createMockReqRes({

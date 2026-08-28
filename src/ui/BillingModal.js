@@ -455,7 +455,7 @@ async function renderInstaPayView(planId, onSubscriptionUpdated, previousPlan, p
 
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap;">
             <span style="color:rgba(255,255,255,0.6);">Account Name:</span>
-            <strong style="color:#fff;">${escapeHtml(paymentConfig.displayName || 'SALEH MOHAMED SALEH')}</strong>
+            <strong style="color:#fff;">${escapeHtml(paymentConfig.displayName)}</strong>
           </div>
 
           <!-- OPTION 1: INSTAPAY ADDRESS -->
@@ -463,7 +463,7 @@ async function renderInstaPayView(planId, onSubscriptionUpdated, previousPlan, p
             <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
               <span style="color:rgba(255,255,255,0.6);font-size:12px;">InstaPay Address (IPA):</span>
               <div style="display:flex;align-items:center;gap:6px;">
-                <strong style="font-family:monospace;color:#38bdf8;font-size:13px;">${escapeHtml(paymentConfig.instapayAddress || 'saleh2005mohamed@instapay')}</strong>
+                <strong style="font-family:monospace;color:#38bdf8;font-size:13px;">${escapeHtml(paymentConfig.instapayAddress)}</strong>
                 <button type="button" id="btn-copy-address" style="background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.3);color:#38bdf8;padding:3px 8px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:700;">Copy</button>
               </div>
             </div>
@@ -476,7 +476,7 @@ async function renderInstaPayView(planId, onSubscriptionUpdated, previousPlan, p
             <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
               <span style="color:rgba(255,255,255,0.6);font-size:12px;">Phone Number:</span>
               <div style="display:flex;align-items:center;gap:6px;">
-                <strong style="font-family:monospace;color:#38bdf8;font-size:13px;">${escapeHtml(paymentConfig.phoneNumber || '01270024222')}</strong>
+                <strong style="font-family:monospace;color:#38bdf8;font-size:13px;">${escapeHtml(paymentConfig.phoneNumber)}</strong>
                 <button type="button" id="btn-copy-phone" style="background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.3);color:#38bdf8;padding:3px 8px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:700;">Copy</button>
               </div>
             </div>
@@ -576,7 +576,7 @@ async function renderInstaPayView(planId, onSubscriptionUpdated, previousPlan, p
 
   // Copy InstaPay address
   modalContainer.querySelector('#btn-copy-address')?.addEventListener('click', (e) => {
-    const addr = paymentConfig?.instapayAddress || 'saleh2005mohamed@instapay';
+    const addr = paymentConfig?.instapayAddress || '';
     if (addr && navigator.clipboard) {
       navigator.clipboard.writeText(addr);
       e.target.textContent = '✓ Copied!';
@@ -586,7 +586,7 @@ async function renderInstaPayView(planId, onSubscriptionUpdated, previousPlan, p
 
   // Copy Phone Number
   modalContainer.querySelector('#btn-copy-phone')?.addEventListener('click', (e) => {
-    const phone = paymentConfig?.phoneNumber || '01270024222';
+    const phone = paymentConfig?.phoneNumber || '';
     if (phone && navigator.clipboard) {
       navigator.clipboard.writeText(phone);
       e.target.textContent = '✓ Copied!';

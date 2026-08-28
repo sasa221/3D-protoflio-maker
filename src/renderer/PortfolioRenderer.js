@@ -17,6 +17,27 @@ function escapeHTML(str) {
   }[m]));
 }
 
+// Escaping an href prevents attribute injection but does not stop a
+// javascript: URL. Public portfolios are rendered from user-owned content,
+// so protocol validation is required before an anchor is emitted.
+function safeExternalHref(value, { allowMailto = false } = {}) {
+  const href = String(value || '').trim();
+  if (!href) return '';
+  if (/^https?:\/\//i.test(href)) return href;
+  if (allowMailto && /^mailto:[^\s@]+@[^\s@]+\.[^\s@]+$/i.test(href)) return href;
+  return '';
+}
+
+function safeResumeHref(value) {
+  const href = String(value || '').trim();
+  return /^(?:https?:\/\/|blob:|data:application\/pdf(?:;base64)?,)/i.test(href) ? href : '';
+}
+
+function safeImageSrc(value) {
+  const src = String(value || '').trim();
+  return /^(?:https?:\/\/|blob:|data:image\/(?:png|jpe?g|gif|webp);base64,)/i.test(src) ? src : '';
+}
+
 /**
  * Get Shared Canonical Portfolio Snapshot Config
  */
@@ -1321,7 +1342,7 @@ export function generatePortfolioHTMLBody(portfolioData, theme, options = {}) {
   const primaryHex = '#' + (theme.primaryColor || 0x7c3aed).toString(16).padStart(6, '0');
   const secondaryHex = '#' + (theme.secondaryColor || 0x06b6d4).toString(16).padStart(6, '0');
 
-  const avatarSrc = typeof portfolioData.avatar === 'object' ? portfolioData.avatar.publicUrl : (portfolioData.avatar || '');
+  const avatarSrc = safeImageSrc(typeof portfolioData.avatar === 'object' ? portfolioData.avatar.publicUrl : (portfolioData.avatar || ''));
   const avatarImgTag = avatarSrc ? `
     <img src="${escapeHTML(avatarSrc)}" alt="${escapeHTML(portfolioData.name || 'Portfolio owner')}" style="transform: scale(${portfolioData.avatarZoom || 1}) translate(${portfolioData.avatarPosX || 0}px, ${portfolioData.avatarPosY || 0}px);"/>
   ` : '';
@@ -1332,7 +1353,7 @@ export function generatePortfolioHTMLBody(portfolioData, theme, options = {}) {
   const hasSkills = Array.isArray(portfolioData.skills) && portfolioData.skills.length > 0;
   const hasCerts = Array.isArray(portfolioData.certs) && portfolioData.certs.length > 0;
   
-  const resumeURL = portfolioData.resume ? (portfolioData.resume.publicUrl || portfolioData.resume.signedUrl || portfolioData.resume.dataUrl || portfolioData.resume.url) : null;
+  const resumeURL = safeResumeHref(portfolioData.resume ? (portfolioData.resume.publicUrl || portfolioData.resume.signedUrl || portfolioData.resume.dataUrl || portfolioData.resume.url) : null);
   const hasValidResume = Boolean(resumeURL || (portfolioData.resume && portfolioData.resume.storagePath));
 
   const expStats = calculateProfessionalExperience(portfolioData.experience || []);
@@ -1428,7 +1449,7 @@ export function generatePortfolioHTMLBody(portfolioData, theme, options = {}) {
 
             <div class="hero-actions">
               ${hasProjects ? `<a href="#sec-projects" class="btn btn-primary">Explore Projects ↓</a>` : `<a href="#sec-contact" class="btn btn-primary">Get In Touch</a>`}
-              ${hasValidResume ? `<a href="${escapeHTML(resumeURL)}" download="${escapeHTML(portfolioData.resume.fileName || 'Resume.pdf')}" target="_blank" class="btn btn-secondary resume-btn">📄 ${escapeHTML(portfolioData.resume.buttonText || 'Download Resume')}</a>` : ''}
+              ${hasValidResume ? `<a href="${escapeHTML(resumeURL)}" download="${escapeHTML(portfolioData.resume.fileName || 'Resume.pdf')}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary resume-btn">📄 ${escapeHTML(portfolioData.resume.buttonText || 'Download Resume')}</a>` : ''}
               <a href="#sec-contact" class="btn btn-secondary">Get In Touch</a>
             </div>
           </div>
@@ -1501,12 +1522,12 @@ export function generatePortfolioHTMLBody(portfolioData, theme, options = {}) {
               <h2 class="section-title" style="margin-bottom: 12px;">Let's Connect</h2>
               <p class="contact-msg">${escapeHTML(portfolioData.contactMessage || 'Feel free to reach out for collaborations or opportunities.')}</p>
               <div class="contact-links">
-                ${portfolioData.social?.email ? `<a href="mailto:${escapeHTML(portfolioData.social.email)}" class="btn btn-primary">✉ Email Me</a>` : ''}
-                ${hasValidResume ? `<a href="${escapeHTML(resumeURL)}" download="${escapeHTML(portfolioData.resume.fileName || 'Resume.pdf')}" target="_blank" class="btn btn-secondary">📄 Download Resume</a>` : ''}
-                ${portfolioData.social?.github ? `<a href="${escapeHTML(portfolioData.social.github)}" target="_blank" class="btn btn-secondary">💻 GitHub</a>` : ''}
-                ${portfolioData.social?.linkedin ? `<a href="${escapeHTML(portfolioData.social.linkedin)}" target="_blank" class="btn btn-secondary">LinkedIn</a>` : ''}
-                ${portfolioData.social?.twitter ? `<a href="${escapeHTML(portfolioData.social.twitter)}" target="_blank" class="btn btn-secondary">Twitter</a>` : ''}
-                ${portfolioData.social?.website ? `<a href="${escapeHTML(portfolioData.social.website)}" target="_blank" class="btn btn-secondary">Website</a>` : ''}
+                ${safeExternalHref(`mailto:${portfolioData.social?.email || ''}`, { allowMailto: true }) ? `<a href="${escapeHTML(safeExternalHref(`mailto:${portfolioData.social.email}`, { allowMailto: true }))}" class="btn btn-primary">✉ Email Me</a>` : ''}
+                ${hasValidResume ? `<a href="${escapeHTML(resumeURL)}" download="${escapeHTML(portfolioData.resume.fileName || 'Resume.pdf')}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">📄 Download Resume</a>` : ''}
+                ${safeExternalHref(portfolioData.social?.github) ? `<a href="${escapeHTML(safeExternalHref(portfolioData.social.github))}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">💻 GitHub</a>` : ''}
+                ${safeExternalHref(portfolioData.social?.linkedin) ? `<a href="${escapeHTML(safeExternalHref(portfolioData.social.linkedin))}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">LinkedIn</a>` : ''}
+                ${safeExternalHref(portfolioData.social?.twitter) ? `<a href="${escapeHTML(safeExternalHref(portfolioData.social.twitter))}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Twitter</a>` : ''}
+                ${safeExternalHref(portfolioData.social?.website) ? `<a href="${escapeHTML(safeExternalHref(portfolioData.social.website))}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Website</a>` : ''}
               </div>
             </div>
           </div>
@@ -1550,7 +1571,7 @@ function generateExperienceHTML(experienceList) {
         <div class="exp-header">
           <div>
             <h3 class="exp-role">${escapeHTML(exp.role || 'Role')}</h3>
-            <div class="exp-company">${exp.companyUrl ? `<a href="${escapeHTML(exp.companyUrl)}" target="_blank" rel="noopener">${escapeHTML(exp.company)}</a>` : escapeHTML(exp.company || '')} ${exp.location ? `<span class="exp-location">📍 ${escapeHTML(exp.location)}</span>` : ''}</div>
+            <div class="exp-company">${safeExternalHref(exp.companyUrl) ? `<a href="${escapeHTML(safeExternalHref(exp.companyUrl))}" target="_blank" rel="noopener noreferrer">${escapeHTML(exp.company)}</a>` : escapeHTML(exp.company || '')} ${exp.location ? `<span class="exp-location">📍 ${escapeHTML(exp.location)}</span>` : ''}</div>
           </div>
           ${dates ? `<div class="exp-dates-badge">${dates}</div>` : ''}
         </div>
@@ -1615,7 +1636,7 @@ function renderProjectsHTML(projects, primary, secondary) {
     <div class="glass-card project-card">
       ${p.image ? `
         <div class="project-img-wrap">
-        <img src="${escapeHTML(p.image)}" alt="${escapeHTML(p.name || 'Project image')}" loading="lazy" decoding="async" />
+        <img src="${escapeHTML(safeImageSrc(p.image))}" alt="${escapeHTML(p.name || 'Project image')}" loading="lazy" decoding="async" />
         </div>
       ` : `
         <div class="project-img-wrap" style="display:flex;align-items:center;justify-content:center;font-size:2.5rem;opacity:0.4">🚀</div>
@@ -1627,8 +1648,8 @@ function renderProjectsHTML(projects, primary, secondary) {
       <div class="project-name">${escapeHTML(p.name || 'Project Name')}</div>
       <div class="project-desc">${escapeHTML(p.description || '')}</div>
       <div class="project-links">
-        ${p.github ? `<a href="${escapeHTML(p.github)}" target="_blank" class="btn btn-secondary" style="padding: 7px 14px; font-size: 0.78rem;">💻 GitHub</a>` : ''}
-        ${p.url ? `<a href="${escapeHTML(p.url)}" target="_blank" class="btn btn-primary" style="padding: 7px 16px; font-size: 0.78rem; margin-left: auto;">🌐 Live Demo →</a>` : ''}
+        ${safeExternalHref(p.github) ? `<a href="${escapeHTML(safeExternalHref(p.github))}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="padding: 7px 14px; font-size: 0.78rem;">💻 GitHub</a>` : ''}
+        ${safeExternalHref(p.url) ? `<a href="${escapeHTML(safeExternalHref(p.url))}" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="padding: 7px 16px; font-size: 0.78rem; margin-left: auto;">🌐 Live Demo →</a>` : ''}
       </div>
       <button class="btn btn-cinema-trigger" onclick="openProjectCinema(${i})" style="width:100%;margin-top:12px;padding:9px 16px;font-size:0.8rem;background:linear-gradient(135deg,rgba(124,58,237,0.22),rgba(6,182,212,0.22));border:1px solid rgba(124,58,237,0.45);color:#fff;border-radius:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all 0.25s">
         🎬 View Case Study →

@@ -230,8 +230,10 @@ export function getGroupPrice(seats) {
 }
 
 export const INSTAPAY_CONFIG = {
-  displayName: (typeof process !== 'undefined' && process.env?.INSTAPAY_ACCOUNT_NAME) || 'SALEH MOHAMED SALEH',
-  instapayAddress: (typeof process !== 'undefined' && process.env?.INSTAPAY_ADDRESS) || 'saleh2005mohamed@instapay',
-  phoneNumber: (typeof process !== 'undefined' && process.env?.INSTAPAY_PHONE_NUMBER) || '01270024222',
-  isConfigured: true
+  // The server endpoint is the authority for payment details. These values
+  // intentionally fail closed so a client build can never invent a recipient.
+  displayName: '',
+  instapayAddress: '',
+  phoneNumber: '',
+  isConfigured: false
 };

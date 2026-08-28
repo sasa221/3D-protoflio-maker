@@ -151,10 +151,9 @@ async function checkRegisteredAuthEmail(req, res) {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ error: 'Valid email address required.' });
   }
-  const adminClient = getAdminClient({ requireSecret: true });
-  if (!adminClient) return res.status(503).json({ code: 'auth_service', error: 'Authentication service is not configured.' });
-  const user = await findAuthUser(adminClient, email);
-  return res.status(200).json({ success: true, exists: Boolean(user) });
+  // Account discovery must not be exposed as a public oracle. The sign-in UI
+  // uses the same neutral response for an unknown address and a bad password.
+  return res.status(200).json({ success: true });
 }
 
 async function sendPortfolio(req, res, adminClient, slug) {

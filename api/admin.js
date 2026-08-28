@@ -100,10 +100,8 @@ export default async function handler(req, res) {
     const serviceKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
     const database = (url && serviceKey) ? 'connected' : 'not_connected';
     const storage = (url && anonKey) ? 'connected' : 'not_connected';
-    // The product's active billing path is manual InstaPay, not Stripe/Paymob.
-    // api/billing.js exposes the official fallback destination when the optional
-    // PAYMENT_INSTAPAY_* overrides are absent, so health must report that real
-    // path instead of a stale Stripe-only dependency.
+    // Manual billing is only ready after a real destination is configured.
+    // Health must not report billing as ready merely because the UI exists.
     const manualInstaPayBilling = Boolean(INSTAPAY_CONFIG?.isConfigured);
     const billing = manualInstaPayBilling || Boolean(process.env.STRIPE_SECRET_KEY || process.env.PAYMOB_API_KEY || process.env.VITE_ENABLE_BILLING_PORTAL);
     const email = Boolean(process.env.BREVO_API_KEY && process.env.BREVO_SENDER_EMAIL);

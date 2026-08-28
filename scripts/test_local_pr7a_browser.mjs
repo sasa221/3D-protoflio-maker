@@ -9,8 +9,8 @@ const tmpDir = path.join(root, 'tmp', 'pr7a-browser');
 const htmlPath = path.join(tmpDir, 'index.html');
 const homePath = path.join(tmpDir, 'home.html');
 const port = 5175;
-const qualityScreenshotPath = path.join(root, 'docs', 'pr7a-quality-check.png');
-const homeScreenshotPath = path.join(root, 'docs', 'pr7a-home.png');
+const qualityScreenshotPath = process.env.CV_QUALITY_SMOKE_SCREENSHOT || path.join(root, 'docs', 'pr7a-quality-check.png');
+const homeScreenshotPath = process.env.CV_HOME_SMOKE_SCREENSHOT || path.join(root, 'docs', 'pr7a-home.png');
 
 await fs.mkdir(tmpDir, { recursive: true });
 await fs.writeFile(htmlPath, `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/src/index.css"></head><body style="margin:0"><main id="root"></main><script type="module">import { renderCVBuilderPage } from '/src/ui/CVBuilderPage.js'; renderCVBuilderPage(document.querySelector('#root'), { ownerUserId: 'pr7a-browser-user', openImport: true });</script></body></html>`);

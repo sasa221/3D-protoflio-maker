@@ -14,7 +14,7 @@ check('Custom auth signup action uses Supabase Admin generateLink', source.inclu
 check('Custom auth resend action uses magiclink generateLink', source.includes("type: 'magiclink'"));
 check('Auth confirmation is dispatched through Brevo API', source.includes('sendBrevoEmail') && source.includes('generateSignupVerificationEmail'));
 check('Custom auth routes are mapped without adding a serverless function', vercel.includes('/api/auth/signup') && vercel.includes('/api/auth/resend'));
-check('Auth email lookup route is mapped', vercel.includes('/api/auth/check-email') && source.includes('auth-check-email'));
+check('Auth email lookup route is mapped without exposing account existence', vercel.includes('/api/auth/check-email') && source.includes('auth-check-email') && !source.includes('exists: Boolean(user)'));
 check('Reset endpoint does not reveal account existence', source.includes('Do not reveal whether an account exists') && source.includes('emailSent: true') && !source.includes("code: 'email_not_registered'"));
 check('Auth flows carry distinct Brevo tags', source.includes('auth-signup-verification') && source.includes('auth-password-reset'));
 check('Verification email contains both OTP and secure link', (() => {

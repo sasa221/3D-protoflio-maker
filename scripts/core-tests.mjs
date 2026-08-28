@@ -55,9 +55,10 @@ assert.equal(GROUP_SEAT_PRICING[3], 2550);
 assert.equal(GROUP_SEAT_PRICING[4], 3200);
 assert.equal(GROUP_SEAT_PRICING[5], 3750);
 assert.equal(KEEP_IT_LIVE.priceAnnualPerPortfolioEGP, 500);
-assert.equal(INSTAPAY_CONFIG.displayName, 'SALEH MOHAMED SALEH');
-assert.equal(INSTAPAY_CONFIG.instapayAddress, 'saleh2005mohamed@instapay');
-assert.equal(INSTAPAY_CONFIG.phoneNumber, '01270024222');
+assert.equal(INSTAPAY_CONFIG.isConfigured, false, 'Payment UI must fail closed without a server response');
+assert.equal(INSTAPAY_CONFIG.displayName, '');
+assert.equal(INSTAPAY_CONFIG.instapayAddress, '');
+assert.equal(INSTAPAY_CONFIG.phoneNumber, '');
 
 // 6. Security Invariants
 const envPath = path.join(rootDir, '.env');

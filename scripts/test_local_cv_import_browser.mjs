@@ -12,7 +12,7 @@ const htmlPath = path.join(tmpDir, 'index.html');
 const pdfPath = path.join(tmpDir, 'synthetic-student.pdf');
 const badPdfPath = path.join(tmpDir, 'corrupt.pdf');
 const docxPath = path.join(tmpDir, 'synthetic-professional.docx');
-const screenshotPath = path.join(root, 'docs', 'pr6-import-review.png');
+const screenshotPath = process.env.CV_IMPORT_SMOKE_SCREENSHOT || path.join(root, 'docs', 'pr6-import-review.png');
 const port = 5174;
 
 async function makePdf() {

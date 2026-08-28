@@ -6,7 +6,7 @@
  */
 
 import {
-  signUp, login, getSession, isLoggedIn, getCurrentUser, verifyEmailOtp, resendEmailOtp, checkEmailRegistered, isEmailVerified
+  signUp, login, getSession, isLoggedIn, getCurrentUser, verifyEmailOtp, resendEmailOtp, isEmailVerified
 } from './services/AuthService.js';
 import { mapAuthError } from './services/AuthErrorMapper.js';
 import { PLAN_CONFIG } from './services/EntitlementService.js';
@@ -316,17 +316,7 @@ export function renderAuthPage(onSuccess) {
       }
 
       if (mapped.type === 'invalid_credentials') {
-        const email = document.getElementById('login-email')?.value?.trim() || '';
-        try {
-          const lookup = await checkEmailRegistered(email);
-          if (!lookup?.exists) {
-            setLoginNotice('This email is not registered yet.', { showSignup: true });
-          } else {
-            setLoginNotice('Incorrect password. Try again or use Forgot Password.');
-          }
-        } catch (_) {
-          setLoginNotice(mapped.userFacing);
-        }
+        setLoginNotice('Incorrect email or password. Try again or use Forgot Password.');
       } else if (err) {
         err.textContent = mapped.userFacing;
         err.style.display = 'block';

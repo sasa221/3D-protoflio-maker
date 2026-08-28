@@ -211,26 +211,21 @@ assert(unlockResult.action === 'OPEN_PRICING', 'Clicking Unlock with Pro opens p
 assert(unlockResult.targetTier === 'pro', 'Pricing target is Pro');
 assert(mockPortfolioData.theme === 'code', 'Saved active theme remains untouched during unlock click');
 
-// ─── 8. OFFICIAL INSTAPAY CONFIG INVARIANTS ──────────────────
-console.log('\n8. Testing Official Real InstaPay Configuration Invariants...');
+// ─── 8. PAYMENT CONFIG FAIL-CLOSED INVARIANTS ────────────────
+console.log('\n8. Testing Payment Configuration Fail-Closed Invariants...');
 
-const officialPaymentConfig = {
-  configured: true,
+const missingPaymentConfig = {
+  configured: false,
   method: 'INSTAPAY',
-  displayName: 'SALEH MOHAMED SALEH',
-  instapayAddress: 'saleh2005mohamed@instapay',
-  phoneNumber: '01270024222',
-  bankName: null,
-  paymentNote: 'Transfer via InstaPay only. You may use either the InstaPay address or phone number. This is not a mobile wallet payment.'
+  displayName: '',
+  instapayAddress: '',
+  phoneNumber: ''
 };
 
-assert(officialPaymentConfig.configured === true, 'InstaPay is configured');
-assert(officialPaymentConfig.displayName === 'SALEH MOHAMED SALEH', 'Account name matches official owner');
-assert(officialPaymentConfig.instapayAddress === 'saleh2005mohamed@instapay', 'IPA matches official address');
-assert(officialPaymentConfig.phoneNumber === '01270024222', 'Phone matches official number');
-assert(!officialPaymentConfig.paymentNote.toLowerCase().includes('vodafone cash'), 'No Vodafone Cash references');
-assert(!officialPaymentConfig.paymentNote.toLowerCase().includes('wallet transfer'), 'No wallet transfer references');
-assert(officialPaymentConfig.paymentNote.includes('InstaPay only'), 'Explicit InstaPay only statement present');
+assert(missingPaymentConfig.configured === false, 'InstaPay is unavailable until the server is configured');
+assert(!missingPaymentConfig.displayName, 'No account name is invented when configuration is missing');
+assert(!missingPaymentConfig.instapayAddress, 'No InstaPay address is invented when configuration is missing');
+assert(!missingPaymentConfig.phoneNumber, 'No phone number is invented when configuration is missing');
 
 console.log('\n============================================================');
 console.log(`  SUMMARY: ${passed} / ${passed + failed} assertions PASSED (Failures: ${failed})`);

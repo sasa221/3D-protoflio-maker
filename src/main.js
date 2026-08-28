@@ -50,6 +50,20 @@ import { persistPortfolioSync } from './services/CVPortfolioSyncService.js';
 import { isLocalAuthMockEnabled } from './config/RuntimeSafety.js';
 import confetti from 'canvas-confetti';
 
+// Studio renders saved and imported user content into template strings. Keep
+// data as plain text in storage, but escape every value at this final HTML
+// binding boundary so a malformed CV cannot break out of a form field.
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[char]));
+}
+
+function safeImageSrc(value) {
+  const source = String(value || '').trim();
+  return /^(?:https?:|blob:|data:image\/(?:png|jpe?g|gif|webp);base64,)/i.test(source) ? source : '';
+}
+
 // ─── STATE ─────────────────────────────────
 let engine = null;
 let sceneDirector = null;
@@ -888,7 +902,7 @@ function buildHTML() {
                 border:3px solid var(--primary);box-shadow:0 0 25px rgba(124,58,237,0.5);
                 position:relative;background:#000;
               ">
-                <img id="profile-avatar-preview-img" src="${portfolioData.avatar}" style="width:100%;height:100%;object-fit:cover;transform:scale(${portfolioData.avatarZoom || 1});transition:transform 0.2s;"/>
+                <img id="profile-avatar-preview-img" src="${escapeHTML(safeImageSrc(typeof portfolioData.avatar === 'object' ? portfolioData.avatar.publicUrl : portfolioData.avatar))}" alt="Profile preview" style="width:100%;height:100%;object-fit:cover;transform:scale(${portfolioData.avatarZoom || 1});transition:transform 0.2s;"/>
               </div>
 
               <!-- ZOOM CONTROLS -->
@@ -919,20 +933,20 @@ function buildHTML() {
 
         <div class="section-label">Basic Info</div>
         <div class="field-group"><label class="field-label">Full Name</label>
-          <input class="field-input" id="f-name" placeholder="e.g. Alex Johnson" value="${portfolioData.name}"/>
+          <input class="field-input" id="f-name" placeholder="e.g. Alex Johnson" value="${escapeHTML(portfolioData.name)}"/>
         </div>
         <div class="field-group"><label class="field-label">Profession / Job Title</label>
-          <input class="field-input" id="f-profession" placeholder="e.g. Full-Stack Developer, Architect..." value="${portfolioData.profession}"/>
+          <input class="field-input" id="f-profession" placeholder="e.g. Full-Stack Developer, Architect..." value="${escapeHTML(portfolioData.profession)}"/>
           <span style="font-size:0.68rem;color:var(--text-dim);margin-top:4px">🤖 Auto-detects & applies matching 3D theme!</span>
         </div>
         <div class="field-group"><label class="field-label">Tagline</label>
-          <input class="field-input" id="f-tagline" placeholder="e.g. Building the Future" value="${portfolioData.tagline}"/>
+          <input class="field-input" id="f-tagline" placeholder="e.g. Building the Future" value="${escapeHTML(portfolioData.tagline)}"/>
         </div>
         <div class="field-group"><label class="field-label">Bio</label>
-          <textarea class="field-textarea" id="f-bio" placeholder="Tell your story...">${portfolioData.bio}</textarea>
+          <textarea class="field-textarea" id="f-bio" placeholder="Tell your story...">${escapeHTML(portfolioData.bio)}</textarea>
         </div>
         <div class="field-group"><label class="field-label">Location</label>
-          <input class="field-input" id="f-location" placeholder="e.g. Cairo, Egypt" value="${portfolioData.location}"/>
+          <input class="field-input" id="f-location" placeholder="e.g. Cairo, Egypt" value="${escapeHTML(portfolioData.location)}"/>
         </div>
         <div class="field-group"><label class="field-label">Job Availability Status</label>
           <select class="field-input" id="f-availability-status" onchange="updateAvailabilityStatus(this.value)">
@@ -952,12 +966,12 @@ function buildHTML() {
           {id:'website', label:'Website URL', icon:'◈'}
         ].map(s => `
           <div class="field-group"><label class="field-label">${s.icon} ${s.label}</label>
-            <input class="field-input" id="f-${s.id}" placeholder="${s.id === 'email' ? 'you@example.com' : 'https://'}" value="${portfolioData.social[s.id] || ''}"/>
+            <input class="field-input" id="f-${s.id}" placeholder="${s.id === 'email' ? 'you@example.com' : 'https://'}" value="${escapeHTML(portfolioData.social[s.id] || '')}"/>
           </div>
         `).join('')}
 
         <div class="field-group"><label class="field-label">Contact Message</label>
-          <textarea class="field-textarea" id="f-contact" placeholder="Your contact section message...">${portfolioData.contactMessage}</textarea>
+          <textarea class="field-textarea" id="f-contact" placeholder="Your contact section message...">${escapeHTML(portfolioData.contactMessage)}</textarea>
         </div>
 
         <div id="resume-editor-box"></div>
@@ -2206,7 +2220,7 @@ export function renderPublishTab() {
           </label>
           <div style="display:flex;align-items:center;gap:6px;">
             <span style="font-family:'JetBrains Mono',monospace;font-size:0.76rem;color:rgba(255,255,255,0.4);">/u/</span>
-            <input id="f-publish-slug" class="field-input" value="${portfolioData.slug || ''}" placeholder="my-portfolio-slug" style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;padding:8px 10px;flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;outline:none;" onchange="updatePortfolioSlug(this.value)"/>
+            <input id="f-publish-slug" class="field-input" value="${escapeHTML(portfolioData.slug || '')}" placeholder="my-portfolio-slug" style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;padding:8px 10px;flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;outline:none;" onchange="updatePortfolioSlug(this.value)"/>
           </div>
         </div>
 
@@ -2489,7 +2503,7 @@ function renderSkills() {
 
   el.innerHTML = portfolioData.skills.map((s, i) => `
     <div class="skill-row" id="skill-${i}" style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
-      <input class="field-input" value="${s.name || ''}" placeholder="Skill name (e.g. JavaScript, React)..." oninput="updateSkill(${i},'name',this.value)" style="flex:1"/>
+      <input class="field-input" value="${escapeHTML(s.name || '')}" placeholder="Skill name (e.g. JavaScript, React)..." oninput="updateSkill(${i},'name',this.value)" style="flex:1"/>
       <div style="display:flex;gap:2px">
         <button onclick="moveSkill(${i},-1)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:0.7rem;display:flex;align-items:center;justify-content:center" title="Move Up" ${i === 0 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>↑</button>
         <button onclick="moveSkill(${i},1)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:0.7rem;display:flex;align-items:center;justify-content:center" title="Move Down" ${i === portfolioData.skills.length - 1 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>↓</button>
@@ -2559,21 +2573,21 @@ function renderExperience() {
           <button onclick="removeExperience(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;font-weight:bold;margin-left:4px">✕ Remove</button>
         </div>
       </div>
-      <input class="field-input" value="${exp.role || ''}" placeholder="Job Title / Role (e.g. Senior Frontend Engineer)" oninput="updateExperience(${i},'role',this.value)" style="margin-bottom:8px;font-weight:700"/>
+      <input class="field-input" value="${escapeHTML(exp.role || '')}" placeholder="Job Title / Role (e.g. Senior Frontend Engineer)" oninput="updateExperience(${i},'role',this.value)" style="margin-bottom:8px;font-weight:700"/>
       <div style="display:flex;gap:8px;margin-bottom:8px">
-        <input class="field-input" value="${exp.company || ''}" placeholder="Company Name" oninput="updateExperience(${i},'company',this.value)" style="flex:1"/>
-        <input class="field-input" value="${exp.location || ''}" placeholder="Location (e.g. Remote / Cairo)" oninput="updateExperience(${i},'location',this.value)" style="flex:1"/>
+        <input class="field-input" value="${escapeHTML(exp.company || '')}" placeholder="Company Name" oninput="updateExperience(${i},'company',this.value)" style="flex:1"/>
+        <input class="field-input" value="${escapeHTML(exp.location || '')}" placeholder="Location (e.g. Remote / Cairo)" oninput="updateExperience(${i},'location',this.value)" style="flex:1"/>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
-        <input class="field-input" value="${exp.startDate || ''}" placeholder="Start Date (e.g. 2024)" oninput="updateExperience(${i},'startDate',this.value)" style="flex:1"/>
-        <input class="field-input" value="${exp.endDate || ''}" placeholder="End Date (e.g. Present)" oninput="updateExperience(${i},'endDate',this.value)" style="flex:1" ${exp.current ? 'disabled' : ''}/>
+        <input class="field-input" value="${escapeHTML(exp.startDate || '')}" placeholder="Start Date (e.g. 2024)" oninput="updateExperience(${i},'startDate',this.value)" style="flex:1"/>
+        <input class="field-input" value="${escapeHTML(exp.endDate || '')}" placeholder="End Date (e.g. Present)" oninput="updateExperience(${i},'endDate',this.value)" style="flex:1" ${exp.current ? 'disabled' : ''}/>
         <label style="font-size:0.75rem;color:rgba(255,255,255,0.8);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px">
           <input type="checkbox" ${exp.current ? 'checked' : ''} onchange="updateExperience(${i},'current',this.checked)"/> Current
         </label>
       </div>
-      <textarea class="field-textarea" style="min-height:55px;margin-bottom:8px" placeholder="Role description and achievements..." oninput="updateExperience(${i},'description',this.value)">${exp.description || ''}</textarea>
-      <input class="field-input" value="${Array.isArray(exp.achievements) ? exp.achievements.join(' ; ') : ''}" placeholder="Key Achievements (separated by semicolons ';')" oninput="updateExperienceAchievements(${i},this.value)" style="margin-bottom:8px"/>
-      <input class="field-input" value="${Array.isArray(exp.technologies) ? exp.technologies.join(', ') : ''}" placeholder="Technologies used (comma separated, e.g. React, Three.js)" oninput="updateExperienceTechnologies(${i},this.value)"/>
+      <textarea class="field-textarea" style="min-height:55px;margin-bottom:8px" placeholder="Role description and achievements..." oninput="updateExperience(${i},'description',this.value)">${escapeHTML(exp.description || '')}</textarea>
+      <input class="field-input" value="${escapeHTML(Array.isArray(exp.achievements) ? exp.achievements.join(' ; ') : '')}" placeholder="Key Achievements (separated by semicolons ';')" oninput="updateExperienceAchievements(${i},this.value)" style="margin-bottom:8px"/>
+      <input class="field-input" value="${escapeHTML(Array.isArray(exp.technologies) ? exp.technologies.join(', ') : '')}" placeholder="Technologies used (comma separated, e.g. React, Three.js)" oninput="updateExperienceTechnologies(${i},this.value)"/>
     </div>
   `).join('');
 }
@@ -2661,17 +2675,17 @@ function renderEducation() {
           <button onclick="removeEducation(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;font-weight:bold;margin-left:4px">✕ Remove</button>
         </div>
       </div>
-      <input class="field-input" value="${edu.degree || ''}" placeholder="Degree (e.g. B.Sc. Computer Science)" oninput="updateEducation(${i},'degree',this.value)" style="margin-bottom:8px;font-weight:700"/>
+      <input class="field-input" value="${escapeHTML(edu.degree || '')}" placeholder="Degree (e.g. B.Sc. Computer Science)" oninput="updateEducation(${i},'degree',this.value)" style="margin-bottom:8px;font-weight:700"/>
       <div style="display:flex;gap:8px;margin-bottom:8px">
-        <input class="field-input" value="${edu.institution || ''}" placeholder="Institution / University" oninput="updateEducation(${i},'institution',this.value)" style="flex:1"/>
-        <input class="field-input" value="${edu.location || ''}" placeholder="Location" oninput="updateEducation(${i},'location',this.value)" style="flex:1"/>
+        <input class="field-input" value="${escapeHTML(edu.institution || '')}" placeholder="Institution / University" oninput="updateEducation(${i},'institution',this.value)" style="flex:1"/>
+        <input class="field-input" value="${escapeHTML(edu.location || '')}" placeholder="Location" oninput="updateEducation(${i},'location',this.value)" style="flex:1"/>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:8px">
-        <input class="field-input" value="${edu.startDate || ''}" placeholder="Start Year" oninput="updateEducation(${i},'startDate',this.value)" style="flex:1"/>
-        <input class="field-input" value="${edu.endDate || ''}" placeholder="End Year" oninput="updateEducation(${i},'endDate',this.value)" style="flex:1"/>
-        <input class="field-input" value="${edu.grade || ''}" placeholder="Grade / Honors" oninput="updateEducation(${i},'grade',this.value)" style="flex:1"/>
+        <input class="field-input" value="${escapeHTML(edu.startDate || '')}" placeholder="Start Year" oninput="updateEducation(${i},'startDate',this.value)" style="flex:1"/>
+        <input class="field-input" value="${escapeHTML(edu.endDate || '')}" placeholder="End Year" oninput="updateEducation(${i},'endDate',this.value)" style="flex:1"/>
+        <input class="field-input" value="${escapeHTML(edu.grade || '')}" placeholder="Grade / Honors" oninput="updateEducation(${i},'grade',this.value)" style="flex:1"/>
       </div>
-      <textarea class="field-textarea" style="min-height:50px" placeholder="Field of study or details..." oninput="updateEducation(${i},'description',this.value)">${edu.description || ''}</textarea>
+      <textarea class="field-textarea" style="min-height:50px" placeholder="Field of study or details..." oninput="updateEducation(${i},'description',this.value)">${escapeHTML(edu.description || '')}</textarea>
     </div>
   `).join('');
 }
@@ -2728,7 +2742,7 @@ function renderResumeUI() {
       
       ${hasFile ? `
         <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:10px;padding:10px 14px;margin-bottom:10px">
-          <div style="font-size:0.82rem;color:#10b981;font-weight:700">📄 ${portfolioData.resume.fileName || 'Resume.pdf'}</div>
+          <div style="font-size:0.82rem;color:#10b981;font-weight:700">📄 ${escapeHTML(portfolioData.resume.fileName || 'Resume.pdf')}</div>
           <button onclick="removeResume()" style="background:none;border:none;color:#ef4444;font-size:0.78rem;font-weight:700;cursor:pointer">Remove ✕</button>
         </div>
       ` : ''}
@@ -2818,12 +2832,12 @@ function renderProjects() {
           <button class="del-btn" onclick="removeProject(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;margin-left:4px">✕ Remove</button>
         </div>
       </div>
-      <input class="field-input" value="${p.name || ''}" placeholder="Project Name (e.g. AI E-Commerce Platform)" oninput="updateProject(${i},'name',this.value)" style="margin-bottom:8px;font-weight:700"/>
-      <textarea class="field-textarea" style="min-height:55px;margin-bottom:8px" placeholder="Brief summary of what this project does and key achievements..." oninput="updateProject(${i},'description',this.value)">${p.description || ''}</textarea>
+      <input class="field-input" value="${escapeHTML(p.name || '')}" placeholder="Project Name (e.g. AI E-Commerce Platform)" oninput="updateProject(${i},'name',this.value)" style="margin-bottom:8px;font-weight:700"/>
+      <textarea class="field-textarea" style="min-height:55px;margin-bottom:8px" placeholder="Brief summary of what this project does and key achievements..." oninput="updateProject(${i},'description',this.value)">${escapeHTML(p.description || '')}</textarea>
       
       <!-- IMAGE UPLOADER SECTION -->
       <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center">
-        <input class="field-input" id="project-img-input-${i}" value="${p.image || ''}" placeholder="Project image URL or choose file ←" oninput="updateProject(${i},'image',this.value)" style="flex:1"/>
+        <input class="field-input" id="project-img-input-${i}" value="${escapeHTML(p.image || '')}" placeholder="Project image URL or choose file ←" oninput="updateProject(${i},'image',this.value)" style="flex:1"/>
         <label style="
           padding:9px 12px;background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);
           border-radius:8px;color:#fff;font-size:0.78rem;font-weight:600;cursor:pointer;
@@ -2836,16 +2850,16 @@ function renderProjects() {
 
       ${p.image ? `
         <div style="width:100%;height:90px;border-radius:8px;overflow:hidden;margin-bottom:8px;border:1px solid rgba(255,255,255,0.1);position:relative">
-          <img src="${p.image}" style="width:100%;height:100%;object-fit:cover"/>
+          <img src="${escapeHTML(safeImageSrc(p.image))}" alt="Project preview" style="width:100%;height:100%;object-fit:cover"/>
           <button onclick="updateProject(${i},'image','');renderProjects();updateHUD();" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);border:none;color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:10px">✕</button>
         </div>
       ` : ''}
 
-      <input class="field-input" value="${p.tech || ''}" placeholder="Technologies used (e.g. React · Three.js · Node.js)" oninput="updateProject(${i},'tech',this.value)" style="margin-bottom:8px"/>
+      <input class="field-input" value="${escapeHTML(p.tech || '')}" placeholder="Technologies used (e.g. React · Three.js · Node.js)" oninput="updateProject(${i},'tech',this.value)" style="margin-bottom:8px"/>
       
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-        <input class="field-input" value="${p.github || ''}" placeholder="GitHub URL (Optional)" oninput="updateProject(${i},'github',this.value)"/>
-        <input class="field-input" value="${p.url || ''}" placeholder="Live Demo URL (Optional)" oninput="updateProject(${i},'url',this.value)"/>
+        <input class="field-input" value="${escapeHTML(p.github || '')}" placeholder="GitHub URL (Optional)" oninput="updateProject(${i},'github',this.value)"/>
+        <input class="field-input" value="${escapeHTML(p.url || '')}" placeholder="Live Demo URL (Optional)" oninput="updateProject(${i},'url',this.value)"/>
       </div>
 
       <!-- ADVANCED CASE STUDY EXPANDABLE ACCORDION -->
@@ -2857,18 +2871,18 @@ function renderProjects() {
         
         <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
-            <input class="field-input" value="${p.role || ''}" placeholder="Your Role (e.g. Lead Dev)" oninput="updateProject(${i},'role',this.value)"/>
-            <input class="field-input" value="${p.duration || ''}" placeholder="Duration (e.g. 3 Months)" oninput="updateProject(${i},'duration',this.value)"/>
-            <input class="field-input" value="${p.team || ''}" placeholder="Team Size (e.g. 4 Devs)" oninput="updateProject(${i},'team',this.value)"/>
+            <input class="field-input" value="${escapeHTML(p.role || '')}" placeholder="Your Role (e.g. Lead Dev)" oninput="updateProject(${i},'role',this.value)"/>
+            <input class="field-input" value="${escapeHTML(p.duration || '')}" placeholder="Duration (e.g. 3 Months)" oninput="updateProject(${i},'duration',this.value)"/>
+            <input class="field-input" value="${escapeHTML(p.team || '')}" placeholder="Team Size (e.g. 4 Devs)" oninput="updateProject(${i},'team',this.value)"/>
           </div>
 
-          <textarea class="field-textarea" style="min-height:50px" placeholder="The Problem (What challenge did this solve?)" oninput="updateProject(${i},'problem',this.value)">${p.problem || ''}</textarea>
-          <textarea class="field-textarea" style="min-height:50px" placeholder="The Technical Solution (Architecture & stack choices...)" oninput="updateProject(${i},'solution',this.value)">${p.solution || ''}</textarea>
-          <textarea class="field-textarea" style="min-height:50px" placeholder="Engineering Process & Implementation notes..." oninput="updateProject(${i},'process',this.value)">${p.process || ''}</textarea>
-          <textarea class="field-textarea" style="min-height:50px" placeholder="Business Impact & Key Outcomes..." oninput="updateProject(${i},'impact',this.value)">${p.impact || ''}</textarea>
+          <textarea class="field-textarea" style="min-height:50px" placeholder="The Problem (What challenge did this solve?)" oninput="updateProject(${i},'problem',this.value)">${escapeHTML(p.problem || '')}</textarea>
+          <textarea class="field-textarea" style="min-height:50px" placeholder="The Technical Solution (Architecture & stack choices...)" oninput="updateProject(${i},'solution',this.value)">${escapeHTML(p.solution || '')}</textarea>
+          <textarea class="field-textarea" style="min-height:50px" placeholder="Engineering Process & Implementation notes..." oninput="updateProject(${i},'process',this.value)">${escapeHTML(p.process || '')}</textarea>
+          <textarea class="field-textarea" style="min-height:50px" placeholder="Business Impact & Key Outcomes..." oninput="updateProject(${i},'impact',this.value)">${escapeHTML(p.impact || '')}</textarea>
 
-          <input class="field-input" value="${typeof p.metrics === 'string' ? p.metrics : (Array.isArray(p.metrics) ? p.metrics.map(m => typeof m === 'object' ? `${m.val || m.value}:${m.label}` : m).join(', ') : '')}" placeholder="Key Metrics (e.g. 45% Faster Load, 2M+ Daily Events)" oninput="updateProject(${i},'metrics',this.value)"/>
-          <input class="field-input" value="${p.video || ''}" placeholder="Video Demo URL (Optional)" oninput="updateProject(${i},'video',this.value)"/>
+          <input class="field-input" value="${escapeHTML(typeof p.metrics === 'string' ? p.metrics : (Array.isArray(p.metrics) ? p.metrics.map(m => typeof m === 'object' ? `${m.val || m.value}:${m.label}` : m).join(', ') : ''))}" placeholder="Key Metrics (e.g. 45% Faster Load, 2M+ Daily Events)" oninput="updateProject(${i},'metrics',this.value)"/>
+          <input class="field-input" value="${escapeHTML(p.video || '')}" placeholder="Video Demo URL (Optional)" oninput="updateProject(${i},'video',this.value)"/>
         </div>
       </details>
     </div>
@@ -2967,13 +2981,13 @@ function renderCerts() {
           <button class="del-btn" onclick="removeCert(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;margin-left:4px">✕ Remove</button>
         </div>
       </div>
-      <input class="field-input" value="${c.title || ''}" placeholder="Certificate Title (e.g. AWS Certified Developer)" oninput="updateCert(${i},'title',this.value)" style="margin-bottom:8px;font-weight:700"/>
-      <input class="field-input" value="${c.issuer || ''}" placeholder="Issuing Organization (e.g. Amazon Web Services / Google)" oninput="updateCert(${i},'issuer',this.value)" style="margin-bottom:8px"/>
-      <input class="field-input" value="${c.date || ''}" placeholder="Issue Year / Date (e.g. 2024)" oninput="updateCert(${i},'date',this.value)" style="margin-bottom:8px"/>
+      <input class="field-input" value="${escapeHTML(c.title || '')}" placeholder="Certificate Title (e.g. AWS Certified Developer)" oninput="updateCert(${i},'title',this.value)" style="margin-bottom:8px;font-weight:700"/>
+      <input class="field-input" value="${escapeHTML(c.issuer || '')}" placeholder="Issuing Organization (e.g. Amazon Web Services / Google)" oninput="updateCert(${i},'issuer',this.value)" style="margin-bottom:8px"/>
+      <input class="field-input" value="${escapeHTML(c.date || '')}" placeholder="Issue Year / Date (e.g. 2024)" oninput="updateCert(${i},'date',this.value)" style="margin-bottom:8px"/>
       
       <!-- CERT IMAGE UPLOADER -->
       <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center">
-        <input class="field-input" id="cert-img-input-${i}" value="${c.image || ''}" placeholder="Certificate image URL or choose file ←" oninput="updateCert(${i},'image',this.value)" style="flex:1"/>
+        <input class="field-input" id="cert-img-input-${i}" value="${escapeHTML(c.image || '')}" placeholder="Certificate image URL or choose file ←" oninput="updateCert(${i},'image',this.value)" style="flex:1"/>
         <label style="
           padding:9px 12px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);
           border-radius:8px;color:#fff;font-size:0.78rem;font-weight:600;cursor:pointer;
@@ -2986,7 +3000,7 @@ function renderCerts() {
 
       ${c.image ? `
         <div style="width:100%;height:90px;border-radius:8px;overflow:hidden;margin-bottom:8px;border:1px solid rgba(255,255,255,0.1);position:relative">
-          <img src="${c.image}" style="width:100%;height:100%;object-fit:cover"/>
+          <img src="${escapeHTML(safeImageSrc(c.image))}" alt="Certificate preview" style="width:100%;height:100%;object-fit:cover"/>
           <button onclick="updateCert(${i},'image','');renderCerts();updateHUD();" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);border:none;color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:10px">✕</button>
         </div>
       ` : ''}
@@ -3361,7 +3375,10 @@ window.clearAll = function() {
   engine?.applyTheme(theme);
   updateHUD();
   buildThemeGrid();
-  showToast('info', '🗑️', 'Cleared! <button onclick="window.restoreClearedPortfolio()" style="background:none;border:none;color:#06b6d4;font-weight:700;cursor:pointer;text-decoration:underline;margin-left:6px">Undo</button>');
+  showToast('info', '🗑️', 'Cleared!', {
+    label: 'Undo',
+    onClick: () => window.restoreClearedPortfolio()
+  });
 };
 
 window.restoreClearedPortfolio = function() {
@@ -3519,7 +3536,7 @@ window.upgradeToPro = function() {
 };
 
 // ─── TOAST ──────────────────────────────────
-function showToast(type, icon, message) {
+function showToast(type, icon, message, action = null) {
   let container = document.getElementById('toast-container');
   if (!container) {
     container = document.createElement('div');
@@ -3529,7 +3546,20 @@ function showToast(type, icon, message) {
   }
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
-  toast.innerHTML = `<span class="toast-icon">${icon}</span><span>${message}</span>`;
+  const iconEl = document.createElement('span');
+  iconEl.className = 'toast-icon';
+  iconEl.textContent = String(icon ?? '');
+  const messageEl = document.createElement('span');
+  messageEl.textContent = String(message ?? '');
+  toast.append(iconEl, messageEl);
+  if (action?.label && typeof action.onClick === 'function') {
+    const actionButton = document.createElement('button');
+    actionButton.type = 'button';
+    actionButton.textContent = action.label;
+    actionButton.style.cssText = 'background:none;border:none;color:#06b6d4;font-weight:700;cursor:pointer;text-decoration:underline;margin-left:6px';
+    actionButton.addEventListener('click', action.onClick, { once: true });
+    toast.appendChild(actionButton);
+  }
   container.appendChild(toast);
   setTimeout(() => {
     toast.style.transition = 'all 0.4s';

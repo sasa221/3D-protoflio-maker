@@ -15,6 +15,21 @@ function escapeHTML(str) {
   }[m]));
 }
 
+function safeExternalHref(value) {
+  const href = String(value || '').trim();
+  return /^https?:\/\//i.test(href) ? href : '';
+}
+
+function safeImageSrc(value) {
+  const src = String(value || '').trim();
+  return /^(?:https?:\/\/|blob:|data:image\/(?:png|jpe?g|gif|webp);base64,)/i.test(src) ? src : '';
+}
+
+function safeEmbedSrc(value) {
+  const src = safeExternalHref(value);
+  return /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com|youtube-nocookie\.com|player\.vimeo\.com)\//i.test(src) ? src : '';
+}
+
 /**
  * Generate Project Cinema Modal HTML Structure
  */
@@ -29,8 +44,8 @@ export function generateProjectCinemaHTML(projects = [], theme = {}) {
     const impact = p.impact || '';
     const duration = p.duration || '';
     const team = p.team || '';
-    const video = p.video || '';
-    const images = Array.isArray(p.images) ? p.images : (p.image ? [p.image] : []);
+    const video = safeEmbedSrc(p.video);
+    const images = (Array.isArray(p.images) ? p.images : (p.image ? [p.image] : [])).map(safeImageSrc).filter(Boolean);
     
     // Parse metrics (supports array or newline/comma string)
     let metrics = [];
@@ -83,7 +98,7 @@ export function generateProjectCinemaHTML(projects = [], theme = {}) {
               ${images.length > 1 ? `
                 <div class="cinema-thumb-strip">
                   ${images.map((imgUrl, imgIdx) => `
-                    <button class="cinema-thumb-btn ${imgIdx === 0 ? 'active' : ''}" onclick="switchCinemaImage(${i}, '${escapeHTML(imgUrl)}', this)">
+                    <button class="cinema-thumb-btn ${imgIdx === 0 ? 'active' : ''}" data-cinema-image="${escapeHTML(imgUrl)}" onclick="switchCinemaImage(${i}, this.dataset.cinemaImage, this)">
                       <img src="${escapeHTML(imgUrl)}" alt="${escapeHTML(p.name || 'Project')} screenshot ${imgIdx + 1}" loading="lazy" decoding="async" />
                     </button>
                   `).join('')}
@@ -158,8 +173,8 @@ export function generateProjectCinemaHTML(projects = [], theme = {}) {
           ` : '<div></div>'}
 
           <div class="cinema-action-btns">
-            ${p.github ? `<a href="${escapeHTML(p.github)}" target="_blank" class="cinema-btn cinema-btn-sec">💻 GitHub Code</a>` : ''}
-            ${p.url ? `<a href="${escapeHTML(p.url)}" target="_blank" class="cinema-btn cinema-btn-pri">🌐 Live Demo →</a>` : ''}
+            ${safeExternalHref(p.github) ? `<a href="${escapeHTML(safeExternalHref(p.github))}" target="_blank" rel="noopener noreferrer" class="cinema-btn cinema-btn-sec">💻 GitHub Code</a>` : ''}
+            ${safeExternalHref(p.url) ? `<a href="${escapeHTML(safeExternalHref(p.url))}" target="_blank" rel="noopener noreferrer" class="cinema-btn cinema-btn-pri">🌐 Live Demo →</a>` : ''}
           </div>
         </div>
       </div>

@@ -40,10 +40,12 @@ export default async function handler(req, res) {
   // 0. ACTION: PAYMENT CONFIG (Public Read-Only Destination Info)
   // ─────────────────────────────────────────────────────────────
   if (action === 'payment-config' || (req.method === 'GET' && action === 'config')) {
-    const displayName = process.env.PAYMENT_INSTAPAY_NAME || 'SALEH MOHAMED SALEH';
-    const instapayAddress = process.env.PAYMENT_INSTAPAY_ADDRESS || 'saleh2005mohamed@instapay';
-    const phoneNumber = process.env.PAYMENT_INSTAPAY_PHONE || '01270024222';
-    const paymentNote = process.env.PAYMENT_INSTAPAY_NOTE || 'Transfer via InstaPay only. You may use either the InstaPay address or phone number. This is not a mobile wallet payment.';
+    // Never invent a payment destination. A missing production environment
+    // variable must disable checkout rather than show a personal address.
+    const displayName = process.env.PAYMENT_INSTAPAY_NAME || '';
+    const instapayAddress = process.env.PAYMENT_INSTAPAY_ADDRESS || '';
+    const phoneNumber = process.env.PAYMENT_INSTAPAY_PHONE || '';
+    const paymentNote = process.env.PAYMENT_INSTAPAY_NOTE || 'Manual payments are not configured at the moment.';
     const bankName = process.env.PAYMENT_INSTAPAY_BANK || null;
     const isConfigured = Boolean(displayName && instapayAddress);
 
