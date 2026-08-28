@@ -55,6 +55,30 @@ assert.equal(review.summary.value, 'Frontend engineer with verified React experi
 assert.equal('rawText' in review, false);
 assert.equal('originalText' in review, false);
 assert.ok(review.warnings.length === 0, 'complete synthetic fixture should not need structural warnings');
+const tableXml = `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:w="0"/></w:tblPr><w:tr><w:tc><w:p><w:r><w:t>Table Candidate</w:t></w:r></w:p><w:p><w:r><w:t>table@example.test</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p><w:r><w:t>SKILLS</w:t></w:r></w:p><w:p><w:r><w:t>JavaScript, Git</w:t></w:r></w:p></w:body></w:document>`;
+const tableDocx = file('table.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', zipSync({ '[Content_Types].xml': strToU8('<Types/>'), 'word/document.xml': strToU8(tableXml) }));
+const tableExtracted = await extractImportText(tableDocx);
+assert.doesNotMatch(tableExtracted.text, /w:tblPr|w:tblW/, 'DOCX table formatting XML never leaks into extracted content');
+assert.equal(buildImportReview(tableExtracted.text, tableExtracted).contact.name.value, 'Table Candidate');
+
+const arabicReview = buildImportReview(`سمير شاهين
+محلل بيانات
+القاهرة, مصر | arabic@example.test | +1 202-555-1071 | linkedin.com/in/arabic-test
+الملخص المهني
+محلل بيانات بخبرة في إعداد التقارير.
+الخبرات العملية
+محلل بيانات - شركة تجريبية | 2022 - حتى الآن
+التعليم
+Bachelor of Science - Nile Valley University | 2018
+المهارات
+Python • SQL • Excel`, { format: 'pdf', fileName: 'arabic.pdf' });
+assert.equal(arabicReview.contact.name.value, 'سمير شاهين');
+assert.equal(arabicReview.contact.location.value, 'القاهرة, مصر');
+assert.equal(arabicReview.contact.linkedin.value, 'https://linkedin.com/in/arabic-test');
+assert.match(arabicReview.summary.value, /محلل بيانات/);
+assert.equal(arabicReview.experience.length, 1);
+assert.equal(arabicReview.education.length, 1);
+assert.deepEqual(arabicReview.skills.map(item => item.value), ['Python', 'SQL', 'Excel']);
 const salehPdfText = `SALEH MOHAMED ABOREHAB LinkedIn Portfolio
 Giza, Egypt | eng.salehmohammedd@gmail.com | +201270024222
 | www.linkedin.com/in/saleh-mohammedd/ | https://github.com/sasa221

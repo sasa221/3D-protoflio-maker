@@ -35,7 +35,7 @@ try {
   await page.locator('[name="careerStage"]').selectOption('student');
   if (!/Education.*Projects.*Training.*Skills/i.test(await page.locator('#cv-stage-guidance').innerText())) throw new Error('Student guidance is missing.');
   await page.locator('[data-cv-quality-fix="education"]').click();
-  if (await page.evaluate(() => document.activeElement?.name) !== 'education') throw new Error('Fix this did not focus Education.');
+  if (!await page.evaluate(() => document.activeElement?.closest?.('[data-collection="education"]') !== null)) throw new Error('Fix this did not focus Education.');
   await page.screenshot({ path: qualityScreenshotPath, fullPage: true });
   for (const viewport of [{ width: 1024, height: 768 }, { width: 390, height: 844 }]) {
     await page.setViewportSize(viewport);

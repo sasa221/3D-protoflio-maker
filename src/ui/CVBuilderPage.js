@@ -144,7 +144,7 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
     onFix: section => {
       const target = form.querySelector(`[data-collection="${section}"]`) || form.elements.namedItem(section) || form.elements.namedItem(section === 'linkedin' ? 'github' : 'summary');
       target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      (target?.querySelector?.('input,textarea,button') || target)?.focus();
+      (target?.querySelector?.('input:not([type="hidden"]),textarea,button') || target)?.focus();
     }
   });
   const updateStageGuidance = () => {

@@ -2,7 +2,7 @@ import { unzipSync } from 'fflate';
 
 export const CV_IMPORT_LIMITS = Object.freeze({ maxBytes: 10 * 1024 * 1024, maxPages: 12, maxTextLength: 120000, maxDocxXmlLength: 6000000 });
 const SECTION_NAMES = ['summary', 'experience', 'education', 'skills', 'projects', 'certifications', 'languages', 'training', 'activities'];
-const SECTION_RE = /^(summary|profile|about me|professional summary|objectives?|experience|work experience|professional experience|international experience|relevant experience|additional experience|research experience|employment|career history|education|academic background|qualifications|academics|skills|skills\s*&\s*languages|technical skills|core skills|tools(?:\s*&\s*technologies)?|technologies|competencies|projects|selected projects|featured projects|certifications|certificates|licenses|courses|languages|foreign languages|training|activities|leadership\s*&\s*activities|volunteering|volunteer experience|community involvement|presentations\s*&\s*conferences|publications|professional memberships)\s*:??$/i;
+const SECTION_RE = /^(summary|profile|about me|professional summary|objectives?|experience|work experience|professional experience|international experience|relevant experience|additional experience|research experience|employment|career history|education|academic background|qualifications|academics|skills|skills\s*&\s*languages|technical skills|core skills|tools(?:\s*&\s*technologies)?|technologies|competencies|projects|selected projects|featured projects|certifications|certificates|licenses|courses|languages|foreign languages|training|activities|leadership\s*&\s*activities|volunteering|volunteer experience|community involvement|presentations\s*&\s*conferences|publications|professional memberships|الملخص|الملخص المهني|نبذة شخصية|الهدف المهني|الخبرة|الخبرات|الخبرات العملية|التعليم|المؤهلات|المؤهلات العلمية|المهارات|المهارات التقنية|المشاريع|المشروعات|الشهادات|الدورات|اللغات|التدريب|الأنشطة|الانشطة|العمل التطوعي|التواصل|بيانات التواصل|التفاصيل)\s*:??$/i;
 const INLINE_SECTION_RE = /^(professional summary|about me|objectives?|work experience|professional experience|career history|academic background|technical skills|core skills|tools\s*&\s*technologies|selected projects|featured projects|volunteer experience|community involvement|summary|profile|experience|employment|education|qualifications|academics|skills|technologies|competencies|projects|certifications|certificates|licenses|courses|languages|training|activities|volunteering)\s*(?::|\s{2,})\s*(.+)$/i;
 const UPPER_INLINE_SECTION_RE = /^(PROFESSIONAL SUMMARY|OBJECTIVES?|WORK EXPERIENCE|PROFESSIONAL EXPERIENCE|INTERNATIONAL EXPERIENCE|RELEVANT EXPERIENCE|ADDITIONAL EXPERIENCE|RESEARCH EXPERIENCE|CAREER HISTORY|ACADEMIC BACKGROUND|TECHNICAL SKILLS|CORE SKILLS|SKILLS & LANGUAGES|SELECTED PROJECTS|FEATURED PROJECTS|VOLUNTEER EXPERIENCE|LEADERSHIP & ACTIVITIES|SUMMARY|PROFILE|EXPERIENCE|EMPLOYMENT|EDUCATION|QUALIFICATIONS|ACADEMICS|SKILLS|PROJECTS|CERTIFICATIONS|LANGUAGES|TRAINING|ACTIVITIES|VOLUNTEERING)\s+(.+)$/;
 
@@ -13,14 +13,14 @@ function keyFor(value) { return String(value || '').toLowerCase().replace(/[^a-z
 function isHeading(line) { return SECTION_RE.test(cleanLine(line)); }
 function sectionKey(line) {
   const lower = cleanLine(line).toLowerCase();
-  if (/summary|profile|about|objective/.test(lower)) return 'summary';
-  if (/experience|employment|career history/.test(lower)) return 'experience';
-  if (/education|academic|qualification/.test(lower)) return 'education';
-  if (/skill|tools|technolog|competenc/.test(lower)) return 'skills';
-  if (/project/.test(lower)) return 'projects';
-  if (/certificat|license|course/.test(lower)) return 'certifications';
-  if (/language/.test(lower)) return 'languages';
-  if (/training/.test(lower)) return 'training';
+  if (/summary|profile|about|objective|ملخص|نبذة|هدف مهني/.test(lower)) return 'summary';
+  if (/experience|employment|career history|خبر/.test(lower)) return 'experience';
+  if (/education|academic|qualification|تعليم|مؤهل/.test(lower)) return 'education';
+  if (/skill|tools|technolog|competenc|مهار/.test(lower)) return 'skills';
+  if (/project|مشروع|مشروعات/.test(lower)) return 'projects';
+  if (/certificat|license|course|شهاد|دورات/.test(lower)) return 'certifications';
+  if (/language|لغات/.test(lower)) return 'languages';
+  if (/training|تدريب/.test(lower)) return 'training';
   return 'activities';
 }
 
@@ -30,7 +30,7 @@ function decodeXml(value) {
 
 function normalizeWebLink(value) {
   const link = clean(value, 600).replace(/[),.;]+$/, '');
-  return /^www\./i.test(link) ? `https://${link}` : link;
+  return /^(?:www\.|(?:linkedin|github)\.com\/)/i.test(link) ? `https://${link}` : link;
 }
 
 const MONTH_YEAR_RE = /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{4}\b/i;
@@ -84,9 +84,9 @@ function extractDocxText(buffer) {
   if (!documentName) throw new Error('The DOCX document body is missing.');
   const xml = new TextDecoder().decode(entries[documentName]);
   if (xml.length > CV_IMPORT_LIMITS.maxDocxXmlLength) throw new Error('The DOCX document body exceeds the local size limit.');
-  const paragraphs = xml.split(/<\/w:p\s*>/i).map(paragraph => {
-    const withTabs = paragraph.replace(/<w:tab\s*\/?\s*>/gi, '\t');
-    const text = [...withTabs.matchAll(/<w:t[^>]*>([\s\S]*?)<\/w:t\s*>/gi)].map(match => decodeXml(match[1])).join('');
+  const textOnlyXml = xml.replace(/<w:tab\s*\/?\s*>/gi, '\t').replace(/<\/w:p\s*>/gi, '\n');
+  const paragraphs = textOnlyXml.split('\n').map(paragraph => {
+    const text = [...paragraph.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t\s*>/gi)].map(match => decodeXml(match[1])).join('');
     return cleanLine(text);
   }).filter(Boolean);
   return paragraphs.join('\n');
@@ -135,14 +135,14 @@ export function buildImportReview(text, { format = 'text', fileName = '', embedd
   const headingIndexes = lines.map((line, index) => isHeading(line) ? { index, key: sectionKey(line) } : null).filter(Boolean);
   const firstSection = headingIndexes[0]?.index ?? lines.length;
   const header = lines.slice(0, firstSection);
-  const headerText = header.join(' ');
-  const headerParts = header.flatMap(line => line.split(/\s*\|\s*/)).map(part => clean(part)).filter(Boolean);
-  const email = headerText.match(/[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0] || '';
-  const phone = headerText.match(/(?:\+?\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)\d{3,4}[\s-]?\d{3,4}/)?.[0] || '';
-  const links = headerText.match(/(?:https?:\/\/|www\.)[^\s|]+/gi) || [];
-  const nameCandidate = header.find(line => !/@/.test(line) && !/\+?\d[\d\s()-]{7,}/.test(line) && !/(?:https?:\/\/|www\.)/i.test(line) && !/^(resume|cv|curriculum vitae|linkedin|portfolio|linkedin portfolio)$/i.test(line)) || '';
+  const documentText = lines.join(' ');
+  const documentParts = lines.flatMap(line => line.split(/\s*\|\s*/)).map(part => clean(part)).filter(Boolean);
+  const email = documentText.match(/[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0] || '';
+  const phone = documentText.match(/(?:\+?\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)\d{3,4}[\s-]?\d{3,4}/)?.[0] || '';
+  const links = documentText.match(/(?:https?:\/\/|www\.|(?:linkedin|github)\.com\/)[^\s|]+/gi) || [];
+  const nameCandidate = header.find(line => !/@/.test(line) && !/\+?\d[\d\s()-]{7,}/.test(line) && !/(?:https?:\/\/|www\.|(?:linkedin|github)\.com\/)/i.test(line) && !/synthetic test cv|not a real person/i.test(line) && !/^CV-\d+/i.test(line) && !/^(resume|cv|curriculum vitae|linkedin|portfolio|linkedin portfolio)$/i.test(line)) || '';
   const name = clean(nameCandidate.replace(/\s+(?:linkedin\s+)?portfolio\s*$/i, ''), 160);
-  const location = headerParts.find(part => /^[A-Za-zÀ-ÿ.' -]+,\s*[A-Za-zÀ-ÿ.' -]+$/.test(part) && !/@/.test(part)) || '';
+  const location = documentParts.find(part => part.length <= 70 && !/[.!?]$/.test(part) && /^[\p{L}.' -]+,\s*[\p{L}.' -]+$/u.test(part) && !/@/.test(part)) || '';
   // Nothing is persisted by default. The reviewer must explicitly select
   // each field, including contact details, before saving it.
   const field = (value, source = 'extracted') => ({ value: clean(value), source, needsReview: true, selected: Boolean(clean(value)) });
