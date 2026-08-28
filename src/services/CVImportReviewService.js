@@ -82,14 +82,22 @@ function extractDocxText(buffer) {
   if (names.some(name => /vbaProject|macros|\.bin$/i.test(name))) throw new Error('Macro-enabled Office content is not supported.');
   const documentName = names.find(name => name.toLowerCase() === 'word/document.xml');
   if (!documentName) throw new Error('The DOCX document body is missing.');
-  const xml = new TextDecoder().decode(entries[documentName]);
-  if (xml.length > CV_IMPORT_LIMITS.maxDocxXmlLength) throw new Error('The DOCX document body exceeds the local size limit.');
-  const textOnlyXml = xml.replace(/<w:tab\s*\/?\s*>/gi, '\t').replace(/<\/w:p\s*>/gi, '\n');
-  const paragraphs = textOnlyXml.split('\n').map(paragraph => {
-    const text = [...paragraph.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t\s*>/gi)].map(match => decodeXml(match[1])).join('');
-    return cleanLine(text);
-  }).filter(Boolean);
-  return paragraphs.join('\n');
+  const contentNames = [
+    ...names.filter(name => /^word\/header\d+\.xml$/i.test(name)),
+    documentName,
+    ...names.filter(name => /^word\/footer\d+\.xml$/i.test(name))
+  ];
+  const extractPart = name => {
+    const xml = new TextDecoder().decode(entries[name]);
+    if (xml.length > CV_IMPORT_LIMITS.maxDocxXmlLength) throw new Error('The DOCX document body exceeds the local size limit.');
+    const textOnlyXml = xml.replace(/<w:tab\s*\/?\s*>/gi, '\t').replace(/<\/w:p\s*>/gi, '\n');
+    return textOnlyXml.split('\n').map(paragraph => [...paragraph.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t\s*>/gi)].map(match => decodeXml(match[1])).join('')).map(cleanLine).filter(Boolean).join('\n');
+  };
+  const embeddedLinks = names.filter(name => name.endsWith('.rels')).flatMap(name => {
+    const relationships = new TextDecoder().decode(entries[name]);
+    return [...relationships.matchAll(/<Relationship\b[^>]*\bTarget="([^"]+)"[^>]*\bTargetMode="External"[^>]*\/?\s*>/gi)].map(match => decodeXml(match[1]));
+  }).filter((link, index, links) => /^(?:https?:\/\/|mailto:|tel:)/i.test(link) && links.indexOf(link) === index);
+  return { text: contentNames.map(extractPart).filter(Boolean).join('\n'), embeddedLinks };
 }
 
 export function validateImportFile(file) {
@@ -117,7 +125,9 @@ export async function extractImportText(file, { onProgress } = {}) {
     embeddedLinks = Array.isArray(extractedPdf.embeddedLinks) ? extractedPdf.embeddedLinks : [];
   } else {
     onProgress?.({ stage: 'docx', percent: 45, label: 'Extracting DOCX text locally…' });
-    text = extractDocxText(await file.arrayBuffer());
+    const extractedDocx = extractDocxText(await file.arrayBuffer());
+    text = extractedDocx.text;
+    embeddedLinks = extractedDocx.embeddedLinks;
   }
   const normalized = String(text || '').replace(/\r/g, '').split('\n').map(cleanLine).filter(Boolean).join('\n');
   if (normalized.length < 20) throw new Error('The file contains too little readable text.');
@@ -135,13 +145,13 @@ export function buildImportReview(text, { format = 'text', fileName = '', embedd
   const headingIndexes = lines.map((line, index) => isHeading(line) ? { index, key: sectionKey(line) } : null).filter(Boolean);
   const firstSection = headingIndexes[0]?.index ?? lines.length;
   const header = lines.slice(0, firstSection);
-  const documentText = lines.join(' ');
+  const documentText = `${lines.join(' ')} ${embeddedLinks.join(' ')}`;
   const documentParts = lines.flatMap(line => line.split(/\s*\|\s*/)).map(part => clean(part)).filter(Boolean);
-  const email = documentText.match(/[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0] || '';
-  const phone = documentText.match(/(?:\+?\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)\d{3,4}[\s-]?\d{3,4}/)?.[0] || '';
+  const email = lines.join(' ').match(/[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0] || embeddedLinks.find(link => /^mailto:/i.test(link))?.replace(/^mailto:/i, '').split('?')[0] || '';
+  const phone = lines.join(' ').match(/\+\d{1,3}[\s-]?(?:\(?\d{2,4}\)?[\s-]?)\d{3,4}[\s-]?\d{3,4}/)?.[0] || embeddedLinks.find(link => /^tel:/i.test(link))?.replace(/^tel:/i, '') || lines.join(' ').match(/(?:\(?\d{2,4}\)?[\s-]?)\d{3,4}[\s-]?\d{3,4}/)?.[0] || '';
   const links = documentText.match(/(?:https?:\/\/|www\.|(?:linkedin|github)\.com\/)[^\s|]+/gi) || [];
-  const nameCandidate = header.find(line => !/@/.test(line) && !/\+?\d[\d\s()-]{7,}/.test(line) && !/(?:https?:\/\/|www\.|(?:linkedin|github)\.com\/)/i.test(line) && !/synthetic test cv|not a real person/i.test(line) && !/^CV-\d+/i.test(line) && !/^(resume|cv|curriculum vitae|linkedin|portfolio|linkedin portfolio)$/i.test(line)) || '';
-  const name = clean(nameCandidate.replace(/\s+(?:linkedin\s+)?portfolio\s*$/i, ''), 160);
+  const nameCandidate = header.map(line => clean(line.replace(/\s+(?:linkedin\s+)?portfolio\s*$/i, ''))).find(line => !/@/.test(line) && !/\+?\d[\d\s()-]{7,}/.test(line) && !/(?:https?:\/\/|www\.|(?:linkedin|github)\.com\/)/i.test(line) && !/synthetic test cv|not a real person/i.test(line) && !/^CVX?-\d+/i.test(line) && !/^page\s+\d+$/i.test(line) && !/^(?:view|open|visit|email|call|schedule|download)\b/i.test(line) && !/^(?:website|linkedin|github|portfolio|certificate|project link)(?:\s*[|·-]\s*(?:website|linkedin|github|portfolio|certificate|project link))*$/i.test(line) && !/^(resume|cv|curriculum vitae)$/i.test(line)) || '';
+  const name = clean(nameCandidate, 160);
   const location = documentParts.find(part => part.length <= 70 && !/[.!?]$/.test(part) && /^[\p{L}.' -]+,\s*[\p{L}.' -]+$/u.test(part) && !/@/.test(part)) || '';
   // Nothing is persisted by default. The reviewer must explicitly select
   // each field, including contact details, before saving it.
@@ -151,7 +161,7 @@ export function buildImportReview(text, { format = 'text', fileName = '', embedd
     const end = headingIndexes[index + 1]?.index ?? lines.length;
     sections[heading.key].push(...lines.slice(heading.index + 1, end).map(value => clean(value)).filter(Boolean));
   });
-  const projectLinks = embeddedLinks.map(normalizeWebLink).filter(link => link && !/linkedin\.com|github\.com/i.test(link));
+  const projectLinks = embeddedLinks.map(normalizeWebLink).filter(link => /^https?:\/\//i.test(link) && !/linkedin\.com|github\.com/i.test(link));
   const groupedProjects = groupResumeEntries(sections.projects, 'projects').map((value, index) => /view\s+(?:my\s+)?website/i.test(value) && projectLinks[index] ? `${value} | ${projectLinks[index]}` : value);
   const review = {
     source: { format, fileName: clean(fileName, 160) },

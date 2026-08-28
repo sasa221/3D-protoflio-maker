@@ -61,6 +61,20 @@ const tableExtracted = await extractImportText(tableDocx);
 assert.doesNotMatch(tableExtracted.text, /w:tblPr|w:tblW/, 'DOCX table formatting XML never leaks into extracted content');
 assert.equal(buildImportReview(tableExtracted.text, tableExtracted).contact.name.value, 'Table Candidate');
 
+const linkedDocx = file('linked.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', zipSync({
+  '[Content_Types].xml': strToU8('<Types/>'),
+  'word/document.xml': strToU8(xml),
+  'word/header1.xml': strToU8('<w:hdr><w:p><w:r><w:t>View my website</w:t></w:r></w:p></w:hdr>'),
+  'word/footer1.xml': strToU8('<w:ftr><w:p><w:r><w:t>Email me | Call</w:t></w:r></w:p></w:ftr>'),
+  'word/_rels/document.xml.rels': strToU8('<Relationships><Relationship Id="r1" Target="https://example.test/portfolio?a=1&amp;b=2#work" TargetMode="External"/><Relationship Id="r2" Target="mailto:linked@example.test" TargetMode="External"/><Relationship Id="r3" Target="tel:+12025550199" TargetMode="External"/></Relationships>')
+}));
+const linkedExtracted = await extractImportText(linkedDocx);
+assert.deepEqual(linkedExtracted.embeddedLinks, ['https://example.test/portfolio?a=1&b=2#work', 'mailto:linked@example.test', 'tel:+12025550199']);
+const linkedReview = buildImportReview(`Page 1\nLinked Candidate\n${linkedExtracted.text}`, linkedExtracted);
+assert.equal(linkedReview.contact.name.value, 'Linked Candidate');
+assert.equal(linkedReview.contact.email.value, 'sam@example.test', 'visible primary email remains preferred over footer link targets');
+assert.equal(linkedReview.contact.phone.value, '+20 100 222 3333');
+
 const arabicReview = buildImportReview(`سمير شاهين
 محلل بيانات
 القاهرة, مصر | arabic@example.test | +1 202-555-1071 | linkedin.com/in/arabic-test
