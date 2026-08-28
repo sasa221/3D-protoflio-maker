@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="40" x2="1120" y2="590" gradientUnits="userSpaceOnUse"><stop stop-color="#160c32"/><stop offset=".5" stop-color="#070810"/><stop offset="1" stop-color="#061b25"/></linearGradient>
+    <linearGradient id="brand" x1="390" y1="150" x2="820" y2="490" gradientUnits="userSpaceOnUse"><stop stop-color="#8b5cf6"/><stop offset=".55" stop-color="#a855f7"/><stop offset="1" stop-color="#06b6d4"/></linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="30"/></filter>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="212" cy="90" r="170" fill="#7c3aed" opacity=".16" filter="url(#glow)"/><circle cx="1040" cy="530" r="190" fill="#06b6d4" opacity=".14" filter="url(#glow)"/>
+  <g opacity=".18" stroke="#67e8f9"><path d="M60 530 360 260 580 480 850 190 1140 430"/><path d="M80 560h1040"/><path d="M140 590h920"/></g>
+  <rect x="86" y="92" width="88" height="88" rx="24" fill="url(#brand)"/><path d="m139 105-32 46h24l-9 39 32-50h-23l8-35Z" fill="#fff"/>
+  <text x="196" y="151" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="800">3D Portfolio Maker</text>
+  <text x="86" y="302" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="62" font-weight="900">Build a portfolio</text>
+  <text x="86" y="374" fill="url(#brand)" font-family="Arial, Helvetica, sans-serif" font-size="62" font-weight="900">recruiters remember.</text>
+  <text x="90" y="438" fill="#cbd5e1" font-family="Arial, Helvetica, sans-serif" font-size="25">Interactive 3D portfolio · CV import · ATS-ready CV tools</text>
+  <rect x="88" y="493" width="285" height="58" rx="29" fill="url(#brand)"/><text x="133" y="531" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="800">Create yours — no code</text>
+</svg>

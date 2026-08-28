@@ -1,6 +1,8 @@
 User-agent: *
 Allow: /
 Disallow: /studio
+Disallow: /cv
+Disallow: /account
 Disallow: /login
 Disallow: /reset-password
 Disallow: /api/
