@@ -5,7 +5,7 @@ Turn your CV into a recruiter-ready interactive 3D portfolio — no coding requi
 🔗 **Live Demo:** https://portfolio-maker-murex.vercel.app
 
 <p align="center">
-  <img src="src/assets/hero.png" width="700" alt="3D Portfolio Maker">
+  <img src="screenshots/home.png" width="680" alt="3D Portfolio Maker home page">
 </p>
 
 ## What it does
