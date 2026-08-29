@@ -25,6 +25,17 @@ const GROUP_SEAT_PRICING = {
   5: 3750
 };
 
+const MAX_PAYMENT_PROOF_BYTES = 7 * 1024 * 1024;
+const ALLOWED_PAYMENT_PROOF_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+
+function isRecognizedPaymentProof(buffer, contentType) {
+  if (!Buffer.isBuffer(buffer) || !buffer.length) return false;
+  if (contentType === 'image/png') return buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  if (contentType === 'image/jpeg') return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  if (contentType === 'image/webp') return buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP';
+  return false;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -94,7 +105,21 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Payment transfer proof screenshot is required' });
       }
 
+      if (!ALLOWED_PAYMENT_PROOF_TYPES.has(contentType)) {
+        return res.status(400).json({ error: 'Payment proof must be a PNG, JPG, or WEBP image.' });
+      }
+
       const adminClient = createClient(supabaseUrl, supabaseSecretKey);
+
+      if (portfolioId) {
+        const { data: ownedPortfolio, error: portfolioError } = await adminClient
+          .from('portfolios')
+          .select('id')
+          .eq('id', String(portfolioId))
+          .eq('owner_user_id', userId)
+          .maybeSingle();
+        if (portfolioError || !ownedPortfolio) return res.status(403).json({ error: 'That portfolio is not available to this account.' });
+      }
 
       // Prevent duplicate pending requests
       const { data: existingPending } = await adminClient
@@ -159,9 +184,12 @@ export default async function handler(req, res) {
       const finalExpectedAmount = Math.max(0, baseAmount - discountAmount);
 
       // Upload proof to private storage
-      const base64Data = proofBase64.replace(/^data:image\/\w+;base64,/, '');
+      const base64Data = String(proofBase64).replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, '');
       const buffer = Buffer.from(base64Data, 'base64');
-      const ext = contentType?.includes('png') ? 'png' : contentType?.includes('webp') ? 'webp' : 'jpg';
+      if (!buffer.length || buffer.length > MAX_PAYMENT_PROOF_BYTES || !isRecognizedPaymentProof(buffer, contentType)) {
+        return res.status(400).json({ error: 'Payment proof is invalid or exceeds the 7MB server limit.' });
+      }
+      const ext = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
       const proofPath = `${userId}/proofs/${Date.now()}_proof.${ext}`;
 
       const { error: uploadErr } = await adminClient.storage
@@ -197,12 +225,17 @@ export default async function handler(req, res) {
       }]);
 
       if (insertErr) {
+        if (insertErr.code === '23505') {
+          return res.status(409).json({ error: 'You already have a payment request waiting for review.' });
+        }
         console.error('Payment request DB insert error:', insertErr);
         return res.status(500).json({ error: "We couldn't submit your payment request. Please try again." });
       }
 
       // Dispatch Brevo notification email to admin
-      const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || process.env.ADMIN_EMAILS?.split(',')[0]?.trim() || 'saleh2005mohamed@gmail.com';
+      // Do not fall back to a personal address in production. If an admin
+      // notification destination is not configured, skip the optional email.
+      const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || process.env.ADMIN_EMAILS?.split(',')[0]?.trim() || '';
       if (adminEmail) {
         const html = generateAdminNewPaymentEmail({
           userName,

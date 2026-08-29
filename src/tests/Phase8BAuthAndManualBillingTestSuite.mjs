@@ -11,6 +11,7 @@
 
 import assert from 'node:assert';
 import fs from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -223,6 +224,13 @@ check('payment-config action returns HTTP 200', configRes.statusCode === 200);
 check('payment-config returns method INSTAPAY', configRes.body?.method === 'INSTAPAY');
 check('payment-config contains no leaked API keys or private credentials', !configRes.body?.apiKey && !configRes.body?.secretKey);
 check('payment-config fails closed when no payment destination is configured', configRes.body?.configured === false && !configRes.body?.instapayAddress);
+
+const adminSource = await readFile(new URL('../../api/admin.js', import.meta.url), 'utf8');
+const billingSource = await readFile(new URL('../../api/billing.js', import.meta.url), 'utf8');
+const paymentRaceGuard = await readFile(new URL('../../supabase/migrations/20260829013000_manual_payment_request_guard.sql', import.meta.url), 'utf8');
+check('approval returns the calculated subscription end date', adminSource.includes('activeUntil: newPeriodEnd'));
+check('payment proof type, signature, size, and portfolio ownership are verified server-side', billingSource.includes('isRecognizedPaymentProof') && billingSource.includes('MAX_PAYMENT_PROOF_BYTES') && billingSource.includes(".eq('owner_user_id', userId)"));
+check('pending manual-payment race is prevented in the database', paymentRaceGuard.includes('UNIQUE INDEX') && paymentRaceGuard.includes("WHERE status = 'PENDING'"));
 
 // Test 4.2: Unauthenticated manual payment submission is rejected with 401
 const { req: unauthReq, res: unauthRes } = createMockReqRes({

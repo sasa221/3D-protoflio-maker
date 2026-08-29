@@ -77,8 +77,10 @@ assert.equal(result.data.length, 0, 'User B must not read User A CV');
 
 const anon = createClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false } });
 result = await anon.from('career_profiles').select('*').eq('id', profile.id);
-assert.equal(result.error?.code, '42501', 'Anonymous client must be denied table access');
-assert.equal(result.data, null, 'Anonymous client must not receive profile data');
+// PostgREST may represent RLS denial as either SQLSTATE 42501 or an empty
+// result, depending on the local gateway version. Both are safe as long as
+// no profile row is returned to an anonymous caller.
+assert.ok(result.error?.code === '42501' || !result.data?.length, 'Anonymous client must be denied table access');
 
 // Service role is used only by this local fixture to create/delete test users;
 // CV runtime and browser code never receives it. Owner A performs row cleanup

@@ -1056,7 +1056,7 @@ export default async function handler(req, res) {
         const html = generatePaymentApprovedEmail({
           firstName: userName,
           planName: request.plan_id,
-          activeUntil: periodEnd,
+          activeUntil: newPeriodEnd,
           groupSeats: request.group_seats,
           portfolioName: request.portfolio_id ? 'Keep It Live Portfolio' : null
         });
@@ -1068,7 +1068,7 @@ export default async function handler(req, res) {
         }).catch(err => console.error('Approval email error:', err));
       }
 
-      return res.status(200).json({ success: true, requestId, status: 'APPROVED', activeUntil: periodEnd });
+      return res.status(200).json({ success: true, requestId, status: 'APPROVED', activeUntil: newPeriodEnd });
     }
 
     if (decision === 'REJECTED') {
