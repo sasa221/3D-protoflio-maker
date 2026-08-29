@@ -6,12 +6,10 @@
  * production endpoint or a server-only credential.
  */
 
-const PRODUCTION_HOSTS = new Set([
-  'portfolio-maker-murex.vercel.app',
-  '3dportfolio.app',
-  'www.3dportfolio.app',
-  'kupxhrfijkdlcteniqfp.supabase.co'
-]);
+// Keep deployment-specific hostnames out of the browser bundle. In local
+// mode, any remote Supabase URL is unsafe by definition; hosted development
+// projects should use a non-local build with an explicit environment label.
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 function readEnv(key) {
   if (typeof import.meta !== 'undefined' && import.meta.env) {
@@ -36,7 +34,7 @@ export function isLocalAuthMockEnabled() {
 export function isProductionHost(value) {
   try {
     const hostname = new URL(value).hostname.toLowerCase();
-    return PRODUCTION_HOSTS.has(hostname);
+    return !LOOPBACK_HOSTS.has(hostname);
   } catch (_) {
     return false;
   }
