@@ -191,7 +191,7 @@ export async function renderLandingPage(container) {
             background: rgba(124,58,237,0.12); border: 1px solid rgba(124,58,237,0.3); color: #a855f7;
             font-size: 0.8rem; font-weight: 700; margin-bottom: 20px; font-family: 'JetBrains Mono', monospace;
           ">
-            <span>✨ CV to portfolio maker for recruiter-ready websites</span>
+            <span>✨ Turn your CV into a recruiter-ready portfolio</span>
           </div>
 
           <h1 style="
@@ -463,7 +463,7 @@ export async function renderLandingPage(container) {
         </div>
         <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px;">
           <a href="/cv-to-portfolio" style="display: block; padding: 20px; border: 1px solid rgba(103,232,249,.22); border-radius: 16px; background: rgba(103,232,249,.05); color: #fff; text-decoration: none;">
-            <strong style="display: block; font-family: 'Outfit', sans-serif; font-size: 1.12rem; margin-bottom: 8px;">CV to portfolio maker</strong>
+            <strong style="display: block; font-family: 'Outfit', sans-serif; font-size: 1.12rem; margin-bottom: 8px;">Turn your CV into a portfolio</strong>
             <span style="display: block; color: rgba(255,255,255,.64); font-size: .88rem; line-height: 1.55;">Import, review, and turn your existing CV into a shareable portfolio.</span>
           </a>
           <a href="/developer-portfolio-builder" style="display: block; padding: 20px; border: 1px solid rgba(168,85,247,.24); border-radius: 16px; background: rgba(168,85,247,.06); color: #fff; text-decoration: none;">
