@@ -24,6 +24,7 @@
     "test:cv-variants-api": "node src/tests/CVTargetedVariantApiContractTestSuite.mjs",
     "test:cv-variants-local": "node scripts/test_local_cv_targeted_variants_api.mjs",
     "test:cv-import": "node src/tests/CVImportReviewServiceTestSuite.mjs",
+    "test:cv-real-import": "node src/tests/CVRealImportRegressionTestSuite.mjs",
     "test:cv-structured": "node src/tests/CVStructuredImportTestSuite.mjs",
     "test:seo": "node src/tests/SEOContractTestSuite.mjs && node scripts/test_local_seo_browser.mjs",
     "test:cors": "node src/tests/CorsPolicyTestSuite.mjs && node src/tests/ServerlessConsolidationTestSuite.mjs",
@@ -35,7 +36,7 @@
     "test:product-polish": "node scripts/product_polish_smoke.mjs",
     "test:public-polish": "node src/tests/PublicPortfolioPolishTestSuite.mjs",
     "preview": "vite preview",
-    "test:core": "node scripts/core-tests.mjs && npm run test:cv-import && npm run test:cv-quality && npm run test:contact-persistence",
+    "test:core": "node scripts/core-tests.mjs && npm run test:cv-import && npm run test:cv-real-import && npm run test:cv-quality && npm run test:contact-persistence",
     "check": "npm run test:core && npm run build:local"
   },
   "devDependencies": {

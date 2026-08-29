@@ -1,7 +1,5 @@
-/** Deterministic, evidence-only CV parser. It never invents candidate records. */
-export class BaseCVAnalyzerProvider {
-  async analyze() { throw new Error('Analyzer provider must implement analyze().'); }
-}
+/** Deterministic, evidence-only CV parser. */
+export class BaseCVAnalyzerProvider { async analyze() { throw new Error('Analyzer provider must implement analyze().'); } }
 
 const SECTION_PATTERNS = {
   summary: /^(summary|profile|about me|professional summary|objectives?)\b/i,
@@ -13,180 +11,31 @@ const SECTION_PATTERNS = {
   volunteering: /^(volunteering|volunteer experience|activities|community involvement)\b/i,
   languages: /^(languages|foreign languages)\b/i
 };
-
 const DATE_TOKEN = '(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|Q[1-4])';
-const DATE_LINE_RE = new RegExp(`(?:${DATE_TOKEN}\\s+)?(?:19|20)\\d{2}(?:\\s*(?:-|to)\\s*(?:(?:${DATE_TOKEN}\\s+)?(?:19|20)\\d{2}|Present|Current))?`, 'i');
+const DATE_RANGE_RE = new RegExp(`((?:${DATE_TOKEN}\\s+)?(?:19|20)\\d{2})\\s*(?:-|to|–|—)\\s*((?:${DATE_TOKEN}\\s+)?(?:19|20)\\d{2}|Present|Current)`, 'i');
+const DATE_LINE_RE = new RegExp(`(?:${DATE_TOKEN}\\s+)?(?:19|20)\\d{2}`, 'i');
+const SINGLE_DATE_RE = new RegExp(`\\b(?:${DATE_TOKEN})\\s+(?:19|20)\\d{2}\\b|\\b(?:19|20)\\d{2}\\b`, 'i');
 
-function cleanLine(line = '') {
-  return String(line).replace(/^[#\-•▪*\s]+/, '').replace(/\s+/g, ' ').trim();
-}
+function cleanLine(value = '') { return String(value).replace(/\u00ad/g, '').replace(/\s+/g, ' ').trim(); }
+function stripBullet(value = '') { return cleanLine(value).replace(/^[•▪◦\-*]+\s*/, '').trim(); }
+function dateRange(value = '') { const match = String(value).match(DATE_RANGE_RE); return match ? { startDate: cleanLine(match[1]), endDate: cleanLine(match[2]), current: /present|current/i.test(match[2]) } : { startDate: '', endDate: '', current: false }; }
+function dateRole(value = '') { const text = stripBullet(value); const range = text.match(DATE_RANGE_RE); if (range) return { role: text.slice(0, range.index).replace(/[,:|\-]+\s*$/, '').trim(), ...dateRange(text) }; const single = text.match(SINGLE_DATE_RE); return single ? { role: text.slice(0, single.index).replace(/[,:|\-]+\s*$/, '').trim(), startDate: single[0], endDate: single[0], current: false } : { role: '', startDate: '', endDate: '', current: false }; }
+function detectSections(lines) { const found = []; lines.forEach((line, index) => { for (const [key, pattern] of Object.entries(SECTION_PATTERNS)) if (pattern.test(cleanLine(line))) { found.push({ key, index }); break; } }); const sections = {}; found.forEach((item, index) => { sections[item.key] = { startIndex: item.index, endIndex: found[index + 1]?.index ?? lines.length }; }); return sections; }
+function sectionLines(sections, key, lines) { const section = sections[key]; return section ? lines.slice(section.startIndex + 1, section.endIndex).map(cleanLine).filter(Boolean) : []; }
+function organizationHeader(value = '') { const parts = stripBullet(value).replace(/[–—]/g, '|').split(/\||\s+-\s+|(?<=[a-z])-(?=[A-Z]{2,}\b)/).map(item => cleanLine(item)).filter(Boolean); if (parts.length < 2) return { role: '', organization: stripBullet(value), organizationShort: '' }; const roleFirst = /\b(?:developer|engineer|designer|analyst|trainee|intern|manager|specialist|consultant|coordinator|member|lead|teacher|researcher)\b/i.test(parts[0]); return roleFirst ? { role: parts[0], organization: parts.slice(1).join(' - '), organizationShort: parts.at(-1) } : { role: '', organization: parts[0], organizationShort: parts.slice(1).join(' - ') }; }
+function collectDetails(rows) { const bullets = []; const prose = []; rows.forEach(raw => { const line = cleanLine(raw); if (!line) return; const bullet = line.match(/^[•▪◦\-*]\s*(.+)$/); if (bullet) bullets.push(stripBullet(bullet[1]).replace(/-\s*$/, '').trim()); else if (bullets.length) bullets[bullets.length - 1] = `${bullets.at(-1)} ${line}`.replace(/\s+/g, ' ').trim(); else prose.push(line); }); return { bullets, description: prose.join(' ').replace(/\s+/g, ' ').trim() }; }
 
-function cleanHeaderLine(line = '') {
-  return cleanLine(line).replace(/\b(?:LinkedIn|GitHub|Portfolio|Website|Resume|Curriculum Vitae)\b.*$/i, '').trim();
-}
+function parseExperience(rows) { const entries = []; for (let index = 0; index < rows.length;) { const header = stripBullet(rows[index]); const nextInfo = dateRole(rows[index + 1] || ''); const headerInfo = organizationHeader(header); const inlineInfo = dateRole(header); if (!nextInfo.startDate && !inlineInfo.startDate) { index += 1; continue; } const roleInfo = nextInfo.startDate ? nextInfo : inlineInfo; let role = roleInfo.role || headerInfo.role; let organization = headerInfo.organization; let organizationShort = headerInfo.organizationShort; if (inlineInfo.startDate) { const beforeDate = header.slice(0, header.search(DATE_RANGE_RE)).replace(/[,:|\-]+\s*$/, '').trim(); const parsed = organizationHeader(beforeDate); role = role || parsed.role; organization = parsed.organization || organization; organizationShort = parsed.organizationShort || organizationShort; } index += nextInfo.startDate ? 2 : 1; const detailRows = []; while (index < rows.length) { const candidate = stripBullet(rows[index]); if (dateRole(rows[index + 1] || '').startDate || dateRole(candidate).startDate) break; detailRows.push(rows[index]); index += 1; } const detail = collectDetails(detailRows); entries.push({ id: `exp_${entries.length + 1}`, role: role || 'Experience', company: organizationShort || organization, organization, organizationShort, location: '', ...roleInfo, description: detail.description, achievements: detail.bullets, technologies: [] }); } return entries; }
+function parseEducation(rows) { if (!rows.length) return []; const dateIndex = rows.findIndex(row => DATE_RANGE_RE.test(row) || DATE_LINE_RE.test(row)); const before = dateIndex >= 0 ? rows.slice(0, dateIndex) : rows; const dates = dateIndex >= 0 ? dateRange(rows[dateIndex]) : { startDate: '', endDate: '', current: false }; const grade = rows.find(row => /^(?:gpa|grade)\s*[:\-]/i.test(row))?.split(/[:\-]/).slice(1).join(':').trim() || ''; let institution = before[0] || ''; let degree = before[1] || ''; let field = ''; if (!degree && dateIndex >= 0) { const parts = stripBullet(rows[dateIndex]).replace(DATE_RANGE_RE, '').trim().split(/\s*,\s*/).map(cleanLine).filter(Boolean); degree = parts.shift() || ''; field = parts.join(', '); } const detailsStart = dateIndex >= 0 ? dateIndex + 1 : Math.max(before.length, 1); return [{ id: 'edu_1', degree, field, institution, ...dates, grade, description: rows.slice(detailsStart).filter(row => !/^(?:gpa|grade)\s*[:\-]/i.test(row)).join(' ') }]; }
+function parseProjects(rows, embeddedLinks = []) { const projects = []; const hasDate = value => DATE_RANGE_RE.test(value) || /\b(?:19|20)\d{2}\b/.test(value); for (let index = 0; index < rows.length;) { const current = stripBullet(rows[index]); const next = rows[index + 1] || ''; const inline = dateRole(current); const nextDate = dateRole(next); const dateMatch = current.match(SINGLE_DATE_RE) || next.match(SINGLE_DATE_RE); if (!dateMatch && !inline.startDate && !nextDate.startDate) { index += 1; continue; } const inlineRange = inline.startDate && DATE_RANGE_RE.test(current); const titleSource = inlineRange ? current.slice(0, current.search(DATE_RANGE_RE)) : (current.match(SINGLE_DATE_RE) ? current.slice(0, current.match(SINGLE_DATE_RE).index) : current); const name = titleSource.replace(/\(?\s*view\s+(?:my\s+)?website\s*\)?/ig, '').replace(/[,:|\-]+\s*$/, '').trim() || current; const date = inline.startDate || nextDate.startDate || dateMatch?.[0] || ''; index += inline.startDate ? 1 : (nextDate.startDate ? 2 : (next.match(SINGLE_DATE_RE) ? 2 : 1)); const detailRows = []; while (index < rows.length && !hasDate(rows[index]) && !(rows[index + 1] && SINGLE_DATE_RE.test(rows[index + 1]))) { detailRows.push(rows[index]); index += 1; } const detail = collectDetails(detailRows); projects.push({ id: `project_${projects.length + 1}`, name, date, startDate: date, endDate: inline.endDate || nextDate.endDate || date, description: detail.description || detail.bullets.join(' '), bullets: detail.bullets, tech: '', url: embeddedLinks.find(link => /^https?:\/\//i.test(link) && !/linkedin\.com|github\.com$/i.test(new URL(link).hostname)) || '' }); } return projects; }
+function normalizeSkillCategory(value = '') { const lower = stripBullet(value).toLowerCase(); if (/programming|tools|technical skills|technologies/.test(lower)) return 'Programming & Tools'; if (/data analysis|analytics/.test(lower)) return 'Data Analysis'; if (/interpersonal|soft skills/.test(lower)) return 'Interpersonal Skills'; if (/language/.test(lower)) return 'Languages'; return stripBullet(value) || 'Programming & Tools'; }
+function parseSkillRows(rows = []) { const groups = []; let current = null; rows.forEach(raw => { const row = cleanLine(raw); if (!row) return; const match = row.match(/^[•▪◦\-*]?\s*([^:|]{2,60}):\s*(.+)$/); if (match) { current = { category: normalizeSkillCategory(match[1]), text: match[2] }; groups.push(current); } else if (current) current.text += ` ${stripBullet(row)}`; else { current = { category: '', text: stripBullet(row) }; groups.push(current); } }); const skills = []; const languages = []; groups.forEach(group => group.text.split(/[,;|•·]/).map(value => stripBullet(value).replace(/[.,;]+$/, '').trim()).filter(Boolean).forEach(name => { if (group.category === 'Languages') { const match = name.match(/^(.+?)\s+(Native|Fluent|Professional|Intermediate|Beginner|Basic|A1|A2|B1|B2|C1|C2)$/i); languages.push({ language: (match?.[1] || name).trim(), proficiency: match?.[2] || '' }); } else skills.push({ name, category: group.category || 'Programming & Tools', level: null }); })); return { skills: skills.filter((item, i, list) => list.findIndex(x => x.name.toLowerCase() === item.name.toLowerCase() && x.category === item.category) === i), languages }; }
+function categorizeSkill(name) { const lower = name.toLowerCase(); if (/power\s*bi|data cleaning|data transformation|data visualization|analytical thinking/.test(lower)) return 'Data Analysis'; if (/management|organization|problem solving|communication|teamwork|time management|adaptability/.test(lower)) return 'Interpersonal Skills'; return 'Programming & Tools'; }
+function inferSkills(fullText, rows) { const parsed = parseSkillRows(rows); if (parsed.skills.length || parsed.languages.length) return parsed; const known = ['JavaScript', 'TypeScript', 'React', 'Vue', 'Angular', 'HTML', 'CSS', 'Bootstrap', 'PHP', 'Laravel', 'Python', 'Java', 'C++', 'C#', 'SQL', 'MySQL', 'PostgreSQL', 'Power BI', 'Tableau', 'Excel', 'Git', 'Node.js', 'Three.js', 'WebGL']; const source = String(fullText).toLowerCase(); return { skills: known.filter(skill => source.includes(skill.toLowerCase())).map(name => ({ name, category: categorizeSkill(name), level: null })), languages: [] }; }
+function parseLanguages(rows) { return rows.flatMap(row => row.split(/[,|•·]/)).map(cleanLine).filter(Boolean).map(value => { const match = value.match(/^(.+?)\s+(Native|Fluent|Professional|Intermediate|Beginner|Basic|A1|A2|B1|B2|C1|C2)$/i); return { language: (match?.[1] || value).trim(), proficiency: match?.[2] || '' }; }); }
+function parseCertifications(rows) { return rows.map(row => { const parts = stripBullet(row).split(/\s*,\s*/); return { name: parts[0], title: parts[0], issuer: parts.slice(1).join(', '), date: '' }; }).filter(item => item.name); }
+function parseVolunteering(rows) { if (!rows.length) return []; const first = organizationHeader(rows[0]); const dates = dateRange(rows[1] || ''); const detail = collectDetails(rows.slice(dates.startDate ? 2 : 1)); return [{ organization: first.organization, role: first.role || stripBullet(rows[0]), ...dates, description: detail.description, achievements: detail.bullets }]; }
+function inferHeadline(summary, candidates) { return candidates.find(value => /\b(developer|engineer|designer|analyst|scientist|manager|specialist|consultant)\b/i.test(value)) || summary.match(/\b[\p{L}-]+(?:\s+[\p{L}-]+){0,3}\s+(?:Developer|Engineer|Designer|Analyst|Scientist|Manager|Specialist|Consultant)\b/iu)?.[0] || ''; }
 
-function detectSections(lines) {
-  const found = [];
-  lines.forEach((line, index) => {
-    const value = cleanLine(line);
-    for (const [key, pattern] of Object.entries(SECTION_PATTERNS)) {
-      if (pattern.test(value)) { found.push({ key, index }); break; }
-    }
-  });
-  const sections = {};
-  found.forEach((item, index) => {
-    sections[item.key] = { startIndex: item.index, endIndex: found[index + 1]?.index ?? lines.length };
-  });
-  return sections;
-}
-
-function sectionLines(sections, key, lines) {
-  const section = sections[key];
-  return section ? lines.slice(section.startIndex + 1, section.endIndex).map(cleanLine).filter(Boolean) : [];
-}
-
-function splitTitleOrganization(value = '') {
-  const parts = value.split(/\s+-\s+/).map(cleanLine).filter(Boolean);
-  return { title: parts.shift() || '', organization: parts.join(' - ') };
-}
-
-function parseDateRange(value = '') {
-  const parts = value.split(/\s+(?:-|to)\s+/i).map(cleanLine);
-  return { startDate: parts[0] || '', endDate: parts[1] || '', current: /present|current/i.test(parts[1] || '') };
-}
-
-function parseExperience(rows) {
-  const entries = [];
-  for (let index = 0; index < rows.length;) {
-    if (!DATE_LINE_RE.test(rows[index + 1] || '')) { index += 1; continue; }
-    const { title: role, organization: company } = splitTitleOrganization(rows[index]);
-    const dates = parseDateRange(rows[index + 1]);
-    index += 2;
-    const details = [];
-    while (index < rows.length && !DATE_LINE_RE.test(rows[index + 1] || '')) details.push(cleanLine(rows[index++]));
-    entries.push({
-      id: `exp_${entries.length + 1}`, role, company, location: '', ...dates,
-      description: details.join(' '), achievements: details, technologies: []
-    });
-  }
-  return entries;
-}
-
-function parseEducation(rows) {
-  if (!rows.length) return [];
-  const dateIndex = rows.findIndex(row => DATE_LINE_RE.test(row));
-  const beforeDates = dateIndex >= 0 ? rows.slice(0, dateIndex) : rows;
-  const degreeParts = splitTitleOrganization(beforeDates[0] || '');
-  const dates = dateIndex >= 0 ? parseDateRange(rows[dateIndex]) : { startDate: '', endDate: '', current: false };
-  const grade = rows.find(row => /^(?:gpa|grade)\s*:/i.test(row))?.split(':').slice(1).join(':').trim() || '';
-  return [{
-    id: 'edu_1', degree: degreeParts.title, field: degreeParts.organization,
-    institution: beforeDates[1] || '', startDate: dates.startDate, endDate: dates.endDate,
-    grade, description: rows.slice(Math.max(dateIndex + 1, 2)).filter(row => !/^(?:gpa|grade)\s*:/i.test(row)).join(' ')
-  }];
-}
-
-function parseProjects(rows) {
-  const projects = [];
-  for (let index = 0; index < rows.length;) {
-    if (!DATE_LINE_RE.test(rows[index + 1] || '')) { index += 1; continue; }
-    const name = rows[index];
-    const date = rows[index + 1];
-    index += 2;
-    const details = [];
-    while (index < rows.length && !DATE_LINE_RE.test(rows[index + 1] || '')) details.push(rows[index++]);
-    const techRows = details.filter(row => /(?:·|\||,)/.test(row) && row.length < 100);
-    projects.push({
-      id: `project_${projects.length + 1}`, name, date,
-      description: details.filter(row => !techRows.includes(row)).join(' '),
-      tech: techRows.join(' · '), url: ''
-    });
-  }
-  return projects;
-}
-
-function parseCertifications(rows) {
-  return rows.map(row => {
-    const { title, organization } = splitTitleOrganization(row);
-    return { name: title, title, issuer: organization, date: '' };
-  }).filter(item => item.name);
-}
-
-function parseLanguages(rows) {
-  const text = rows.join(' ');
-  const matches = [...text.matchAll(/([\p{L}][\p{L} -]{1,30}?)\s+(Native|Fluent|Professional|Intermediate|Beginner|Basic|A1|A2|B1|B2|C1|C2)\b/giu)];
-  if (matches.length) return matches.map(match => ({ language: cleanLine(match[1]), proficiency: match[2] }));
-  return rows.flatMap(row => row.split(/[,|•]/)).map(cleanLine).filter(Boolean).map(language => ({ language, proficiency: '' }));
-}
-
-function parseVolunteering(rows) {
-  if (!rows.length) return [];
-  const { title: role, organization } = splitTitleOrganization(rows[0]);
-  const hasDates = DATE_LINE_RE.test(rows[1] || '');
-  const dates = hasDates ? parseDateRange(rows[1]) : { startDate: '', endDate: '', current: false };
-  const details = rows.slice(hasDates ? 2 : 1);
-  return [{ organization, role, ...dates, description: details.join(' '), achievements: details }];
-}
-
-function inferSkills(fullText, explicitRows) {
-  const evidenceSkills = [
-    'JavaScript', 'TypeScript', 'React', 'Vue', 'Angular', 'HTML', 'CSS', 'Bootstrap',
-    'PHP', 'Laravel', 'Python', 'Java', 'C++', 'C#', 'SQL', 'MySQL', 'PostgreSQL',
-    'Power BI', 'Tableau', 'Excel', 'Git', 'Node.js', 'Three.js', 'WebGL'
-  ];
-  const explicit = explicitRows.flatMap(row => row.split(/[,;|•·]/)).map(cleanLine).filter(Boolean);
-  const inferred = evidenceSkills.filter(skill => new RegExp(`(^|[^\\p{L}\\p{N}])${skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\p{L}\\p{N}]|$)`, 'iu').test(fullText));
-  return [...new Set([...explicit, ...inferred])].map(name => ({ name, category: 'Skills', level: null }));
-}
-
-function inferHeadline(summary, candidates) {
-  return candidates.find(value => /\b(developer|engineer|designer|analyst|scientist|manager|specialist|consultant)\b/i.test(value)) ||
-    summary.match(/\b[\p{L}-]+(?:\s+[\p{L}-]+){0,3}\s+(?:Developer|Engineer|Designer|Analyst|Scientist|Manager|Specialist|Consultant)\b/iu)?.[0] || '';
-}
-
-export class DeterministicFallbackProvider extends BaseCVAnalyzerProvider {
-  async analyze(normalizedCV) {
-    const lines = normalizedCV?.lines || [];
-    const fullText = normalizedCV?.text || '';
-    if (!lines.length) throw new Error('CV text content is empty or unreadable.');
-
-    const sections = detectSections(lines);
-    const firstSectionIndex = Math.min(...Object.values(sections).map(section => section.startIndex), lines.length);
-    const header = lines.slice(0, firstSectionIndex).map(cleanHeaderLine).filter(Boolean);
-    const email = fullText.match(/[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0] || '';
-    const phone = fullText.match(/(?:\+?\d{1,3}[\s-]?)?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}/)?.[0] || '';
-    const links = fullText.match(/(?:https?:\/\/|www\.)[^\s|]+/gi) || [];
-    const candidates = header.filter(value => !value.includes('@') && !/(?:https?:\/\/|www\.)/i.test(value) && !/\d{5,}/.test(value));
-    const name = candidates.find(value => /^[\p{L}][\p{L} .'-]{2,44}$/u.test(value)) || '';
-    const rows = key => sectionLines(sections, key, lines);
-    const summary = rows('summary').join(' ');
-    const headline = inferHeadline(summary, candidates.filter(value => value !== name));
-    const skills = inferSkills(fullText, rows('skills'));
-
-    const experience = parseExperience(rows('experience'));
-    const education = parseEducation(rows('education'));
-    const projects = parseProjects(rows('projects'));
-    const certifications = parseCertifications(rows('certifications'));
-    const volunteering = parseVolunteering(rows('volunteering'));
-    const languages = parseLanguages(rows('languages'));
-
-    return {
-      personal: {
-        name, headline, email, phone,
-        location: header.find(value => value !== name && value !== headline && value.includes(','))?.split('|')[0].trim() || '',
-        github: links.find(value => /github\.com/i.test(value)) || '',
-        linkedin: links.find(value => /linkedin\.com/i.test(value)) || ''
-      },
-      summary, experience, education, skills, projects, certifications, volunteering, languages,
-      confidence: { personal: name ? 0.9 : 0.3, experience: experience.length ? 0.85 : 0, education: education.length ? 0.85 : 0, skills: skills.length ? 0.8 : 0 },
-      warnings: name && headline ? [] : ['Review name and professional title before continuing.'],
-      missingProjects: projects.length === 0,
-      providerType: 'Local PDF parser'
-    };
-  }
-}
-
-export class CVParserService {
-  constructor() { this.fallbackProvider = new DeterministicFallbackProvider(); }
-  async parse(normalizedCV) { return this.fallbackProvider.analyze(normalizedCV); }
-}
+export class DeterministicFallbackProvider extends BaseCVAnalyzerProvider { async analyze(normalizedCV) { const lines = normalizedCV?.lines || []; const fullText = normalizedCV?.text || ''; if (!lines.length) throw new Error('CV text content is empty or unreadable.'); const sections = detectSections(lines); const firstSectionIndex = Math.min(...Object.values(sections).map(section => section.startIndex), lines.length); const header = lines.slice(0, firstSectionIndex).map(line => stripBullet(line)).filter(Boolean); const email = fullText.match(/[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0] || ''; const phone = fullText.match(/(?:\+?\d{1,3}[\s-]?)?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}/)?.[0] || ''; const links = fullText.match(/(?:https?:\/\/|www\.)[^\s|]+/gi) || []; const candidates = header.filter(value => !value.includes('@') && !/(?:https?:\/\/|www\.)/i.test(value) && !/\d{5,}/.test(value)); const name = candidates.find(value => /^[\p{L}][\p{L} .'-]{2,60}$/u.test(value)) || ''; const rows = key => sectionLines(sections, key, lines); const summary = rows('summary').join(' '); const parsedSkills = inferSkills(fullText, rows('skills')); return { personal: { name, headline: inferHeadline(summary, candidates.filter(value => value !== name)), email, phone, location: header.find(value => value !== name && value.includes(','))?.split('|')[0].trim() || '', github: links.find(value => /github\.com/i.test(value)) || '', linkedin: links.find(value => /linkedin\.com/i.test(value)) || '' }, summary, experience: parseExperience(rows('experience')), education: parseEducation(rows('education')), skills: parsedSkills.skills, projects: parseProjects(rows('projects'), normalizedCV.embeddedLinks || []), certifications: parseCertifications(rows('certifications')), volunteering: parseVolunteering(rows('volunteering')), languages: [...parsedSkills.languages, ...parseLanguages(rows('languages'))], confidence: { personal: name ? 0.9 : 0.3, experience: 0, education: 0, skills: parsedSkills.skills.length ? 0.8 : 0 }, warnings: name ? [] : ['Review name and professional title before continuing.'], missingProjects: false, providerType: 'Local PDF parser' }; } }
+export class CVParserService { constructor() { this.fallbackProvider = new DeterministicFallbackProvider(); } async parse(normalizedCV) { return this.fallbackProvider.analyze(normalizedCV); } }

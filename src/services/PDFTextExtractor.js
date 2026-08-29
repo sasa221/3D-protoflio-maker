@@ -64,7 +64,12 @@ export async function extractTextFromPDF(file, { maxPages = 12, maxTextLength = 
             lastXEnd = x !== null ? x + (item.width || 0) : null;
           } else {
             const gap = x !== null && lastXEnd !== null ? x - lastXEnd : null;
-            const separator = currentLine && (gap === null || gap > 1.5) ? ' ' : '';
+            // Some Word-generated PDFs split a word into one-letter glyphs
+            // ("G" + "iza", "J" + "une"). They share the same baseline,
+            // so join that token pair without introducing a visible space.
+            const previousToken = currentLine.trim().split(/\s+/).at(-1) || '';
+            const splitWord = /^[A-Z]$/.test(previousToken) && /^[a-z]/.test(String(item.str || ''));
+            const separator = currentLine && !splitWord && (gap === null || gap > 1.5) ? ' ' : '';
             currentLine += separator + item.str;
             lastXEnd = x !== null ? x + (item.width || 0) : null;
           }

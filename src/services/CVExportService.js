@@ -43,12 +43,17 @@ function itemText(item) {
 function itemEntry(item) {
   if (typeof item === 'string') return { title: '', meta: '', dates: '', details: safeText(item), url: '' };
   if (!item || typeof item !== 'object') return null;
+  const role = safeText(item.role || '');
+  const organization = safeText(item.organization || item.institution || item.provider || item.company || '');
+  const shortOrganization = safeText(item.organizationShort || '');
+  const bullets = Array.isArray(item.bullets) ? item.bullets.map(safeText).filter(Boolean) : (Array.isArray(item.achievements) ? item.achievements.map(safeText).filter(Boolean) : []);
+  const rawDetails = safeText(item.details || item.description || item.text || '');
   return {
-    title: safeText(item.name || item.degree || item.title || ''),
-    meta: [safeText(item.institution || item.provider || item.organization || item.company || ''), safeText(item.field || ''), safeText(item.role && item.role !== item.title && item.role !== item.name ? item.role : '')].filter(Boolean).join(' · '),
+    title: item.role ? (shortOrganization ? `${shortOrganization} — ${role}` : role) : safeText(item.name || item.degree || item.title || ''),
+    meta: [item.role && shortOrganization ? organization : organization, safeText(item.field || ''), item.role && !shortOrganization && item.title && item.title !== role ? safeText(item.title) : ''].filter(Boolean).join(' · '),
     dates: [safeText(item.startDate || ''), safeText(item.endDate || '')].filter(Boolean).join(' – '),
-    details: safeText(item.details || item.description || item.text || ''),
-    bullets: Array.isArray(item.bullets) ? item.bullets.map(safeText).filter(Boolean) : [],
+    details: bullets.length ? '' : rawDetails,
+    bullets,
     url: safeUrl(item.websiteUrl || item.url || '', 'web')
   };
 }
@@ -89,7 +94,17 @@ function normalizedContent(profile = {}) {
     ['experience', 'education', 'projects', 'training', 'certifications', 'activities'].includes(key)
       ? structured(key).map(itemEntry).filter(Boolean)
       : key === 'skills'
-        ? structured(key).map(item => ({ title: safeText(item?.category || ''), meta: '', dates: '', details: safeText(item?.text || item?.name || item), bullets: [], url: '' })).filter(item => item.details)
+        ? (() => {
+            const groups = new Map();
+            structured(key).forEach(item => {
+              const name = safeText(item?.text || item?.name || item);
+              if (!name) return;
+              const category = safeText(item?.category || 'Skills') || 'Skills';
+              if (!groups.has(category)) groups.set(category, []);
+              groups.get(category).push(name);
+            });
+            return Array.from(groups, ([category, names]) => ({ title: category, meta: '', dates: '', details: names.join(' · '), bullets: [], url: '' }));
+          })()
         : lines.map(line => ({ title: '', meta: '', dates: '', details: line, bullets: [], url: '' }))
   ]));
   const student = profile.careerStage === 'student';
@@ -191,7 +206,9 @@ export async function exportCareerProfilePdf(profile) {
         ensure(bodyLineHeight * 2);
         if (entry.title) {
           page.drawText(entry.title, { x: margin, y, size: bodySize, font: bold, color: rgb(0.08, 0.1, 0.14), maxWidth: entry.url ? width * 0.52 : width * 0.72 });
-          if (entry.url) page.drawText(' · View website ↗', { x: margin + bold.widthOfTextAtSize(entry.title, bodySize), y, size: 9.5, font: regular, color: rgb(0.02, 0.45, 0.62), maxWidth: width * 0.4 });
+          // Standard WinAnsi fonts cannot encode the Unicode northeast arrow;
+          // keep the link affordance ASCII so real imported project URLs export.
+          if (entry.url) page.drawText(' · View website >', { x: margin + bold.widthOfTextAtSize(entry.title, bodySize), y, size: 9.5, font: regular, color: rgb(0.02, 0.45, 0.62), maxWidth: width * 0.4 });
         }
         if (entry.dates) {
           const dateWidth = regular.widthOfTextAtSize(entry.dates, 9.5);

@@ -14,9 +14,9 @@ function cleanLine(value) { return clean(value).trim(); }
 function repairPdfArtifacts(value) {
   return String(value || '')
     .replace(/\b(\d{3})\s+(\d)\b/g, '$1$2')
-    .replace(/\b([A-Z])\s+(?=[a-z])/g, '$1')
-    .replace(/\b([A-Z])\s+(?=[A-Z]\b)/g, '$1')
-    .replace(/\b([a-z]{3,})\s+([a-z])\b/g, '$1$2');
+    // PDF.js already repairs same-line glyph splits. Keep this pass narrow so
+    // natural text such as "I also" is never rewritten into "Ialso".
+    .replace(/\b([A-Za-z]+)\s+-\s+([A-Za-z]+)\b/g, '$1 - $2');
 }
 function keyFor(value) { return String(value || '').toLowerCase().replace(/[^a-z]/g, ''); }
 function isHeading(line) { return SECTION_RE.test(cleanLine(line)); }
@@ -57,19 +57,51 @@ function bulletLines(lines = []) {
     return out;
   }, []);
 }
+function normalizeSkillCategory(value = '') {
+  const lower = clean(value).toLowerCase();
+  if (/programming|tools|technical skills|technologies/.test(lower)) return 'Programming & Tools';
+  if (/data analysis|analytics/.test(lower)) return 'Data Analysis';
+  if (/interpersonal|soft skills/.test(lower)) return 'Interpersonal Skills';
+  if (/language/.test(lower)) return 'Languages';
+  return clean(value) || 'Programming & Tools';
+}
+function parseExperienceEntry(lines = []) {
+  const source = lines.map(value => clean(value)).filter(Boolean);
+  const normalizedSource = source.map(value => value.replace(/^[•▪◦\-*]+\s*/, '').trim());
+  const dateIndex = normalizedSource.findIndex(line => parseDateRange(line).startDate);
+  const dateLine = dateIndex >= 0 ? normalizedSource[dateIndex] : '';
+  const dates = parseDateRange(dateLine);
+  const before = normalizedSource.slice(0, dateIndex >= 0 ? dateIndex : normalizedSource.length);
+  const roleLine = before.find(line => /(?:developer|engineer|designer|analyst|trainee|intern|manager|specialist|consultant|coordinator|member|lead)/i.test(line)) || before[0] || '';
+  const dateStart = dateLine.search(new RegExp(`(?:${MONTH_YEAR_RE.source}|\\b\\d{4}\\b)`, 'i'));
+  const rolePrefix = dateStart >= 0 ? dateLine.slice(0, dateStart) : '';
+  const role = clean(rolePrefix || roleLine).replace(/[,:|\-]+$/, '').trim();
+  const headerLine = before.find(line => /\s+(?:-|–|—)\s+/.test(line)) || (before.length > 1 ? before.at(-1) : before[0] || '');
+  const organizationSource = headerLine || before.find(line => line !== role) || '';
+  const orgParts = organizationSource.replace(/[–—]/g, '|').split(/\||\s+-\s+|(?<=[a-z])-(?=[A-Z]{2,}\b)/).map(value => clean(value)).filter(Boolean);
+  const headerStartsWithRole = orgParts.length > 1 && /developer|engineer|analyst|trainee|intern|manager|designer|specialist|consultant/i.test(orgParts[0]);
+  const organization = orgParts.length > 1 && !headerStartsWithRole ? orgParts[0] : (orgParts.slice(1).join(' - ') || organizationSource);
+  const organizationShort = orgParts.length > 1 && !headerStartsWithRole ? orgParts.slice(1).join(' - ') : '';
+  const detailStart = dateIndex >= 0 ? dateIndex + 1 : 1;
+  const details = source.slice(detailStart);
+  const bullets = bulletLines(details);
+  const prose = details.filter(line => !/^[•▪◦\-*]/.test(line)).join(' ');
+  return { role: role || organizationSource, title: role || organizationSource, organization, organizationShort, company: organizationShort || organization, startDate: dates.startDate, endDate: dates.endDate, description: prose, details: prose, bullets };
+}
 function structuredEntry(kind, raw, links = []) {
   const lines = (Array.isArray(raw) ? raw : String(raw || '').split(/\n+/)).map(value => clean(value)).filter(Boolean);
   const text = lines.join(' | ');
   const dates = parseDateRange(text);
   const dateLine = lines.find(line => parseDateRange(line).startDate) || '';
   const withoutDate = lines.filter(line => line !== dateLine);
+  if (kind === 'experience') return parseExperienceEntry(lines);
   const first = clean(withoutDate[0] || lines[0] || '');
   const second = clean(withoutDate[1] || '');
   const detailsLines = withoutDate.slice(second && !/^[•▪◦\-*]/.test(second) ? 2 : 1);
   const bullets = bulletLines(detailsLines);
   const details = detailsLines.filter(line => !/^[•▪◦\-*]/.test(line)).join(' ');
   if (kind === 'projects') {
-    const rawUrl = text.match(/(?:https?:\/\/|www\.)[^\s|)]+/i)?.[0] || links.find(link => /^https?:\/\//i.test(link)) || '';
+    const rawUrl = text.match(/(?:https?:\/\/|www\.)[^\s|)]+/i)?.[0] || (/view\s+(?:my\s+)?(?:website|project)/i.test(text) ? links.find(link => /^https?:\/\//i.test(link)) : '') || '';
     const url = /^https?:\/\//i.test(normalizeWebLink(rawUrl)) ? normalizeWebLink(rawUrl) : '';
     const datedSource = dateLine || first;
     const dateMatch = datedSource.match(new RegExp(`(${MONTH_YEAR_RE.source}|\\b\\d{4}\\b)`, 'i'));
@@ -251,10 +283,14 @@ export function buildImportReview(text, { format = 'text', fileName = '', embedd
   const projectLinks = embeddedLinks.map(normalizeWebLink).filter(link => /^https?:\/\//i.test(link) && !/linkedin\.com|github\.com/i.test(link));
   const groupedProjects = groupResumeEntries(sections.projects, 'projects').map((value, index) => /view\s+(?:my\s+)?website|view\s+project/i.test(value) && projectLinks[index] ? `${value} | ${projectLinks[index]}` : value);
   const reviewItem = (value, kind, links = []) => ({ ...field(Array.isArray(value) ? value.join(' | ') : value), parsed: structuredEntry(kind, value, links), confidence: Array.isArray(value) && value.length > 1 ? 'medium' : 'high' });
-  const skillItems = sections.skills.flatMap(value => {
-    const match = value.match(/^([^:|]{2,50}):\s*(.+)$/);
-    return (match ? match[2] : value).split(/[,;|•·]/).map(item => ({ value: clean(item), category: match ? clean(match[1], 50) : '' })).filter(item => item.value);
-  }).map(item => ({ ...field(item.value), parsed: { text: item.value, name: item.value, category: item.category } }));
+  const skillGroups = []; let currentSkillGroup = null;
+  sections.skills.forEach(value => {
+    const match = value.match(/^[•▪◦\-*]?\s*([^:|]{2,60}):\s*(.+)$/);
+    if (match) { currentSkillGroup = { category: normalizeSkillCategory(match[1]), text: match[2] }; skillGroups.push(currentSkillGroup); }
+    else if (currentSkillGroup) currentSkillGroup.text += ` ${clean(value)}`;
+    else { currentSkillGroup = { category: 'Programming & Tools', text: value }; skillGroups.push(currentSkillGroup); }
+  });
+  const skillItems = skillGroups.flatMap(group => group.text.split(/[,;|•·]/).map(item => ({ value: clean(item).replace(/[.,;]+$/, ''), category: group.category })).filter(item => item.value)).map(item => ({ ...field(item.value), parsed: { text: item.value, name: item.value, category: item.category } }));
   const review = {
     source: { format, fileName: clean(fileName, 160) },
     contact: { name: field(name), email: field(email), phone: field(phone), location: field(location), linkedin: field(normalizeWebLink(links.find(link => /linkedin\.com/i.test(link)) || '')), github: field(normalizeWebLink(links.find(link => /github\.com/i.test(link)) || '')) },

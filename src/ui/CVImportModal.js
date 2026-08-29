@@ -13,6 +13,10 @@ let currentCanonicalCV = null;
 let currentCVFile = null;
 let onImportCallback = null;
 
+function escapeHtml(value = '') {
+  return String(value).replace(/[&<>\"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+}
+
 export function initCVImportModal(onImport) {
   onImportCallback = onImport;
 
@@ -165,6 +169,12 @@ function renderReviewStep() {
   const projCount = currentCanonicalCV.projects?.length || 0;
   const certCount = currentCanonicalCV.certifications?.length || 0;
   const langCount = currentCanonicalCV.languages?.length || 0;
+  const skillGroups = new Map();
+  (currentCanonicalCV.skills || []).forEach(skill => {
+    const category = skill.category || 'Programming & Tools';
+    if (!skillGroups.has(category)) skillGroups.set(category, []);
+    skillGroups.get(category).push(skill.name);
+  });
 
   card.innerHTML = `
     <button onclick="window.closeCVImportModal()" style="
@@ -203,7 +213,7 @@ function renderReviewStep() {
       <div style="margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.06);">
         <div style="font-size: 0.75rem; font-weight: 700; color: rgba(255,255,255,0.5); margin-bottom: 6px;">PROFILE INFO</div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-          <input class="field-input" id="can-name" value="${currentCanonicalCV.personal.name || ''}" placeholder="Candidate Name" oninput="currentCanonicalCV.personal.name=this.value" style="font-size: 0.8rem; padding: 6px 10px; font-weight: 700;"/>
+          <input class="field-input" id="can-name" value="${escapeHtml(currentCanonicalCV.personal.name || '')}" placeholder="Candidate Name" oninput="currentCanonicalCV.personal.name=this.value" style="font-size: 0.8rem; padding: 6px 10px; font-weight: 700;"/>
           <input class="field-input" id="can-headline" value="${currentCanonicalCV.personal.headline || ''}" placeholder="Job Title / Profession" oninput="currentCanonicalCV.personal.headline=this.value" style="font-size: 0.8rem; padding: 6px 10px;"/>
         </div>
       </div>
@@ -214,13 +224,17 @@ function renderReviewStep() {
         ${currentCanonicalCV.experience.map((exp, idx) => `
           <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 10px; margin-bottom: 8px;">
             <div style="display: flex; gap: 8px; margin-bottom: 6px; align-items: center;">
-              <input class="field-input" id="exp-role-${idx}" value="${exp.role || ''}" placeholder="Role Title" oninput="currentCanonicalCV.experience[${idx}].role=this.value" style="flex: 1; font-size: 0.78rem; padding: 6px 8px; font-weight: 700; color: var(--primary);"/>
+              <input class="field-input" id="exp-role-${idx}" value="${escapeHtml(exp.role || '')}" placeholder="Role Title" oninput="currentCanonicalCV.experience[${idx}].role=this.value" style="flex: 1; font-size: 0.78rem; padding: 6px 8px; font-weight: 700; color: var(--primary);"/>
               <button onclick="window.swapRoleCompany(${idx})" style="background: rgba(124,58,237,0.2); border: 1px solid rgba(124,58,237,0.4); border-radius: 6px; color: #fff; font-size: 0.7rem; font-weight: 700; padding: 6px 10px; cursor: pointer; white-space: nowrap;" title="Swap Role and Company">🔀 Swap Role/Company</button>
             </div>
             <div style="display: flex; gap: 8px;">
-              <input class="field-input" id="exp-company-${idx}" value="${exp.company || ''}" placeholder="Company Name" oninput="currentCanonicalCV.experience[${idx}].company=this.value" style="flex: 1; font-size: 0.78rem; padding: 6px 8px;"/>
-              <input class="field-input" value="${exp.startDate || ''}${exp.endDate ? ` — ${exp.endDate}` : ''}" placeholder="Dates" oninput="currentCanonicalCV.experience[${idx}].startDate=this.value" style="width: 140px; font-size: 0.75rem; padding: 6px 8px;"/>
+              <input class="field-input" id="exp-company-${idx}" value="${escapeHtml(exp.company || '')}" placeholder="Short name" oninput="currentCanonicalCV.experience[${idx}].company=this.value" style="flex: 1; font-size: 0.78rem; padding: 6px 8px;"/>
+              <input class="field-input" value="${escapeHtml(exp.organization || '')}" placeholder="Organization" oninput="currentCanonicalCV.experience[${idx}].organization=this.value" style="flex: 1.4; font-size: 0.75rem; padding: 6px 8px;"/>
+              <input class="field-input" value="${escapeHtml(exp.startDate || '')}" placeholder="Start date" oninput="currentCanonicalCV.experience[${idx}].startDate=this.value" style="width: 110px; font-size: 0.75rem; padding: 6px 8px;"/>
+              <input class="field-input" value="${escapeHtml(exp.endDate || '')}" placeholder="End date" oninput="currentCanonicalCV.experience[${idx}].endDate=this.value" style="width: 110px; font-size: 0.75rem; padding: 6px 8px;"/>
             </div>
+            ${exp.achievements?.length ? `<ul style="margin: 8px 0 0 18px; padding: 0; color: rgba(255,255,255,0.72); font-size: 0.74rem; line-height: 1.45;">${exp.achievements.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+            ${exp.organization && exp.organization !== exp.company ? `<div style="margin-top: 6px; color: rgba(255,255,255,0.56); font-size: 0.72rem;">Full organization: ${escapeHtml(exp.organization)}</div>` : ''}
           </div>
         `).join('')}
       </div>
@@ -242,7 +256,7 @@ function renderReviewStep() {
       <div>
         <div style="font-size: 0.75rem; font-weight: 700; color: rgba(255,255,255,0.5); margin-bottom: 6px;">TECHNICAL SKILLS (${skillCount})</div>
         <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;">
-          ${currentCanonicalCV.skills.map(s => `<span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 3px 10px; font-size: 0.72rem;">${s.name}</span>`).join('')}
+          ${Array.from(skillGroups, ([category, names]) => `<div style="width: 100%; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 5px;"><strong style="font-size: 0.72rem; min-width: 150px; color: rgba(255,255,255,0.78);">${escapeHtml(category)}</strong>${names.map(name => `<span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 3px 10px; font-size: 0.72rem;">${escapeHtml(name)}</span>`).join('')}</div>`).join('')}
         </div>
         ${langCount > 0 ? `
           <div style="font-size: 0.75rem; font-weight: 700; color: rgba(168,85,247,0.8); margin-bottom: 4px;">NATURAL LANGUAGES (${langCount})</div>

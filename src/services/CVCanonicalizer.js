@@ -123,22 +123,37 @@ function separateSkillsAndLanguages(rawSkills, rawLanguages = []) {
     if (!sName) return;
 
     const trimmed = sName.trim();
-    const isLang = ['english', 'arabic'].some(l => l === trimmed.toLowerCase());
+    const isLanguageCategory = normalizeCategory(s.category || '') === 'Languages';
+    const languageMatch = trimmed.match(/^(.+?)\s+(Native|Fluent|Professional|Intermediate|Beginner|Basic|A1|A2|B1|B2|C1|C2)$/i);
+    const isLang = isLanguageCategory || ['english', 'arabic'].some(l => l === trimmed.toLowerCase()) || Boolean(languageMatch);
 
     if (isLang) {
-      if (!languages.some(l => l.language.toLowerCase() === trimmed.toLowerCase())) {
-        languages.push({ language: trimmed, proficiency: trimmed.toLowerCase() === 'english' ? 'B2' : 'Native' });
+      const language = languageMatch?.[1]?.trim() || trimmed;
+      const proficiency = languageMatch?.[2] || (trimmed.toLowerCase() === 'english' ? 'B2' : trimmed.toLowerCase() === 'arabic' ? 'Native' : '');
+      if (!languages.some(l => l.language.toLowerCase() === language.toLowerCase())) {
+        languages.push({ language, proficiency });
       }
     } else {
+      const category = normalizeCategory(s.category || categorizeSkill(trimmed));
       techSkills.push({
-        name: trimmed,
+        name: trimmed.replace(/^([^:]{2,50}):\s*/, ''),
         level: null, // NO FABRICATED PERCENTAGES!
-        category: s.category || categorizeSkill(trimmed)
+        category
       });
     }
   });
 
-  return { techSkills, languages };
+  const uniqueSkills = techSkills.filter((item, index, list) => list.findIndex(other => other.name.toLowerCase() === item.name.toLowerCase() && other.category === item.category) === index);
+  return { techSkills: uniqueSkills, languages };
+}
+
+function normalizeCategory(value = '') {
+  const lower = String(value).toLowerCase();
+  if (/programming|tools|technical skills|technologies/.test(lower)) return 'Programming & Tools';
+  if (/data analysis|analytics/.test(lower)) return 'Data Analysis';
+  if (/interpersonal|soft skills/.test(lower)) return 'Interpersonal Skills';
+  if (/language/.test(lower)) return 'Languages';
+  return value || 'Programming & Tools';
 }
 
 function categorizeSkill(name) {
@@ -159,7 +174,9 @@ function deduplicateExperience(rawExp) {
       list.push({
         id: exp.id || 'exp_' + Math.random().toString(36).substr(2, 9),
         role,
-        company,
+        company: company || cleanString(exp.organization || ''),
+        organization: cleanString(exp.organization || company),
+        organizationShort: cleanString(exp.organizationShort || ''),
         location: cleanString(exp.location || ''),
         startDate: exp.startDate || '',
         endDate: exp.endDate || '',
@@ -208,17 +225,25 @@ function deduplicateProjects(rawProj) {
     let name = cleanString(p.name || 'Project');
     // Strip bullets, dates, (View Website) from project title
     name = name.replace(/^[•\-\*\s]+/, '')
-               .replace(/(?:May|Dec|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov)\s*(?:19|20)\d{2}/gi, '')
+               .replace(/\s+(?:May|Dec|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov)\s*(?:19|20)\d{1,4}\s*$/gi, '')
                .replace(/\(View\s*Website\)/gi, '')
+               .replace(/[,:|]+\s*$/, '')
                .trim();
 
     if (name && !list.some(item => item.name.toLowerCase() === name.toLowerCase())) {
       list.push({
         name,
         description: cleanString(p.description || ''),
+        bullets: Array.isArray(p.bullets) ? p.bullets.map(cleanString).filter(Boolean) : [],
         tech: cleanString(p.tech || ''),
-        url: p.url || '',
-        date: p.date || ''
+        // A PDF may expose one annotation for a "View Website" label. Never
+        // copy that same link onto every project; keep it on the first
+        // evidence-bearing item only.
+        url: (p.url || p.websiteUrl) && !list.some(item => item.url === (p.url || p.websiteUrl)) ? (p.url || p.websiteUrl) : '',
+        websiteUrl: (p.websiteUrl || p.url) && !list.some(item => item.url === (p.websiteUrl || p.url)) ? (p.websiteUrl || p.url) : '',
+        date: p.date || '',
+        startDate: p.startDate || p.date || '',
+        endDate: p.endDate || p.date || ''
       });
     }
   });
