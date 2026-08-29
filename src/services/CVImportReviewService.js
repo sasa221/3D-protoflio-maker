@@ -269,6 +269,8 @@ export function buildImportReview(text, { format = 'text', fileName = '', embedd
   if (!review.education.length) review.warnings.push('No education rows were clearly extracted.');
   const coreSectionCount = ['summary', 'experience', 'education', 'skills', 'projects'].filter(key => key === 'summary' ? Boolean(review.summary.value) : review[key].length > 0).length;
   if (!review.contact.email.value && coreSectionCount < 2) review.warnings.push('This document does not look like a CV or resume. Check the file before selecting anything.');
+  const uncertainCount = ['experience', 'education', 'projects', 'certifications', 'training', 'activities'].reduce((count, key) => count + (review[key] || []).filter(item => item.confidence === 'medium' || !item.parsed?.title && !item.parsed?.name && !item.parsed?.role && !item.parsed?.institution).length, 0);
+  if (uncertainCount) review.warnings.push(`${uncertainCount} imported row${uncertainCount === 1 ? '' : 's'} need a quick structure check before saving.`);
   return review;
 }
 
