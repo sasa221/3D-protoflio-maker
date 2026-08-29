@@ -224,6 +224,7 @@ import { renderFirstRunChecklist } from './ui/FirstRunChecklist.js';
 import { renderWorkspaceNav, renderWorkspaceHeader, setActiveWorkspace } from './ui/StudioWorkspaceLayout.js';
 import { openAccountSettingsModal } from './ui/AccountSettingsModal.js';
 import { setPageTitle } from './config/ProductConfig.js';
+import { applyRouteSEO } from './services/SEOService.js';
 
 function getAppContainer() {
   let app = document.getElementById('app');
@@ -238,6 +239,7 @@ function getAppContainer() {
 // ─── ROUTER ─────────────────────────────────
 async function router() {
   const path = window.location.pathname;
+  applyRouteSEO(path);
 
   // 1. Public Portfolio Route
   if (path.startsWith('/u/')) {
@@ -466,6 +468,9 @@ async function handlePublicRoute(username, variantSlug) {
       render404Page(username);
       return;
     }
+    // Replace the slug placeholder with only fields from the published
+    // snapshot; drafts and private profile fields never reach head metadata.
+    applyRouteSEO(`/u/${encodeURIComponent(username.trim().toLowerCase())}${variantSlug ? `/${encodeURIComponent(variantSlug.trim().toLowerCase())}` : ''}`, { publicProfile: pf.master_profile_json?.publishedProfile || pf.master_profile_json || {} });
 
     let masterJson = pf.master_profile_json || {};
     let masterData = masterJson.publishedProfile || masterJson;

@@ -40,7 +40,8 @@ export function renderCVImportReviewPanel(container, { ownerUserId = 'local-dev-
 
     function fieldRow(path, item, multiline = false) {
       const input = multiline ? `<textarea data-import-field="${escape(path)}" rows="3">${escape(item.value)}</textarea>` : `<input data-import-field="${escape(path)}" value="${escape(item.value)}">`;
-      return `<label class="cv-import-field"><input type="checkbox" data-import-select="${escape(path)}" ${item.selected ? 'checked' : ''}><span><strong>${escape(path.split('.').slice(-1)[0])}</strong><em>EXTRACTED · REVIEW</em>${input}</span></label>`;
+      const confidence = item.confidence === 'medium' ? ' · CHECK STRUCTURE' : '';
+      return `<label class="cv-import-field"><input type="checkbox" data-import-select="${escape(path)}" ${item.selected ? 'checked' : ''}><span><strong>${escape(path.split('.').slice(-1)[0])}</strong><em>EXTRACTED · REVIEW${confidence}</em>${input}</span></label>`;
     }
     function listRows(key, items) { return items.map((item, index) => fieldRow(`${key}.${index}`, item, true)).join('') || `<p style="color:rgba(255,255,255,.5);font-size:12px">Not clearly extracted.</p>`; }
     function renderReview(review) {
@@ -54,7 +55,7 @@ export function renderCVImportReviewPanel(container, { ownerUserId = 'local-dev-
         const base = getBaseProfile?.();
         if (!base?.id) { status.textContent = 'Base CV is unavailable; nothing was saved.'; return; }
         const nextSelection = createImportSelection(review);
-        view.querySelectorAll('[data-import-field]').forEach(input => { const path = input.dataset.importField.split('.'); const key = path[0]; if (path.length === 2 && /^\d+$/.test(path[1])) nextSelection[key][Number(path[1])].value = input.value; else if (key === 'contact') nextSelection.contact[path[1]].value = input.value; else nextSelection[key].value = input.value; });
+        view.querySelectorAll('[data-import-field]').forEach(input => { const path = input.dataset.importField.split('.'); const key = path[0]; if (path.length === 2 && /^\d+$/.test(path[1])) { nextSelection[key][Number(path[1])].value = input.value; nextSelection[key][Number(path[1])].parsed = undefined; } else if (key === 'contact') nextSelection.contact[path[1]].value = input.value; else { nextSelection[key].value = input.value; nextSelection[key].parsed = undefined; } });
         view.querySelectorAll('[data-import-select]').forEach(input => { const path = input.dataset.importSelect.split('.'); const key = path[0]; if (path.length === 2 && /^\d+$/.test(path[1])) nextSelection[key][Number(path[1])].selected = input.checked; else if (key === 'contact') nextSelection.contact[path[1]].selected = input.checked; else nextSelection[key].selected = input.checked; });
         const result = applyImportSelection(base, review, nextSelection, { overwriteExisting: view.querySelector('[data-import-overwrite]').checked });
         if (!result.changedFields.length) { status.textContent = 'No fields selected or existing values were preserved. Nothing changed.'; return; }

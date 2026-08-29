@@ -17,7 +17,7 @@ function safeUrl(value, kind = 'web') {
   if (kind === 'email' && /^mailto:[^\s<>]+$/i.test(raw)) return raw;
   try {
     const url = new URL(raw);
-    if (url.protocol !== 'https:') return '';
+    if (!['http:', 'https:'].includes(url.protocol)) return '';
     const hostname = url.hostname.toLowerCase();
     if (kind === 'github' && !(hostname === 'github.com' || hostname.endsWith('.github.com'))) return '';
     if (kind === 'linkedin' && !(hostname === 'linkedin.com' || hostname.endsWith('.linkedin.com'))) return '';
@@ -31,13 +31,14 @@ function itemText(item) {
   if (typeof item === 'string') return safeText(item);
   if (!item || typeof item !== 'object') return '';
   if (item.text) return safeText(item.text);
-  const title = safeText(item.name || item.degree || item.title || '');
-  const organization = safeText(item.institution || item.provider || item.role || '');
+  const title = safeText(item.name || item.degree || item.title || item.role || '');
+  const organization = safeText(item.institution || item.provider || item.organization || item.company || (item.role && item.role !== title ? item.role : '') || '');
   const field = safeText(item.field || '');
   const dates = [safeText(item.startDate || ''), safeText(item.endDate || '')].filter(Boolean).join(' – ');
   const details = safeText(item.details || item.description || '');
-  const link = safeUrl(item.url || '', 'web');
-  return [title, organization, field, dates, details, link].filter(Boolean).join(' | ');
+  const bullets = Array.isArray(item.bullets) ? item.bullets.map(safeText).filter(Boolean).join(' • ') : '';
+  const link = safeUrl(item.websiteUrl || item.url || '', 'web');
+  return [title, organization, field, dates, details, bullets, link].filter(Boolean).join(' | ');
 }
 
 function itemEntry(item) {
@@ -45,10 +46,11 @@ function itemEntry(item) {
   if (!item || typeof item !== 'object') return null;
   return {
     title: safeText(item.name || item.degree || item.title || ''),
-    meta: [safeText(item.institution || item.provider || item.role || ''), safeText(item.field || '')].filter(Boolean).join(' · '),
+    meta: [safeText(item.institution || item.provider || item.organization || item.company || ''), safeText(item.field || ''), safeText(item.role && item.role !== item.title && item.role !== item.name ? item.role : '')].filter(Boolean).join(' · '),
     dates: [safeText(item.startDate || ''), safeText(item.endDate || '')].filter(Boolean).join(' – '),
     details: safeText(item.details || item.description || item.text || ''),
-    url: safeUrl(item.url || '', 'web')
+    bullets: Array.isArray(item.bullets) ? item.bullets.map(safeText).filter(Boolean) : [],
+    url: safeUrl(item.websiteUrl || item.url || '', 'web')
   };
 }
 
@@ -72,6 +74,7 @@ function normalizedContent(profile = {}) {
     safeText(contact.location),
     ...links
   ].filter(Boolean);
+  const structured = key => Array.isArray(content[key]) ? content[key] : [];
   const sections = {
     summary: [safeText(content.summary)].filter(Boolean),
     experience: itemsToLines(content.experience),
@@ -84,9 +87,11 @@ function normalizedContent(profile = {}) {
     activities: itemsToLines(content.activities)
   };
   const entries = Object.fromEntries(Object.entries(sections).map(([key, lines]) => [key,
-    ['education', 'projects', 'training'].includes(key)
-      ? (Array.isArray(content[key]) ? content[key].map(itemEntry).filter(Boolean) : [])
-      : lines.map(line => ({ title: '', meta: '', dates: '', details: line, url: '' }))
+    ['experience', 'education', 'projects', 'training', 'certifications', 'activities'].includes(key)
+      ? structured(key).map(itemEntry).filter(Boolean)
+      : key === 'skills'
+        ? structured(key).map(item => ({ title: safeText(item?.category || ''), meta: '', dates: '', details: safeText(item?.text || item?.name || item), bullets: [], url: '' })).filter(item => item.details)
+        : lines.map(line => ({ title: '', meta: '', dates: '', details: line, bullets: [], url: '' }))
   ]));
   const student = profile.careerStage === 'student';
   const order = student
@@ -172,15 +177,20 @@ export async function exportCareerProfilePdf(profile) {
   y -= 8;
 
   for (const section of model.sections) {
-    ensure(18 + bodyLineHeight);
+    ensure(30 + bodyLineHeight);
     page.drawText(section.title, { x: margin, y, size: 11.5, font: bold, color: rgb(0.08, 0.1, 0.14), maxWidth: width });
     y -= 5;
     page.drawLine({ start: { x: margin, y }, end: { x: margin + width, y }, thickness: 0.7, color: rgb(0.12, 0.14, 0.18) });
     y -= 12;
     for (const entry of section.entries) {
+      const estimated = bodyLineHeight * (1 + (entry.meta ? 1 : 0) + (entry.details ? Math.min(4, wrapLine(entry.details, regular, bodySize, width).length) : 0) + (entry.bullets?.length || 0));
+      ensure(Math.min(estimated + 8, A4_PAGE.height - margin * 2));
       if (entry.title || entry.dates) {
         ensure(bodyLineHeight * 2);
-        if (entry.title) page.drawText(entry.title, { x: margin, y, size: bodySize, font: bold, color: rgb(0.08, 0.1, 0.14), maxWidth: width * 0.72 });
+        if (entry.title) {
+          page.drawText(entry.title, { x: margin, y, size: bodySize, font: bold, color: rgb(0.08, 0.1, 0.14), maxWidth: entry.url ? width * 0.52 : width * 0.72 });
+          if (entry.url) page.drawText(' · View website ↗', { x: margin + bold.widthOfTextAtSize(entry.title, bodySize), y, size: 9.5, font: regular, color: rgb(0.02, 0.45, 0.62), maxWidth: width * 0.4 });
+        }
         if (entry.dates) {
           const dateWidth = regular.widthOfTextAtSize(entry.dates, 9.5);
           page.drawText(entry.dates, { x: Math.max(margin, margin + width - dateWidth), y, size: 9.5, font: regular, color: rgb(0.25, 0.29, 0.36) });
@@ -189,6 +199,12 @@ export async function exportCareerProfilePdf(profile) {
       }
       if (entry.meta) drawLines(wrapLine(entry.meta, bold, 9.5, width), bold, 9.5, 12);
       if (entry.details) drawLines(wrapLine(entry.details, regular, bodySize, width));
+      if (entry.bullets?.length) {
+        for (const bullet of entry.bullets) {
+          const bulletLines = wrapLine(bullet, regular, bodySize, width - 14);
+          bulletLines.forEach((line, index) => drawLines([`${index === 0 ? '• ' : '  '}${line}`], regular, bodySize, bodyLineHeight));
+        }
+      }
       if (entry.url) drawLines(wrapLine(entry.url, regular, 9, width), regular, 9, 11);
       y -= 4;
     }

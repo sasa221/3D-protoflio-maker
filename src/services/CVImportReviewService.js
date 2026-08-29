@@ -8,7 +8,16 @@ const UPPER_INLINE_SECTION_RE = /^(PROFESSIONAL SUMMARY|OBJECTIVES?|WORK EXPERIE
 
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
 function clean(value, max = 2400) { return String(value || '').replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max); }
-function cleanLine(value) { return clean(value).replace(/^[•▪◦\-–—*]+\s*/, '').trim(); }
+// Keep bullet markers during import; the structured parser turns them into
+// actual bullet arrays later instead of losing list semantics.
+function cleanLine(value) { return clean(value).trim(); }
+function repairPdfArtifacts(value) {
+  return String(value || '')
+    .replace(/\b(\d{3})\s+(\d)\b/g, '$1$2')
+    .replace(/\b([A-Z])\s+(?=[a-z])/g, '$1')
+    .replace(/\b([A-Z])\s+(?=[A-Z]\b)/g, '$1')
+    .replace(/\b([a-z]{3,})\s+([a-z])\b/g, '$1$2');
+}
 function keyFor(value) { return String(value || '').toLowerCase().replace(/[^a-z]/g, ''); }
 function isHeading(line) { return SECTION_RE.test(cleanLine(line)); }
 function sectionKey(line) {
@@ -31,6 +40,53 @@ function decodeXml(value) {
 function normalizeWebLink(value) {
   const link = clean(value, 600).replace(/[),.;]+$/, '');
   return /^(?:www\.|(?:linkedin|github)\.com\/)/i.test(link) ? `https://${link}` : link;
+}
+
+function parseDateRange(value) {
+  const text = clean(value, 180);
+  const match = text.match(new RegExp(`(${MONTH_YEAR_RE.source}|\\b\\d{4}\\b)\\s*(?:-|–|—|to|until)\\s*(${MONTH_YEAR_RE.source}|\\b\\d{4}\\b|present|current)`, 'i'));
+  if (!match) return { startDate: '', endDate: '' };
+  return { startDate: clean(match[1]), endDate: clean(match[2]) };
+}
+function bulletLines(lines = []) {
+  return lines.map(line => clean(line)).filter(Boolean).reduce((out, line) => {
+    const bullet = line.match(/^[•▪◦\-*]\s*(.+)$/);
+    if (bullet) out.push(clean(bullet[1]));
+    else if (out.length) out[out.length - 1] = clean(`${out[out.length - 1]} ${line}`);
+    else out.push(clean(line));
+    return out;
+  }, []);
+}
+function structuredEntry(kind, raw, links = []) {
+  const lines = (Array.isArray(raw) ? raw : String(raw || '').split(/\n+/)).map(value => clean(value)).filter(Boolean);
+  const text = lines.join(' | ');
+  const dates = parseDateRange(text);
+  const dateLine = lines.find(line => parseDateRange(line).startDate) || '';
+  const withoutDate = lines.filter(line => line !== dateLine);
+  const first = clean(withoutDate[0] || lines[0] || '');
+  const second = clean(withoutDate[1] || '');
+  const detailsLines = withoutDate.slice(second && !/^[•▪◦\-*]/.test(second) ? 2 : 1);
+  const bullets = bulletLines(detailsLines);
+  const details = detailsLines.filter(line => !/^[•▪◦\-*]/.test(line)).join(' ');
+  if (kind === 'projects') {
+    const rawUrl = text.match(/(?:https?:\/\/|www\.)[^\s|)]+/i)?.[0] || links.find(link => /^https?:\/\//i.test(link)) || '';
+    const url = /^https?:\/\//i.test(normalizeWebLink(rawUrl)) ? normalizeWebLink(rawUrl) : '';
+    const datedSource = dateLine || first;
+    const dateMatch = datedSource.match(new RegExp(`(${MONTH_YEAR_RE.source}|\\b\\d{4}\\b)`, 'i'));
+    const titlePrefix = dateMatch ? datedSource.slice(0, dateMatch.index) : first;
+    const name = clean(titlePrefix.replace(/\(?\s*view\s+(?:my\s+)?(?:website|project)\s*\)?/ig, '').replace(/[,:|\-]+$/, ''));
+    const projectBody = lines.filter(line => line !== dateLine);
+    const projectBullets = bulletLines(projectBody);
+    const projectDetails = projectBody.filter(line => !/^[•▪◦\-*]/.test(line)).join(' ');
+    const inlineDescription = dateMatch ? clean(datedSource.slice(dateMatch.index + dateMatch[0].length).replace(new RegExp(`(?:-|–|—|to)\\s*(?:${MONTH_YEAR_RE.source}|\\b\\d{4}\\b)`, 'i'), '').replace(url, '').replace(/\(?\s*view\s+(?:my\s+)?(?:website|project)\s*\)?/ig, '')) : '';
+    const mergedDetails = [inlineDescription, projectDetails, details].filter(Boolean).join(' ');
+    return { name: name || clean(text, 160), title: name, role: second && !dates.startDate ? second : '', startDate: dates.startDate, endDate: dates.endDate, bullets: projectBullets, description: mergedDetails, details: mergedDetails, websiteUrl: url, url };
+  }
+  if (kind === 'education') return { institution: first, degree: second, field: '', startDate: dates.startDate, endDate: dates.endDate, details, bullets };
+  if (kind === 'training') return { name: first, provider: second, startDate: dates.startDate, endDate: dates.endDate, details, bullets };
+  if (kind === 'certifications') return { name: first, title: first, issuer: second, date: dateLine, details, bullets };
+  if (kind === 'activities' || kind === 'volunteering') return { title: first, role: first, organization: second, startDate: dates.startDate, endDate: dates.endDate, details, description: details, bullets };
+  return { role: first, title: first, organization: second, company: second, startDate: dates.startDate, endDate: dates.endDate, description: details, details, bullets };
 }
 
 const MONTH_YEAR_RE = /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{4}\b/i;
@@ -71,6 +127,36 @@ function groupResumeEntries(lines = [], kind) {
     return groups;
   }
   return source;
+}
+
+// Same grouping as the legacy display helper, but keeps each source line so
+// bullets, headings and date rows can be parsed without flattening them.
+function groupResumeEntryLines(lines = [], kind) {
+  const source = lines.map(value => String(value || '').trim()).filter(Boolean);
+  if (!source.length) return [];
+  if (kind === 'education' || kind === 'activities' || kind === 'training' || kind === 'certifications') return [source];
+  if (kind === 'projects') {
+    const groups = []; let current = [];
+    for (const line of source) {
+      const startsProject = (MONTH_YEAR_RE.test(line) || /\b\d{4}\b/.test(line)) && line.length < 150;
+      if (startsProject && current.length) { groups.push(current); current = []; }
+      current.push(line);
+    }
+    if (current.length) groups.push(current);
+    return groups;
+  }
+  if (kind === 'experience') {
+    const groups = []; let current = [];
+    source.forEach((line, index) => {
+      const nextLooksLikeDatedRole = DATE_RANGE_RE.test(source[index + 1] || '') || /\b(?:19|20)\d{2}\b/.test(source[index + 1] || '');
+      const currentAlreadyHasRole = current.some(value => DATE_RANGE_RE.test(value) || /\b(?:19|20)\d{2}\b/.test(value));
+      if (nextLooksLikeDatedRole && currentAlreadyHasRole && current.length) { groups.push(current); current = []; }
+      current.push(line);
+    });
+    if (current.length) groups.push(current);
+    return groups;
+  }
+  return source.map(line => [line]);
 }
 
 function extractDocxText(buffer) {
@@ -137,7 +223,8 @@ export async function extractImportText(file, { onProgress } = {}) {
 }
 
 export function buildImportReview(text, { format = 'text', fileName = '', embeddedLinks = [] } = {}) {
-  const lines = String(text || '').split('\n').map(cleanLine).filter(Boolean).flatMap(line => {
+  const repairedText = format === 'pdf' ? repairPdfArtifacts(text) : String(text || '');
+  const lines = repairedText.split('\n').map(cleanLine).filter(Boolean).flatMap(line => {
     const match = line.match(INLINE_SECTION_RE) || line.match(UPPER_INLINE_SECTION_RE);
     return match && clean(match[2]) ? [clean(match[1]), clean(match[2])] : [line];
   });
@@ -162,13 +249,18 @@ export function buildImportReview(text, { format = 'text', fileName = '', embedd
     sections[heading.key].push(...lines.slice(heading.index + 1, end).map(value => clean(value)).filter(Boolean));
   });
   const projectLinks = embeddedLinks.map(normalizeWebLink).filter(link => /^https?:\/\//i.test(link) && !/linkedin\.com|github\.com/i.test(link));
-  const groupedProjects = groupResumeEntries(sections.projects, 'projects').map((value, index) => /view\s+(?:my\s+)?website/i.test(value) && projectLinks[index] ? `${value} | ${projectLinks[index]}` : value);
+  const groupedProjects = groupResumeEntries(sections.projects, 'projects').map((value, index) => /view\s+(?:my\s+)?website|view\s+project/i.test(value) && projectLinks[index] ? `${value} | ${projectLinks[index]}` : value);
+  const reviewItem = (value, kind, links = []) => ({ ...field(Array.isArray(value) ? value.join(' | ') : value), parsed: structuredEntry(kind, value, links), confidence: Array.isArray(value) && value.length > 1 ? 'medium' : 'high' });
+  const skillItems = sections.skills.flatMap(value => {
+    const match = value.match(/^([^:|]{2,50}):\s*(.+)$/);
+    return (match ? match[2] : value).split(/[,;|•·]/).map(item => ({ value: clean(item), category: match ? clean(match[1], 50) : '' })).filter(item => item.value);
+  }).map(item => ({ ...field(item.value), parsed: { text: item.value, name: item.value, category: item.category } }));
   const review = {
     source: { format, fileName: clean(fileName, 160) },
     contact: { name: field(name), email: field(email), phone: field(phone), location: field(location), linkedin: field(normalizeWebLink(links.find(link => /linkedin\.com/i.test(link)) || '')), github: field(normalizeWebLink(links.find(link => /github\.com/i.test(link)) || '')) },
     summary: field(sections.summary.join(' ')),
-    experience: groupResumeEntries(sections.experience, 'experience').map(value => field(value)), education: groupResumeEntries(sections.education, 'education').map(value => field(value)), skills: sections.skills.flatMap(value => value.split(/[,;|•·]/).map(item => field(item))).filter(item => item.value),
-    projects: groupedProjects.map(value => field(value)), certifications: sections.certifications.map(value => field(value)), languages: sections.languages.map(value => field(value)), training: groupResumeEntries(sections.training, 'training').map(value => field(value)), activities: groupResumeEntries(sections.activities, 'activities').map(value => field(value)),
+    experience: groupResumeEntryLines(sections.experience, 'experience').map(value => reviewItem(value, 'experience')), education: groupResumeEntryLines(sections.education, 'education').map(value => reviewItem(value, 'education')), skills: skillItems,
+    projects: groupResumeEntryLines(sections.projects, 'projects').map(value => reviewItem(value, 'projects', projectLinks)), certifications: groupResumeEntryLines(sections.certifications, 'certifications').map(value => reviewItem(value, 'certifications')), languages: sections.languages.map(value => ({ ...field(value), parsed: { name: value } })), training: groupResumeEntryLines(sections.training, 'training').map(value => reviewItem(value, 'training')), activities: groupResumeEntryLines(sections.activities, 'activities').map(value => reviewItem(value, 'activities')),
     warnings: []
   };
   if (!name) review.warnings.push('Name was not clearly identified.');
@@ -192,11 +284,12 @@ export function createImportSelection(review) {
 }
 
 function selectedValue(item) { return item?.selected && clean(item.value) ? clean(item.value) : ''; }
+function selectedItem(item) { return item?.selected && clean(item?.value) ? (item.parsed ? clone(item.parsed) : clean(item.value)) : null; }
 function mergeArray(existing, incoming, overwrite) {
-  if (overwrite) return incoming.map(value => ({ text: value }));
+  if (overwrite) return incoming.map(value => typeof value === 'object' ? value : ({ text: value }));
   const out = Array.isArray(existing) ? clone(existing) : [];
   const seen = new Set(out.map(item => clean(typeof item === 'string' ? item : item?.text || item?.name || '').toLowerCase()).filter(Boolean));
-  incoming.forEach(value => { const key = value.toLowerCase(); if (key && !seen.has(key)) { out.push({ text: value }); seen.add(key); } });
+  incoming.forEach(value => { const label = typeof value === 'object' ? clean(value.name || value.text || '') : clean(value); const key = label.toLowerCase(); if (key && !seen.has(key)) { out.push(typeof value === 'object' ? value : { text: value }); seen.add(key); } });
   return out;
 }
 
@@ -221,7 +314,7 @@ function parseImportedStructuredEntry(kind, value) {
 }
 
 function mergeStructuredArray(existing, incoming, kind, overwrite) {
-  const parsed = incoming.map(value => parseImportedStructuredEntry(kind, value));
+  const parsed = incoming.map(value => typeof value === 'object' ? value : parseImportedStructuredEntry(kind, value));
   if (overwrite) return parsed;
   const out = Array.isArray(existing) ? clone(existing) : [];
   const identity = item => clean(item?.name || item?.institution || item?.text || item?.details || '').toLowerCase();
@@ -250,10 +343,11 @@ export function applyImportSelection(profile, review, selection, { overwriteExis
     else { next.content.summary = summary; changedFields.push('summary'); }
   }
   for (const key of ['experience', 'education', 'skills', 'projects', 'certifications', 'languages', 'training', 'activities']) {
-    const values = (selection?.[key] || []).map(selectedValue).filter(Boolean);
+    const selected = (selection?.[key] || []).map(selectedItem).filter(Boolean);
+    const values = selected.map(value => typeof value === 'object' ? value : clean(value)).filter(Boolean);
     if (!values.length) continue;
     const before = JSON.stringify(next.content[key] || []);
-    next.content[key] = ['education', 'projects', 'training'].includes(key)
+    next.content[key] = ['experience', 'education', 'projects', 'certifications', 'training', 'activities'].includes(key)
       ? mergeStructuredArray(next.content[key], values, key, overwriteExisting)
       : mergeArray(next.content[key], values, overwriteExisting);
     if (JSON.stringify(next.content[key]) !== before) changedFields.push(key);

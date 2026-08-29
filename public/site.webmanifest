@@ -3,6 +3,8 @@
   "short_name": "3D Portfolio",
   "description": "Build a cinematic 3D portfolio recruiters remember.",
   "start_url": "/",
+  "id": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#050508",
   "theme_color": "#050508",

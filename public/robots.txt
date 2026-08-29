@@ -2,9 +2,14 @@ User-agent: *
 Allow: /
 Disallow: /studio
 Disallow: /cv
+Disallow: /start
 Disallow: /account
+Disallow: /admin
+Disallow: /dashboard
 Disallow: /login
 Disallow: /reset-password
+Disallow: /privacy
+Disallow: /terms
 Disallow: /api/
 
 Sitemap: https://portfolio-maker-murex.vercel.app/sitemap.xml

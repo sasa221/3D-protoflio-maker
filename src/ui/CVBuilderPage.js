@@ -11,13 +11,23 @@ function escape(value = '') {
 }
 
 const COLLECTIONS = {
+  experience: { title: 'Experience', add: '+ Add experience', fields: [['role', 'Role / title', 'e.g. Front-End Developer'], ['organization', 'Organization', 'e.g. Company or client'], ['startDate', 'From', 'e.g. Jan 2024'], ['endDate', 'To', 'e.g. Present'], ['details', 'Summary', 'What you delivered and the impact', 'textarea'], ['bullets', 'Achievements / bullets', 'One achievement per line', 'textarea']] },
   education: { title: 'Education', add: '+ Add education', fields: [['institution', 'University / institution', 'e.g. Helwan University'], ['degree', 'Degree', 'e.g. Bachelor of Computer Science'], ['field', 'Field of study', 'e.g. Computer Science'], ['startDate', 'From', 'e.g. 2022'], ['endDate', 'To', 'e.g. 2026 or Present'], ['details', 'Details / grade', 'GPA, coursework or achievements', 'textarea']] },
-  projects: { title: 'Projects', add: '+ Add project', fields: [['name', 'Project name', 'e.g. E-commerce website'], ['role', 'Your role', 'e.g. Front-End Developer'], ['startDate', 'From', 'e.g. Jan 2025'], ['endDate', 'To', 'e.g. Mar 2025'], ['url', 'Project link', 'https://...'], ['details', 'Details and results', 'What you built, used and achieved', 'textarea']] },
-  training: { title: 'Training & courses', add: '+ Add training', fields: [['name', 'Training / course name', 'e.g. Front-End Development'], ['provider', 'Provider / organization', 'e.g. NTI'], ['startDate', 'From', 'e.g. Jul 2025'], ['endDate', 'To', 'e.g. Aug 2025'], ['details', 'Details', 'Topics, practical work and achievements', 'textarea']] }
+  projects: { title: 'Projects', add: '+ Add project', fields: [['name', 'Project name', 'e.g. E-commerce website'], ['role', 'Your role', 'e.g. Front-End Developer'], ['startDate', 'From', 'e.g. Jan 2025'], ['endDate', 'To', 'e.g. Mar 2025'], ['url', 'Project link', 'https://...'], ['details', 'Details and results', 'What you built, used and achieved', 'textarea'], ['bullets', 'Highlights / bullets', 'One result per line', 'textarea']] },
+  training: { title: 'Training & courses', add: '+ Add training', fields: [['name', 'Training / course name', 'e.g. Front-End Development'], ['provider', 'Provider / organization', 'e.g. NTI'], ['startDate', 'From', 'e.g. Jul 2025'], ['endDate', 'To', 'e.g. Aug 2025'], ['details', 'Details', 'Topics, practical work and achievements', 'textarea']] },
+  certifications: { title: 'Certifications', add: '+ Add certification', fields: [['name', 'Certificate name', 'e.g. Meta Front-End Certificate'], ['issuer', 'Issuer', 'e.g. Coursera / Google'], ['date', 'Date', 'e.g. 2025'], ['details', 'Details', 'Credential or relevant topics', 'textarea']] },
+  activities: { title: 'Activities & volunteering', add: '+ Add activity', fields: [['title', 'Role / activity', 'e.g. IEEE volunteer'], ['organization', 'Organization', 'e.g. Student chapter'], ['startDate', 'From', 'e.g. 2024'], ['endDate', 'To', 'e.g. Present'], ['details', 'Details', 'Contribution and outcomes', 'textarea'], ['bullets', 'Highlights / bullets', 'One item per line', 'textarea']] }
 };
 
+function renderSkillsSection(items = []) {
+  const categories = ['Programming & Tools', 'Data Analysis', 'Interpersonal Skills', 'Languages'];
+  const rows = (Array.isArray(items) ? items : []).map(item => typeof item === 'string' ? { text: item, category: categories[0] } : { text: item?.text || item?.name || '', category: item?.category || categories[0] }).filter(item => item.text);
+  if (!rows.length) rows.push({ text: '', category: categories[0] });
+  return `<section class="cv-entry-section cv-skills-section" data-skills-editor><div class="cv-entry-heading"><div><h2>Skills</h2><p>Group skills by category so recruiters can scan them quickly.</p></div><button type="button" data-add-skill>+ Add skill</button></div><div class="cv-skills-list">${rows.map((row, index) => `<div class="cv-skill-row" data-skill-row><select data-skill-category aria-label="Skill category">${categories.map(category => `<option ${row.category === category ? 'selected' : ''}>${escape(category)}</option>`).join('')}</select><input data-skill-name value="${escape(row.text)}" placeholder="e.g. JavaScript"><button type="button" data-remove-skill aria-label="Remove skill ${index + 1}">×</button></div>`).join('')}</div></section>`;
+}
+
 function collectionRows(items = []) {
-  return (Array.isArray(items) ? items : []).map(item => typeof item === 'string' ? { details: item } : { ...item, details: item?.details || item?.text || item?.description || '' });
+  return (Array.isArray(items) ? items : []).map(item => typeof item === 'string' ? { details: item } : { ...item, details: item?.details || item?.text || item?.description || '', bullets: Array.isArray(item?.bullets) ? item.bullets.join('\n') : (item?.bullets || '') });
 }
 
 function renderEntry(type, row = {}, index = 0) {
@@ -83,11 +93,13 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
           <label>LinkedIn URL<input name="linkedin" type="url" value="${escape(active.content.contact.linkedin)}" placeholder="https://linkedin.com/in/you"></label>
           <label>GitHub URL<input name="github" type="url" value="${escape(active.content.contact.github)}" placeholder="https://github.com/you"></label>
           <label>Professional summary<textarea name="summary" rows="5" placeholder="Write only what is true about your experience.">${escape(active.content.summary)}</textarea></label>
-          <label>Skills<input name="skills" value="${escape(active.content.skills.join(', '))}" placeholder="JavaScript, Figma, SQL"></label>
+          ${renderSkillsSection(active.content.skills)}
           ${renderCollection('education', active.content.education)}
           ${renderCollection('projects', active.content.projects)}
           ${renderCollection('training', active.content.training)}
-          <label>Work experience<textarea name="experience" rows="6" placeholder="One role per line. Keep training in the separate Training section.">${escape(active.content.experience.map(item => item.text || item.details || '').join('\n'))}</textarea></label>
+          ${renderCollection('experience', active.content.experience)}
+          ${renderCollection('certifications', active.content.certifications)}
+          ${renderCollection('activities', active.content.activities)}
           <div class="career-studio-actions"><button type="submit">Save draft</button><button type="button" data-preview>ATS Preview</button><button type="button" data-export>Export PDF</button><span id="career-save-status" aria-live="polite">Draft</span></div>
           <div class="career-sync-cta"><strong>Optional next step</strong><span>Review selected CV fields before adding anything to a Portfolio.</span><a href="${syncUrl}">Create Portfolio From My CV →</a></div>
           <div id="cv-import-review-container" aria-label="Private CV import"></div>
@@ -114,8 +126,7 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
       linkedin: contact.linkedin || '',
       github: contact.github || '',
       summary: source?.content?.summary || '',
-      skills: Array.isArray(source?.content?.skills) ? source.content.skills.map(item => typeof item === 'string' ? item : item?.text || '').filter(Boolean).join(', ') : '',
-      experience: Array.isArray(source?.content?.experience) ? source.content.experience.map(item => item?.text || '').filter(Boolean).join('\n') : ''
+      skills: '', experience: ''
     };
     for (const [name, value] of Object.entries(values)) {
       const field = form.elements.namedItem(name);
@@ -129,9 +140,9 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => hydrateFormFields(active));
   const collect = () => {
     const data = new FormData(form);
-    const lines = key => String(data.get(key) || '').split('\n').map(text => text.trim()).filter(Boolean).map(text => ({ text }));
     const entries = type => Array.from(form.querySelectorAll(`[data-collection="${type}"] [data-entry]`)).map(card => Object.fromEntries(Array.from(card.querySelectorAll('[data-entry-field]')).map(field => [field.dataset.entryField, field.value.trim()]))).filter(row => Object.values(row).some(Boolean));
-    return { ...active, careerStage: data.get('careerStage'), content: { ...active.content, contact: { ...active.content.contact, name: data.get('name') || '', email: data.get('email') || '', phone: data.get('phone') || '', location: data.get('location') || '', linkedin: data.get('linkedin') || '', github: data.get('github') || '' }, summary: data.get('summary') || '', skills: String(data.get('skills') || '').split(',').map(item => item.trim()).filter(Boolean), education: entries('education'), projects: entries('projects'), training: entries('training'), experience: lines('experience') } };
+    const skills = Array.from(form.querySelectorAll('[data-skill-row]')).map(row => ({ text: row.querySelector('[data-skill-name]')?.value.trim() || '', category: row.querySelector('[data-skill-category]')?.value || '' })).filter(item => item.text);
+    return { ...active, careerStage: data.get('careerStage'), content: { ...active.content, contact: { ...active.content.contact, name: data.get('name') || '', email: data.get('email') || '', phone: data.get('phone') || '', location: data.get('location') || '', linkedin: data.get('linkedin') || '', github: data.get('github') || '' }, summary: data.get('summary') || '', skills, education: entries('education'), projects: entries('projects'), training: entries('training'), experience: entries('experience'), certifications: entries('certifications'), activities: entries('activities') } };
   };
   const updatePreview = () => {
     const next = collect();
@@ -164,6 +175,10 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
       updatePreview(); qualityPanel.refresh();
       return;
     }
+    const addSkill = event.target.closest('[data-add-skill]');
+    if (addSkill) { const list = form.querySelector('.cv-skills-list'); list.insertAdjacentHTML('beforeend', '<div class="cv-skill-row" data-skill-row><select data-skill-category aria-label="Skill category"><option>Programming &amp; Tools</option><option>Data Analysis</option><option>Interpersonal Skills</option><option>Languages</option></select><input data-skill-name placeholder="e.g. JavaScript"><button type="button" data-remove-skill aria-label="Remove skill">×</button></div>'); list.lastElementChild?.querySelector('input')?.focus(); updatePreview(); qualityPanel.refresh(); return; }
+    const removeSkill = event.target.closest('[data-remove-skill]');
+    if (removeSkill) { removeSkill.closest('[data-skill-row]')?.remove(); updatePreview(); qualityPanel.refresh(); return; }
     const remove = event.target.closest('[data-remove-entry]');
     if (remove) { remove.closest('[data-entry]')?.remove(); updatePreview(); qualityPanel.refresh(); }
   });
@@ -217,11 +232,12 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
           const header = document.createElement('div'); header.className = 'ats-entry-header';
           const title = document.createElement('strong'); title.textContent = entry.title;
           const dates = document.createElement('span'); dates.textContent = entry.dates;
-          header.append(title, dates); row.append(header);
+          header.append(title); if (entry.url) { const projectLink = document.createElement('a'); projectLink.href = entry.url; projectLink.target = '_blank'; projectLink.rel = 'noopener noreferrer'; projectLink.textContent = ' · View website ↗'; header.append(projectLink); } header.append(dates); row.append(header);
         }
         if (entry.meta) { const meta = document.createElement('div'); meta.className = 'ats-entry-meta'; meta.textContent = entry.meta; row.append(meta); }
         if (entry.details) { const details = document.createElement('p'); details.textContent = entry.details; row.append(details); }
-        if (entry.url) { const link = document.createElement('a'); link.href = entry.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'View project'; row.append(link); }
+        if (entry.bullets?.length) { const list = document.createElement('ul'); list.className = 'ats-entry-bullets'; entry.bullets.forEach(value => { const li = document.createElement('li'); li.textContent = value; list.append(li); }); row.append(list); }
+        if (entry.url && !entry.title) { const link = document.createElement('a'); link.href = entry.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'View project ↗'; row.append(link); }
         body.append(row);
       }
       sections.append(heading, body);

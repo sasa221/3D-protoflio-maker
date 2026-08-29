@@ -24,6 +24,8 @@
     "test:cv-variants-api": "node src/tests/CVTargetedVariantApiContractTestSuite.mjs",
     "test:cv-variants-local": "node scripts/test_local_cv_targeted_variants_api.mjs",
     "test:cv-import": "node src/tests/CVImportReviewServiceTestSuite.mjs",
+    "test:cv-structured": "node src/tests/CVStructuredImportTestSuite.mjs",
+    "test:seo": "node src/tests/SEOContractTestSuite.mjs && node scripts/test_local_seo_browser.mjs",
     "test:cv-import-browser": "node scripts/test_local_cv_import_browser.mjs",
     "test:cv-quality": "node src/tests/CVQualityScoreServiceTestSuite.mjs",
     "test:pr7a-browser": "node scripts/test_local_pr7a_browser.mjs",

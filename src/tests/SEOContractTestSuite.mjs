@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const html = fs.readFileSync('index.html', 'utf8');
+const robots = fs.readFileSync('public/robots.txt', 'utf8');
+const sitemap = fs.readFileSync('public/sitemap.xml', 'utf8');
+const manifest = JSON.parse(fs.readFileSync('public/site.webmanifest', 'utf8'));
+assert.match(html, /<title>3D Portfolio Maker \| Turn Your CV into a Recruiter-Ready Portfolio<\/title>/);
+assert.match(html, /meta name="description"/);
+assert.match(html, /id="seo-jsonld"/);
+assert.match(html, /apple-touch-icon/);
+assert.match(robots, /Disallow: \/cv/);
+assert.match(robots, /Disallow: \/admin/);
+assert.doesNotMatch(sitemap, /\/start|\/studio|\/cv/);
+assert.equal(manifest.name, '3D Portfolio Maker');
+assert.equal(manifest.scope, '/');
+console.log('SEOContractTestSuite: passed (metadata, icons, private route policy, sitemap, manifest)');

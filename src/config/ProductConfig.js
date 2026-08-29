@@ -26,6 +26,7 @@ export const PRODUCT_CONFIG = {
 
 export function setPageTitle(pageName) {
   if (typeof document !== 'undefined') {
+    if (document.documentElement.dataset.seoManaged === 'true') return;
     if (pageName) {
       document.title = `${pageName} — ${PRODUCT_CONFIG.productName}`;
     } else {
