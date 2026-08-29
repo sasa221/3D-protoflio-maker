@@ -902,7 +902,12 @@ function setupLandingGallery() {
     let visibleCount = 0;
     cards.forEach(card => {
       const matches = filterId === 'all' || card.dataset.galleryFilters.split(',').includes(filterId);
+      // Set both the semantic hidden state and an explicit display state. The
+      // latter keeps the filter deterministic when a global stylesheet or a
+      // browser extension overrides the user-agent `[hidden]` rule.
       card.hidden = !matches;
+      card.style.display = matches ? '' : 'none';
+      card.setAttribute('aria-hidden', String(!matches));
       if (matches) visibleCount += 1;
     });
     if (emptyState) emptyState.hidden = visibleCount > 0;
@@ -919,8 +924,14 @@ function setupLandingGallery() {
   });
 
   document.querySelectorAll('[data-gallery-preview]').forEach(button => {
-    button.addEventListener('click', () => {
-      window.switchDemoTheme(button.dataset.galleryPreview);
+    button.addEventListener('click', async () => {
+      try {
+        await window.switchDemoTheme?.(button.dataset.galleryPreview);
+      } catch (error) {
+        // Theme preview is progressive enhancement; the gallery remains
+        // usable even if the optional 3D runtime cannot load.
+        console.warn('[Landing Gallery] Theme preview unavailable:', error?.message || error);
+      }
       document.getElementById('themes')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
