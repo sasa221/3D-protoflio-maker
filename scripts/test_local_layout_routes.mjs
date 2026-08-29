@@ -39,7 +39,7 @@ try {
   await page.goto(`http://127.0.0.1:${port}/login?next=%2Fstudio`, { waitUntil: 'networkidle' });
   await page.locator('#login-email').fill(credentials.email);
   await page.locator('#login-password').fill(credentials.password);
-  await page.getByRole('button', { name: /Sign In to Studio/i }).click();
+  await page.getByRole('button', { name: /Sign In to Portfolio Studio/i }).click();
   await page.waitForURL('**/studio', { timeout: 15000 });
   await page.waitForSelector('#sidebar', { timeout: 15000 });
 

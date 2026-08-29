@@ -196,6 +196,10 @@ export default async function handler(req, res) {
   // CV/Profile content or user contact data. requireAdmin is enforced above.
   const careerSettingsAction = action === 'career-settings' || action === 'career-settings-update' || action === 'career-settings-audit';
   if (careerSettingsAction) {
+    // Career Studio settings are still local-only until a separately approved
+    // production rollout. Fail closed even when an admin token is valid.
+    const runtimeEnvironment = String(process.env.SUPABASE_ENV || process.env.VITE_SUPABASE_ENV || '').trim().toLowerCase();
+    if (runtimeEnvironment === 'production') return res.status(403).json({ error: 'Career Studio settings are not enabled in production.' });
     const enabled = process.env.FF_CAREER_STUDIO === 'true' || process.env.FF_CAREER_STUDIO === '1';
     if (!enabled) return res.status(404).json({ error: 'Career Studio is not enabled.' });
 
