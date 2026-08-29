@@ -11,12 +11,13 @@ Preflight passed locally. No staging URL or credentials were available, so no ex
 
 | Area | Variables |
 | --- | --- |
-| Supabase | `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `FF_CAREER_STUDIO` |
-| Auth | `AUTH_REDIRECT_URL` |
-| CORS | `CORS_ORIGINS` |
-| Brevo test-only | `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME` |
-| Payments | `VITE_ENABLE_BILLING_PORTAL`, sandbox provider variables only; or leave payments disabled |
+| Supabase | `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY` |
+| Auth/admin | `AUTH_REDIRECT_URL`, `ADMIN_EMAIL`, `ADMIN_EMAILS` |
+| CORS | `CORS_ORIGINS`, `ALLOWED_ORIGINS` |
+| Brevo test-only | `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME`, `BREVO_REPLY_TO_EMAIL` |
+| Payments | `PAYMENT_INSTAPAY_ADDRESS`, `PAYMENT_INSTAPAY_BANK`, `PAYMENT_INSTAPAY_NAME`, `PAYMENT_INSTAPAY_NOTE`, `PAYMENT_INSTAPAY_PHONE`, `ADMIN_NOTIFY_EMAIL`, `VITE_ENABLE_BILLING_PORTAL`, `STRIPE_SECRET_KEY`, `PAYMOB_API_KEY` (sandbox only) |
 | Monitoring | `VITE_SENTRY_DSN`, `SENTRY_AUTH_TOKEN` |
+| Product gates | `FF_CAREER_STUDIO`, `FF_ENTITLEMENT_ENFORCEMENT_ENABLED`, `FF_FREE_FINALIZATION_LOCK_ENABLED`, `FF_GROUP_MANAGEMENT_ENABLED`, `FF_HOSTING_PAYWALL_ENABLED`, `FF_MONETIZATION_UI_ENABLED`, `FF_THEME_PAYWALL_ENABLED`, `CV_FREE_EXPORT_LIMIT`, `CV_VARIANT_LIMIT`, `PUBLIC_SITE_URL` |
 
 Values must be entered in the staging provider, never committed. The sender, redirects, webhook endpoints, and CORS origins must point to staging. Production payment credentials and real recipient lists are prohibited.
 

@@ -6,11 +6,13 @@ This runbook is for a separate staging deployment only. It does not authorize a 
 
 Configure values in the staging provider, never in Git:
 
-- Supabase: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` (server only), `FF_CAREER_STUDIO`.
-- Email (optional for staging): `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME`, `AUTH_REDIRECT_URL` (staging URL).
-- Manual payments: `INSTAPAY_NUMBER`, `INSTAPAY_ACCOUNT_NAME`, `VITE_ENABLE_BILLING_PORTAL` and any provider sandbox keys. Do not use live payment credentials in staging.
+- Supabase: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (browser), `VITE_SUPABASE_ANON_KEY` (legacy alias), `SUPABASE_URL`, and `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` (server only).
+- Auth and administration: `AUTH_REDIRECT_URL` (staging URL), `ADMIN_EMAIL` or `ADMIN_EMAILS`.
+- Email (optional, test inboxes only): `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME`, `BREVO_REPLY_TO_EMAIL`.
+- Manual payments: `PAYMENT_INSTAPAY_ADDRESS`, `PAYMENT_INSTAPAY_BANK`, `PAYMENT_INSTAPAY_NAME`, `PAYMENT_INSTAPAY_NOTE`, `PAYMENT_INSTAPAY_PHONE`, `ADMIN_NOTIFY_EMAIL`, `VITE_ENABLE_BILLING_PORTAL`, and provider sandbox keys only (`STRIPE_SECRET_KEY`, `PAYMOB_API_KEY`). Leave these unset to keep payments disabled.
 - Monitoring: `VITE_SENTRY_DSN` and server-side `SENTRY_AUTH_TOKEN` if error reporting is enabled.
-- CORS: `CORS_ORIGINS` as a comma-separated exact-origin allowlist (for example the staging origin and, outside production, localhost). Wildcard `*` is not accepted.
+- CORS: `CORS_ORIGINS` (preferred) or `ALLOWED_ORIGINS`, as a comma-separated exact-origin allowlist (Staging and, outside production, localhost). Wildcard `*` is not accepted.
+- Product gates and limits: `FF_CAREER_STUDIO`, `FF_ENTITLEMENT_ENFORCEMENT_ENABLED`, `FF_FREE_FINALIZATION_LOCK_ENABLED`, `FF_GROUP_MANAGEMENT_ENABLED`, `FF_HOSTING_PAYWALL_ENABLED`, `FF_MONETIZATION_UI_ENABLED`, `FF_THEME_PAYWALL_ENABLED`, `CV_FREE_EXPORT_LIMIT`, `CV_VARIANT_LIMIT`, and `PUBLIC_SITE_URL`.
 
 Verify every variable is present without printing its value. Confirm sender, redirect, webhook, and public URL values point to staging.
 
