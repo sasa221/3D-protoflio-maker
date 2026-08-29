@@ -1,3 +1,5 @@
+import { getSEOContentPage } from '../config/SEOContentConfig.js';
+
 const SITE_URL = 'https://portfolio-maker-murex.vercel.app';
 const DEFAULT_TITLE = '3D Portfolio Maker | Turn Your CV into a Recruiter-Ready Portfolio';
 const DEFAULT_DESCRIPTION = 'Import your CV, build a recruiter-ready portfolio with cinematic 3D themes, then publish and share your work in minutes.';
@@ -47,6 +49,19 @@ export function applyRouteSEO(path = window.location.pathname, { publicProfile }
     title = 'Pricing | 3D Portfolio Maker';
     description = 'Choose a Free, Pro, Premium, or Premium Group plan to build, publish, and share your 3D portfolio.';
     graph.push({ '@type': 'FAQPage', '@id': `${SITE_URL}/pricing#faq`, mainEntity: faq.map(([question, answer]) => ({ '@type': 'Question', name: question, acceptedAnswer: { '@type': 'Answer', text: answer } })) });
+  } else if (getSEOContentPage(normalized)) {
+    const contentPage = getSEOContentPage(normalized);
+    title = contentPage.metaTitle;
+    description = contentPage.description;
+    graph.push({
+      '@type': 'FAQPage',
+      '@id': `${SITE_URL}${normalized}#faq`,
+      mainEntity: contentPage.faq.map(([question, answer]) => ({
+        '@type': 'Question',
+        name: question,
+        acceptedAnswer: { '@type': 'Answer', text: answer }
+      }))
+    });
   } else if (publicPortfolio) {
     const slug = normalized.split('/').filter(Boolean).pop();
     title = `${clean(publicProfile?.content?.contact?.name || slug?.replace(/[-_]+/g, ' '), 100)} | 3D Portfolio Maker`;
@@ -54,7 +69,7 @@ export function applyRouteSEO(path = window.location.pathname, { publicProfile }
     type = 'profile';
     graph = [publicProfileSchema(normalized, publicProfile)];
   } else if (privateRoute || ['/privacy', '/terms'].includes(normalized)) {
-    title = normalized === '/login' ? 'Sign in | 3D Portfolio Maker' : `${normalized.slice(1).replace(/-/g, ' ') || 'Private page'} | 3D Portfolio Maker`;
+    title = normalized === '/login' ? 'Sign in | 3D Portfolio Maker' : normalized === '/privacy' ? 'Privacy Policy | 3D Portfolio Maker' : normalized === '/terms' ? 'Terms of Service | 3D Portfolio Maker' : `${normalized.slice(1).replace(/-/g, ' ') || 'Private page'} | 3D Portfolio Maker`;
     robots = 'noindex,nofollow,noarchive';
     graph = [];
   }

@@ -55,7 +55,7 @@ const landing = fs.readFileSync(new URL('../ui/LandingPage.js', import.meta.url)
 assert.match(landing, /Build My CV/);
 assert.match(landing, /\/cv\/new/);
 assert.match(landing, /Import Existing CV/);
-assert.match(landing, /Build a 3D portfolio recruiters remember/);
+assert.match(landing, /Turn your CV into a recruiter-ready 3D portfolio/);
 const entryPaths = fs.readFileSync(new URL('../services/CareerEntryPathService.js', import.meta.url), 'utf8');
 assert.match(entryPaths, /mode=import/);
 const builder = fs.readFileSync(new URL('../ui/CVBuilderPage.js', import.meta.url), 'utf8');

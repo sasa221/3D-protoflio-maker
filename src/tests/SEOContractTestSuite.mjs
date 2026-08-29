@@ -1,16 +1,32 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { SEO_CONTENT_PAGES } from '../config/SEOContentConfig.js';
 const html = fs.readFileSync('index.html', 'utf8');
 const robots = fs.readFileSync('public/robots.txt', 'utf8');
 const sitemap = fs.readFileSync('public/sitemap.xml', 'utf8');
 const manifest = JSON.parse(fs.readFileSync('public/site.webmanifest', 'utf8'));
+const landing = fs.readFileSync('src/ui/LandingPage.js', 'utf8');
+const seoService = fs.readFileSync('src/services/SEOService.js', 'utf8');
 assert.match(html, /<title>3D Portfolio Maker \| Turn Your CV into a Recruiter-Ready Portfolio<\/title>/);
 assert.match(html, /meta name="description"/);
 assert.match(html, /id="seo-jsonld"/);
 assert.match(html, /apple-touch-icon/);
 assert.match(robots, /Disallow: \/cv/);
 assert.match(robots, /Disallow: \/admin/);
-assert.doesNotMatch(sitemap, /\/start|\/studio|\/cv/);
+assert.doesNotMatch(sitemap, /<loc>[^<]*\/(?:start|studio|cv)(?:[/?<])/);
+assert.match(sitemap, /\/cv-to-portfolio|\/developer-portfolio-builder|\/3d-portfolio-maker/);
 assert.equal(manifest.name, '3D Portfolio Maker');
 assert.equal(manifest.scope, '/');
+assert.equal(Object.keys(SEO_CONTENT_PAGES).length, 3);
+for (const [path, page] of Object.entries(SEO_CONTENT_PAGES)) {
+  assert.ok(page.title && page.description && page.intro, `${path} has editorial metadata`);
+  assert.ok(page.steps.length === 3 && page.features.length >= 4 && page.faq.length >= 3, `${path} has useful content`);
+  assert.match(sitemap, new RegExp(path.replaceAll('/', '\\/')));
+  assert.match(seoService, /getSEOContentPage\(normalized\)/);
+}
+assert.match(landing, /href="\/cv-to-portfolio"/);
+assert.match(landing, /href="\/developer-portfolio-builder"/);
+assert.match(landing, /href="\/3d-portfolio-maker"/);
+assert.match(seoService, /Privacy Policy \| 3D Portfolio Maker/);
+assert.doesNotMatch(seoService, /Privacy Policy.*Vercel/);
 console.log('SEOContractTestSuite: passed (metadata, icons, private route policy, sitemap, manifest)');

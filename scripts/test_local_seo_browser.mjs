@@ -7,10 +7,13 @@ const browser = await chromium.launch({ headless: true });
 try {
   for (let i = 0; i < 60; i += 1) { try { if ((await fetch(`http://127.0.0.1:${port}/`)).ok) break; } catch (_) {} await new Promise(r => setTimeout(r, 150)); }
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-  for (const route of ['/', '/pricing', '/login', '/studio', '/cv/new']) {
+  for (const route of ['/', '/pricing', '/cv-to-portfolio', '/developer-portfolio-builder', '/3d-portfolio-maker', '/login', '/studio', '/cv/new']) {
     await page.goto(`http://127.0.0.1:${port}${route}`, { waitUntil: 'networkidle' });
-    const head = await page.evaluate(() => ({ title: document.title, description: document.querySelector('meta[name="description"]')?.content, robots: document.querySelector('meta[name="robots"]')?.content, canonical: document.querySelector('link[rel="canonical"]')?.href, jsonld: Boolean(document.querySelector('#seo-jsonld')) }));
+    const head = await page.evaluate(() => ({ title: document.title, description: document.querySelector('meta[name="description"]')?.content, robots: document.querySelector('meta[name="robots"]')?.content, canonical: document.querySelector('link[rel="canonical"]')?.href, jsonld: Boolean(document.querySelector('#seo-jsonld')), h1: document.querySelector('h1')?.textContent?.trim(), fallback: Boolean(document.querySelector('.seo-fallback')), overflow: document.documentElement.scrollWidth > window.innerWidth, faq: [...document.querySelectorAll('#seo-jsonld')].some(node => node.textContent.includes('FAQPage')) }));
     if (!head.title || !head.description || !head.canonical || !head.jsonld) throw new Error(`Missing rendered SEO metadata on ${route}`);
+    const contentPage = ['/cv-to-portfolio', '/developer-portfolio-builder', '/3d-portfolio-maker'].includes(route);
+    if (contentPage && (!head.h1 || head.fallback || !head.faq)) throw new Error(`SEO content page did not render cleanly: ${route}`);
+    if (head.overflow) throw new Error(`Horizontal overflow on ${route}`);
     const shouldBePrivate = ['/login', '/studio', '/cv/new'].includes(route);
     if (shouldBePrivate && !/^noindex/i.test(head.robots || '')) throw new Error(`Private route is indexable: ${route}`);
     if (!shouldBePrivate && /^noindex/i.test(head.robots || '')) throw new Error(`Marketing route is blocked: ${route}`);

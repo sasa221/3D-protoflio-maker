@@ -305,6 +305,14 @@ async function router() {
     return;
   }
 
+  // Public editorial pages support organic discovery without exposing any
+  // authenticated workspace or user-generated career data.
+  if (['/cv-to-portfolio', '/developer-portfolio-builder', '/3d-portfolio-maker'].includes(path)) {
+    const { renderSEOContentPage } = await import('./ui/SEOContentPage.js');
+    renderSEOContentPage(getAppContainer(), path);
+    return;
+  }
+
   // Career Studio is opt-in and local/development-only until separately approved.
   if (path === '/cv' || path === '/cv/new' || path.startsWith('/cv/')) {
     const { renderCVBuilderPage } = await import('./ui/CVBuilderPage.js');

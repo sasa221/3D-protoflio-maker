@@ -100,6 +100,7 @@ export async function renderLandingPage(container) {
       #app section:first-of-type, section:first-of-type { grid-template-columns: 1fr !important; }
       /* How it works: stack 3 columns */
       #features > div:last-child { grid-template-columns: 1fr !important; }
+      #product-guides > div:last-child { grid-template-columns: 1fr !important; }
       /* Themes: stack 2 columns */
       #themes > div { grid-template-columns: 1fr !important; }
       /* Job targeting: stack */
@@ -138,6 +139,8 @@ export async function renderLandingPage(container) {
 
       <nav id="landing-primary-nav" style="display: flex; gap: 28px; font-size: 0.88rem; font-weight: 600; color: rgba(255,255,255,0.75);">
         <a href="#features" style="color: inherit; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.75)'">Features</a>
+        <a href="/cv-to-portfolio" style="color: inherit; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.75)'">CV to Portfolio</a>
+        <a href="/developer-portfolio-builder" style="color: inherit; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.75)'">For Developers</a>
         <a href="#themes" style="color: inherit; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.75)'">3D Themes</a>
         <a href="#targeting" style="color: inherit; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.75)'">Job Targeting</a>
         <a href="#pricing" style="color: inherit; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.75)'">Pricing</a>
@@ -188,7 +191,7 @@ export async function renderLandingPage(container) {
             background: rgba(124,58,237,0.12); border: 1px solid rgba(124,58,237,0.3); color: #a855f7;
             font-size: 0.8rem; font-weight: 700; margin-bottom: 20px; font-family: 'JetBrains Mono', monospace;
           ">
-            <span>✨ Build and share a 3D portfolio</span>
+            <span>✨ CV to portfolio maker for recruiter-ready websites</span>
           </div>
 
           <h1 style="
@@ -196,7 +199,7 @@ export async function renderLandingPage(container) {
             line-height: 1.1; margin-bottom: 18px; background: linear-gradient(135deg, #ffffff 40%, var(--primary, #a855f7) 100%);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -1px;
           ">
-            Build a 3D portfolio recruiters remember.
+            Turn your CV into a recruiter-ready 3D portfolio.
           </h1>
 
           <p style="font-size: 1.05rem; color: rgba(255,255,255,0.7); line-height: 1.6; max-width: 540px; margin-bottom: 28px;">
@@ -290,7 +293,7 @@ export async function renderLandingPage(container) {
           HOW IT WORKS
         </div>
         <h2 style="font-family: 'Outfit', sans-serif; font-size: 2.5rem; font-weight: 900; margin-bottom: 16px;">
-          From PDF to portfolio in minutes.
+          From CV to portfolio in minutes.
         </h2>
         <p style="color: rgba(255,255,255,0.65); max-width: 620px; margin: 0 auto 50px auto; font-size: 1.05rem;">
           Import your resume, review structured career data, select a 3D environment, and deploy your live portfolio.
@@ -447,6 +450,31 @@ export async function renderLandingPage(container) {
         <p id="portfolio-gallery-empty" hidden style="text-align: center; color: rgba(255,255,255,0.68); margin: 28px 0 0;">
           No examples in this category yet.
         </p>
+      </section>
+
+      <!-- PRODUCT GUIDES: editorial pages with real feature explanations -->
+      <section id="product-guides" aria-labelledby="product-guides-title" style="padding: clamp(48px, 7vw, 72px) 48px; max-width: 1300px; margin: 0 auto;">
+        <div style="display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 24px;">
+          <div>
+            <div style="font-size: 0.75rem; font-weight: 800; color: #67e8f9; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px;">GET STARTED WITH THE RIGHT PATH</div>
+            <h2 id="product-guides-title" style="font-family: 'Outfit', sans-serif; font-size: 2rem; font-weight: 900; margin: 0;">Choose the workflow that fits your goal.</h2>
+          </div>
+          <a href="/pricing" style="color: #c4b5fd; font-weight: 750; text-decoration: none;">Compare plans →</a>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px;">
+          <a href="/cv-to-portfolio" style="display: block; padding: 20px; border: 1px solid rgba(103,232,249,.22); border-radius: 16px; background: rgba(103,232,249,.05); color: #fff; text-decoration: none;">
+            <strong style="display: block; font-family: 'Outfit', sans-serif; font-size: 1.12rem; margin-bottom: 8px;">CV to portfolio maker</strong>
+            <span style="display: block; color: rgba(255,255,255,.64); font-size: .88rem; line-height: 1.55;">Import, review, and turn your existing CV into a shareable portfolio.</span>
+          </a>
+          <a href="/developer-portfolio-builder" style="display: block; padding: 20px; border: 1px solid rgba(168,85,247,.24); border-radius: 16px; background: rgba(168,85,247,.06); color: #fff; text-decoration: none;">
+            <strong style="display: block; font-family: 'Outfit', sans-serif; font-size: 1.12rem; margin-bottom: 8px;">Developer portfolio builder</strong>
+            <span style="display: block; color: rgba(255,255,255,.64); font-size: .88rem; line-height: 1.55;">Put projects, technologies, links, and recruiter view in one clear story.</span>
+          </a>
+          <a href="/3d-portfolio-maker" style="display: block; padding: 20px; border: 1px solid rgba(16,185,129,.24); border-radius: 16px; background: rgba(16,185,129,.05); color: #fff; text-decoration: none;">
+            <strong style="display: block; font-family: 'Outfit', sans-serif; font-size: 1.12rem; margin-bottom: 8px;">3D portfolio maker</strong>
+            <span style="display: block; color: rgba(255,255,255,.64); font-size: .88rem; line-height: 1.55;">Choose a themed interactive presentation without hiding the work behind effects.</span>
+          </a>
+        </div>
       </section>
 
       <!-- 4. JOB TARGETING SECTION -->
