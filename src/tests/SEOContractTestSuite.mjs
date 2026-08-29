@@ -18,6 +18,9 @@ assert.match(sitemap, /\/cv-to-portfolio|\/developer-portfolio-builder|\/3d-port
 assert.equal(manifest.name, '3D Portfolio Maker');
 assert.equal(manifest.scope, '/');
 assert.equal(Object.keys(SEO_CONTENT_PAGES).length, 3);
+assert.equal(SEO_CONTENT_PAGES['/cv-to-portfolio'].title, 'Turn your CV into a portfolio');
+assert.equal(SEO_CONTENT_PAGES['/cv-to-portfolio'].metaTitle, 'CV to Portfolio | Turn Your Resume into a Portfolio Website');
+assert.match(SEO_CONTENT_PAGES['/cv-to-portfolio'].description, /CV or resume.*portfolio website/i);
 for (const [path, page] of Object.entries(SEO_CONTENT_PAGES)) {
   assert.ok(page.title && page.description && page.intro, `${path} has editorial metadata`);
   assert.ok(page.steps.length === 3 && page.features.length >= 4 && page.faq.length >= 3, `${path} has useful content`);
