@@ -49,7 +49,18 @@ export async function renderLandingPage(container) {
   container.style.height = 'auto';
   container.style.minHeight = '100vh';
   container.style.overflowY = 'auto';
+  // The shared Studio shell defaults the document to a fixed 100vh viewport.
+  // Reset those constraints for the marketing page so every section remains
+  // reachable with the normal document scrollbar after direct navigation.
+  document.documentElement.style.height = 'auto';
+  document.documentElement.style.minHeight = '100%';
+  document.documentElement.style.overflowX = 'hidden';
+  document.documentElement.style.overflowY = 'auto';
+  document.body.style.height = 'auto';
+  document.body.style.minHeight = '100vh';
+  document.body.style.width = '100%';
   document.body.style.overflowY = 'auto';
+  document.body.style.overflowX = 'hidden';
   container.style.background = '#050508';
   container.style.color = '#fff';
 
@@ -248,12 +259,12 @@ export async function renderLandingPage(container) {
             ">
               Interactive Portfolio Demo
             </div>
-            <div style="font-size: 0.7rem; color: rgba(255,255,255,0.72);">⚡ 3D LIVE</div>
+            <div id="landing-demo-state" style="font-size: 0.7rem; color: rgba(255,255,255,0.72);">READY TO LOAD</div>
           </div>
 
           <div style="position: relative; flex: 1; overflow: hidden;">
             <canvas id="landing-hero-canvas" style="position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0;"></canvas>
-            <div id="landing-hero-viewport" aria-hidden="true" inert style="position: absolute; inset: 0; z-index: 10; overflow: hidden;">
+            <div id="landing-hero-viewport" style="position: absolute; inset: 0; z-index: 10; overflow: hidden;">
               <div data-landing-demo-placeholder style="height:100%;display:grid;place-items:center;text-align:center;padding:30px;color:rgba(255,255,255,.72);background:radial-gradient(circle at 50% 40%,rgba(124,58,237,.2),transparent 58%);">
                 <div><div style="font-size:2.5rem;margin-bottom:10px">⚡</div><strong style="display:block;font-size:1.2rem;color:#fff">See your portfolio in motion</strong><span style="display:block;margin-top:8px;font-size:.85rem">Interactive 3D preview loads when you open the demo.</span><button type="button" data-load-landing-demo style="margin-top:18px;border:1px solid rgba(103,232,249,.5);border-radius:999px;padding:10px 18px;background:rgba(6,182,212,.12);color:#67e8f9;font-weight:800;cursor:pointer">Load interactive demo</button></div>
               </div>
@@ -268,7 +279,7 @@ export async function renderLandingPage(container) {
             box-shadow: 0 10px 30px rgba(0,0,0,0.6);
           ">
             <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; animation: pulse 1.5s infinite;"></span>
-            <span>⚡ LIVE DEMO</span>
+            <span id="landing-demo-chip-label">▶ LOAD DEMO</span>
           </div>
         </div>
       </section>
@@ -312,7 +323,7 @@ export async function renderLandingPage(container) {
             <div style="font-size: 0.75rem; font-weight: 800; color: #10b981; margin-bottom: 8px;">STEP 03</div>
             <h3 style="font-size: 1.2rem; font-weight: 800; margin-bottom: 10px;">Deploy & Measure</h3>
             <p style="font-size: 0.88rem; color: rgba(255,255,255,0.6); line-height: 1.6;">
-              Publish your portfolio to your custom domain or unique URL. Track project opens and resume download engagement.
+              Publish your portfolio to a shareable URL (custom domains are available on Premium). Track project opens and resume download engagement.
             </p>
           </div>
         </div>
@@ -379,6 +390,10 @@ export async function renderLandingPage(container) {
             box-shadow: 0 25px 60px rgba(0,0,0,0.9); display: flex; flex-direction: column;
           ">
             <canvas id="theme-showcase-canvas" style="position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0;"></canvas>
+            <div data-theme-showcase-placeholder class="theme-showcase-placeholder" role="status">
+              <strong>Choose a world to preview</strong>
+              <span>The interactive 3D scene loads when this section is visible.</span>
+            </div>
             
             <div style="
               position: absolute; bottom: 16px; left: 16px; right: 16px; z-index: 10;
@@ -967,6 +982,7 @@ let themeShowcaseEngine = null;
 function initThemeShowcaseCanvas(theme) {
   const canvas = document.getElementById('theme-showcase-canvas');
   if (!canvas) return;
+  const placeholder = document.querySelector('[data-theme-showcase-placeholder]');
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
   try {
     if (!themeShowcaseEngine) {
@@ -975,7 +991,13 @@ function initThemeShowcaseCanvas(theme) {
     } else {
       themeShowcaseEngine.applyTheme(theme);
     }
+    placeholder?.setAttribute('hidden', '');
   } catch (e) {
+    if (placeholder) {
+      placeholder.hidden = false;
+      placeholder.querySelector('strong').textContent = '3D preview unavailable';
+      placeholder.querySelector('span').textContent = 'You can still explore every theme and build your portfolio without WebGL.';
+    }
     console.warn('[Landing Page] Theme showcase fallback:', e.message);
   }
 }
@@ -1003,6 +1025,10 @@ async function initLandingHeroDemo() {
   if (!canvas || !viewport) return;
 
   try {
+    const stateLabel = document.getElementById('landing-demo-state');
+    const chipLabel = document.getElementById('landing-demo-chip-label');
+    if (stateLabel) stateLabel.textContent = 'LOADING 3D…';
+    if (chipLabel) chipLabel.textContent = '⏳ LOADING';
     await loadDemoRuntime();
     // Hero demo is FIXED to Code Matrix ('code') and is completely independent
     const heroTheme = getThemeById('code');
@@ -1027,10 +1053,18 @@ async function initLandingHeroDemo() {
 
     const html = generatePortfolioHTMLBody(MARKETING_DEMO_PORTFOLIO, heroTheme, { deviceMode: 'desktop' });
     renderScaledDemoHTML(viewport, html);
+    viewport.removeAttribute('aria-hidden');
+    viewport.removeAttribute('inert');
+    if (stateLabel) stateLabel.textContent = '⚡ 3D LIVE';
+    if (chipLabel) chipLabel.textContent = '⚡ 3D LIVE';
 
     window.removeEventListener('resize', updateLandingDemoScale);
     window.addEventListener('resize', updateLandingDemoScale);
   } catch (e) {
+    const stateLabel = document.getElementById('landing-demo-state');
+    const chipLabel = document.getElementById('landing-demo-chip-label');
+    if (stateLabel) stateLabel.textContent = '2D PREVIEW';
+    if (chipLabel) chipLabel.textContent = '✓ PREVIEW READY';
     console.warn('[Landing Page] Hero 3D demo fallback:', e.message);
   }
 }

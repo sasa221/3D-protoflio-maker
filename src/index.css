@@ -1405,6 +1405,13 @@ html:has(.admin-forbidden) {
 .ats-entry-bullets li { margin:2px 0; }
 @media (max-width: 560px) { .cv-skill-row { grid-template-columns: 1fr 30px; } .cv-skill-row select, .cv-skill-row input { grid-column:1; } .cv-skill-row button { grid-column:2; grid-row:1 / span 2; } .ats-entry-header { gap:8px; flex-wrap:wrap; } }
 .career-studio-preview small { display: block; max-width: 700px; margin: 10px auto 0; color: #4b5563; }
+.ats-empty-preview { min-height: 220px; display: grid; place-content: center; gap: 8px; padding: 28px; text-align: center; color: #64748b; border: 1px dashed #cbd5e1; border-radius: 12px; background: rgba(248,250,252,.72); }
+.ats-empty-preview strong { color: #334155; font-size: 1rem; }
+.ats-empty-preview span { max-width: 320px; margin: 0 auto; font-size: .78rem; line-height: 1.5; }
+.theme-showcase-placeholder { position: absolute; inset: 0; z-index: 1; display: grid; place-content: center; gap: 8px; padding: 24px; text-align: center; color: rgba(255,255,255,.72); background: radial-gradient(circle at 50% 45%, rgba(124,58,237,.22), transparent 62%); pointer-events: none; }
+.theme-showcase-placeholder[hidden] { display: none; }
+.theme-showcase-placeholder strong { color: #fff; font-size: 1rem; }
+.theme-showcase-placeholder span { max-width: 300px; font-size: .76rem; line-height: 1.5; }
 .cv-targeted-variants { max-width: 1680px; margin: 0 auto; }
 .cv-job-tailor-summary { display:flex; align-items:center; justify-content:space-between; gap:18px; cursor:pointer; list-style:none; }
 .cv-job-tailor-summary::-webkit-details-marker { display:none; }

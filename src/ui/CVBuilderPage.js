@@ -221,6 +221,12 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
     contact.hidden = !model.contactLines.length;
     const sections = container.querySelector('[data-preview-sections]');
     sections.replaceChildren();
+    if (!model.sections.length) {
+      const empty = document.createElement('div');
+      empty.className = 'ats-empty-preview';
+      empty.innerHTML = '<strong>Your CV preview will appear here</strong><span>Add a summary, skill, education, project, or experience entry to build your first draft.</span>';
+      sections.append(empty);
+    }
     for (const section of model.sections) {
       const heading = document.createElement('h3');
       heading.textContent = section.title;

@@ -19,6 +19,13 @@ function maskEmail(email = '') {
   return `${local[0]}${'*'.repeat(local.length - 2)}${local.slice(-1)}@${domain}`;
 }
 
+function getAuthDestinationLabel() {
+  const next = new URLSearchParams(window.location.search).get('next') || '';
+  if (next.startsWith('/cv')) return 'Sign In to CV Builder';
+  if (next.startsWith('/start') || next.startsWith('/studio')) return 'Sign In to Portfolio Studio';
+  return 'Sign In to Studio';
+}
+
 export function renderAuthPage(onSuccess) {
   const isRecovery = window.location.pathname.startsWith('/reset-password') ||
                      window.location.hash.includes('type=recovery') ||
@@ -30,14 +37,27 @@ export function renderAuthPage(onSuccess) {
     return;
   }
 
+  // Auth forms can be taller than a small mobile viewport (especially the
+  // signup terms and confirmation fields). Restore document scrolling from
+  // the Studio shell so the submit action never sits below a clipped card.
+  document.documentElement.style.height = 'auto';
+  document.documentElement.style.minHeight = '100%';
+  document.documentElement.style.overflowY = 'auto';
+  document.documentElement.style.overflowX = 'hidden';
+  document.body.style.height = 'auto';
+  document.body.style.minHeight = '100dvh';
+  document.body.style.width = '100%';
+  document.body.style.overflowY = 'auto';
+  document.body.style.overflowX = 'hidden';
+
   document.body.innerHTML = `
 <div id="auth-page" style="
-  min-height:100vh;width:100vw;
+  min-height:100dvh;width:100%;
   background:#050508;
   display:flex;flex-direction:column;
   align-items:center;justify-content:center;
   font-family:'Inter',sans-serif;
-  overflow:hidden;position:relative;
+  overflow-y:auto;overflow-x:hidden;position:relative;
 ">
   <!-- Animated background canvas -->
   <canvas id="auth-canvas" style="position:fixed;inset:0;z-index:0;width:100%;height:100%"></canvas>
@@ -112,7 +132,7 @@ export function renderAuthPage(onSuccess) {
           font-family:'Inter',sans-serif;letter-spacing:0.5px;
           transition:all 0.3s;margin-bottom:16px;
         ">
-          ⚡ Sign In to Studio
+          ⚡ ${getAuthDestinationLabel()}
         </button>
       </form>
 
@@ -322,7 +342,7 @@ export function renderAuthPage(onSuccess) {
         err.style.display = 'block';
       }
       if (btn) {
-        btn.textContent = '⚡ Sign In to Studio';
+        btn.textContent = `⚡ ${getAuthDestinationLabel()}`;
         btn.disabled = false;
       }
     }
