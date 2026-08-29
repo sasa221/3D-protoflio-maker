@@ -26,6 +26,14 @@ function safeUrl(value, kind = 'web') {
   }
 }
 
+function stripSkillCategoryPrefix(value, category) {
+  const text = safeText(value);
+  const label = safeText(category);
+  if (!text || !label) return text;
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return text.replace(new RegExp(`^${escaped}\\s*:\\s*`, 'i'), '').trim() || text;
+}
+
 function itemText(item) {
   if (typeof item === 'string') return safeText(item);
   if (!item || typeof item !== 'object') return '';
@@ -97,9 +105,9 @@ function normalizedContent(profile = {}) {
         ? (() => {
             const groups = new Map();
             structured(key).forEach(item => {
-              const name = safeText(item?.text || item?.name || item);
-              if (!name) return;
               const category = safeText(item?.category || 'Skills') || 'Skills';
+              const name = stripSkillCategoryPrefix(item?.text || item?.name || item, category);
+              if (!name) return;
               if (!groups.has(category)) groups.set(category, []);
               groups.get(category).push(name);
             });

@@ -37,6 +37,22 @@ const skillSection = model.sections.find(section => section.id === 'skills');
 assert.equal(skillSection.entries.length, 3);
 assert.equal(skillSection.entries.find(entry => entry.title === 'Data Analysis').details.includes('Power BI'), true);
 assert.equal(skillSection.entries.filter(entry => entry.title === 'Data Analysis').length, 1);
+const legacyPrefixedModel = buildCVExportModel({ careerStage: 'professional', content: {
+  contact: { name: 'Legacy prefixed skills' },
+  skills: [
+    { name: 'Programming & Tools: Python', category: 'Programming & Tools' },
+    { name: 'Data Analysis: Power BI', category: 'Data Analysis' },
+    { name: 'Interpersonal Skills: Communication', category: 'Interpersonal Skills' }
+  ]
+} });
+const legacySkillEntries = legacyPrefixedModel.sections.find(section => section.id === 'skills').entries;
+assert.deepEqual(legacySkillEntries.map(entry => [entry.title, entry.details]), [
+  ['Programming & Tools', 'Python'],
+  ['Data Analysis', 'Power BI'],
+  ['Interpersonal Skills', 'Communication']
+], 'legacy category prefixes are removed from grouped export details');
+assert.equal(legacySkillEntries.filter(entry => entry.title === 'Data Analysis').length, 1);
+assert.equal(legacySkillEntries.some(entry => entry.details.startsWith(`${entry.title}:`)), false);
 assert.equal(model.sections.find(section => section.id === 'experience').entries[0].title, 'NTI — Web developer Trainee');
 assert.equal(model.sections.find(section => section.id === 'experience').entries[0].meta, 'National Telecommunication Institute');
 console.log('CVRealImportRegressionTestSuite: passed (real PDF-shaped skills grouping, experience fields/bullets, and grouped export model)');
