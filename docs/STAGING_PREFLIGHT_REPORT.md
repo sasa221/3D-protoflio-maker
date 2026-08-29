@@ -22,7 +22,7 @@ Values must be entered in the staging provider, never committed. The sender, red
 
 ## Checks completed
 
-- Local production-style bundle contains no concrete Supabase cloud URL or server-secret value.
+- Local safety bundle (`npm run build:local`) contains no concrete Supabase cloud URL or server-secret value. A staging build must be rebuilt with the Staging URL before deployment; the local `.env` is never a source for Staging.
 - No wildcard CORS configuration remains; the API uses an exact-origin allowlist and permits loopback only outside production.
 - Health responses expose status and `degradedReasons` without credentials.
 - All migrations were reviewed for destructive statements. The email-campaign migration remains untracked and excluded from this package.
