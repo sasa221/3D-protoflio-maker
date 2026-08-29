@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { buildTargetedJobFit, applyConfirmedVariantChanges, buildVariantDiff } from '../src/services/CVTargetedVariantService.js';
+import { applyCors } from './_cors.js';
 
 export const config = {
   api: {
@@ -175,9 +176,7 @@ function mergeSyncList(existing, incoming) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const action = req.query.action || 'deploy';

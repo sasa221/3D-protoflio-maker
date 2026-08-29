@@ -528,6 +528,28 @@ body {
   background: radial-gradient(circle at center, rgba(15, 15, 35, 0.8), rgba(3, 3, 8, 0.98));
 }
 
+#preview-engine-status {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  z-index: 30;
+  max-width: min(420px, 80%);
+  padding: 12px 18px;
+  border: 1px solid rgba(103, 232, 249, 0.28);
+  border-radius: 999px;
+  background: rgba(8, 12, 28, 0.82);
+  color: rgba(226, 232, 240, 0.82);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  text-align: center;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+}
+#preview-engine-status[data-state="fallback"] {
+  border-color: rgba(251, 191, 36, 0.4);
+  color: #fde68a;
+}
+
 #preview-scaler {
   flex-shrink: 0;
   transform-origin: center center;

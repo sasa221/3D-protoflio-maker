@@ -5,17 +5,24 @@
  */
 
 import { onboardingController } from '../services/OnboardingService.js';
-import { extractTextFromPDF } from '../services/PDFTextExtractor.js';
-import { CVParserService } from '../services/CVParserService.js';
 import { mapCVToPortfolioData } from '../services/CVPortfolioMapper.js';
 import { getThemeById } from '../three/ProceduralTheme.js';
-import { HyperEngine } from '../three/HyperEngine.js';
 import { generatePortfolioCSS, generatePortfolioHTMLBody } from '../renderer/PortfolioRenderer.js';
 import { installProjectCinemaControls } from '../renderer/ProjectCinema.js';
 import { globalEntitlements } from '../services/EntitlementService.js';
 import { getThemeTier } from '../config/ThemeTierConfig.js';
 
 let onboardingEngine = null;
+let HyperEngine = null;
+let onboardingThreePromise = null;
+
+async function loadOnboardingThree() {
+  onboardingThreePromise ||= import('../three/ThreeRuntimeModule.js').then(runtime => {
+    HyperEngine = runtime.HyperEngine;
+    return runtime;
+  });
+  return onboardingThreePromise;
+}
 
 export async function renderOnboardingWizard(container) {
   if (!container) return;
@@ -229,6 +236,10 @@ function renderStep1CVUpload(container) {
     if (statusEl) statusEl.textContent = '⏳ Reading PDF & extracting text...';
 
     try {
+      const [{ extractTextFromPDF }, { CVParserService }] = await Promise.all([
+        import('../services/PDFTextExtractor.js'),
+        import('../services/CVParserService.js')
+      ]);
       const normalized = await extractTextFromPDF(file);
       if (statusEl) statusEl.textContent = '⚡ Structuring career profile...';
 
@@ -491,7 +502,7 @@ async function renderStep3LivePreview(container) {
   };
 }
 
-function initOnboardingPreview(pf) {
+async function initOnboardingPreview(pf) {
   const canvas = document.getElementById('ob-preview-canvas');
   const htmlContainer = document.getElementById('ob-preview-html');
   if (!canvas || !htmlContainer) return;
@@ -506,6 +517,7 @@ function initOnboardingPreview(pf) {
     }
     styleTag.textContent = generatePortfolioCSS(theme);
     if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      await loadOnboardingThree();
       onboardingEngine = new HyperEngine(canvas);
       onboardingEngine.init(theme);
     }

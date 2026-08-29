@@ -1,4 +1,3 @@
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { supabase } from './SupabaseClient.js';
 
 export const A4_PAGE = { width: 595.28, height: 841.89 };
@@ -143,6 +142,9 @@ export function buildCVExportModel(profile) {
 }
 
 export async function exportCareerProfilePdf(profile) {
+  // Keep the PDF generator out of the CV editor's initial bundle. It is
+  // fetched only after the user explicitly starts an export.
+  const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
   const model = buildCVExportModel(profile);
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);

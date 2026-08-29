@@ -10,15 +10,11 @@ window.supabase = supabase;
 window.getCurrentAuthUser = getCurrentAuthUser;
 window.openAccountSettingsModal = openAccountSettingsModal;
 window.uploadAvatar = uploadAvatar;
-import { HyperEngine } from './three/HyperEngine.js';
 import { classifyProfession, getThemeById, getAllThemes } from './three/ProceduralTheme.js';
 import { exportStandaloneHTML, generateShareableURL } from './exporter/PortfolioExporter.js';
 import { globalUsageLimit } from './services/UsageLimitService.js';
 import { generatePortfolioCSS, generatePortfolioHTMLBody } from './renderer/PortfolioRenderer.js';
 import { installProjectCinemaControls } from './renderer/ProjectCinema.js';
-import { SceneDirector } from './three/SceneDirector.js';
-import { ScrollDirector } from './three/ScrollDirector.js';
-import { IntroDirector } from './three/IntroDirector.js';
 import { initMobileNavigationController, toggleMobileMenu } from './renderer/MobileNavigationController.js';
 import {
   createPortfolio, getAllPortfolios,
@@ -69,6 +65,23 @@ let engine = null;
 let sceneDirector = null;
 let scrollDirector = null;
 let introDirector = null;
+let HyperEngine = null;
+let SceneDirector = null;
+let ScrollDirector = null;
+let IntroDirector = null;
+let threeRuntimePromise = null;
+
+async function loadThreeRuntime() {
+  threeRuntimePromise ||= Promise.all([
+    import('./three/ThreeRuntimeModule.js')
+  ]).then(([runtime]) => {
+    HyperEngine = runtime.HyperEngine;
+    SceneDirector = runtime.SceneDirector;
+    ScrollDirector = runtime.ScrollDirector;
+    IntroDirector = runtime.IntroDirector;
+  });
+  return threeRuntimePromise;
+}
 let entitlementChannel = null;
 let currentTheme = null;
 let activeTab = 'profile';
@@ -219,7 +232,6 @@ const PRESETS = {
   }
 };
 
-import { renderOnboardingWizard } from './ui/OnboardingWizard.js';
 import { renderFirstRunChecklist } from './ui/FirstRunChecklist.js';
 import { renderWorkspaceNav, renderWorkspaceHeader, setActiveWorkspace } from './ui/StudioWorkspaceLayout.js';
 import { openAccountSettingsModal } from './ui/AccountSettingsModal.js';
@@ -378,6 +390,9 @@ async function router() {
       renderAuthPage(() => { window.location.href = '/start'; });
       return;
     }
+    // Onboarding includes PDF parsing and the 3D preview. Keep it out of the
+    // marketing/pricing/auth bundles and load it only when this route opens.
+    const { renderOnboardingWizard } = await import('./ui/OnboardingWizard.js');
     renderOnboardingWizard(getAppContainer());
     return;
   }
@@ -505,6 +520,7 @@ async function handlePublicRoute(username, variantSlug) {
     const canvas = document.getElementById('bg-canvas');
     try {
       if (canvas && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        await loadThreeRuntime();
         engine = new HyperEngine(canvas);
         engine.init(theme);
         sceneDirector = new SceneDirector(engine);
@@ -685,7 +701,7 @@ async function initStudio() {
   buildHTML();
 
   renderAll();
-  initEngine();
+  await initEngine();
   bindEvents();
   hydrateStudioFormFields();
   renderWorkspaceHeader();
@@ -1105,6 +1121,7 @@ function buildHTML() {
 
     <!-- PREVIEW STAGE CONTAINER -->
     <div id="preview-stage">
+      <div id="preview-engine-status" role="status" aria-live="polite">Loading your live preview…</div>
       <!-- SCALER WRAPPER -->
       <div id="preview-scaler">
         <!-- VIRTUAL LOGICAL VIEWPORT -->
@@ -1341,7 +1358,7 @@ function setupPreviewResizeObserver() {
 }
 
 // ─── ENGINE INIT ────────────────────────────
-function initEngine() {
+async function initEngine() {
   const canvas = document.getElementById('preview-canvas');
   const theme = portfolioData.theme
     ? getThemeById(portfolioData.theme)
@@ -1351,11 +1368,22 @@ function initEngine() {
 
   try {
     if (canvas && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      await loadThreeRuntime();
       engine = new HyperEngine(canvas);
       engine.init(theme);
+      document.getElementById('preview-engine-status')?.remove();
+    } else {
+      document.getElementById('preview-engine-status')?.remove();
     }
   } catch (engineErr) {
     console.warn('[Studio 3D] WebGL initialization fallback:', engineErr);
+    const stage = document.getElementById('preview-stage');
+    if (stage) stage.dataset.webglFallback = 'true';
+    const status = document.getElementById('preview-engine-status');
+    if (status) {
+      status.textContent = 'Live 3D preview is unavailable on this device. Your portfolio still works in lightweight mode.';
+      status.dataset.state = 'fallback';
+    }
   }
 
   // Initialize Cinematic SceneDirector & ScrollDirector

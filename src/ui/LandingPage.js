@@ -254,7 +254,9 @@ export async function renderLandingPage(container) {
           <div style="position: relative; flex: 1; overflow: hidden;">
             <canvas id="landing-hero-canvas" style="position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0;"></canvas>
             <div id="landing-hero-viewport" aria-hidden="true" inert style="position: absolute; inset: 0; z-index: 10; overflow: hidden;">
-              <!-- Rendered dynamically by PortfolioRenderer -->
+              <div data-landing-demo-placeholder style="height:100%;display:grid;place-items:center;text-align:center;padding:30px;color:rgba(255,255,255,.72);background:radial-gradient(circle at 50% 40%,rgba(124,58,237,.2),transparent 58%);">
+                <div><div style="font-size:2.5rem;margin-bottom:10px">⚡</div><strong style="display:block;font-size:1.2rem;color:#fff">See your portfolio in motion</strong><span style="display:block;margin-top:8px;font-size:.85rem">Interactive 3D preview loads when you open the demo.</span><button type="button" data-load-landing-demo style="margin-top:18px;border:1px solid rgba(103,232,249,.5);border-radius:999px;padding:10px 18px;background:rgba(6,182,212,.12);color:#67e8f9;font-weight:800;cursor:pointer">Load interactive demo</button></div>
+              </div>
             </div>
           </div>
 
@@ -831,9 +833,9 @@ export async function renderLandingPage(container) {
 
   setupLandingGallery();
 
-  // Keep the marketing copy and CTA responsive first; the WebGL demo is
-  // initialized during idle time so it cannot delay the first mobile paint.
-  scheduleLandingHeroDemo();
+  // Marketing pages stay lightweight: 3D code is fetched only after an
+  // explicit interaction with the demo (or a theme switcher button).
+  document.querySelector('[data-load-landing-demo]')?.addEventListener('click', () => initLandingHeroDemo(), { once: true });
 }
 
 function renderGalleryCards(buildHref) {

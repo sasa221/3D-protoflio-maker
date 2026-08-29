@@ -291,7 +291,7 @@ console.log('\n5. Auditing Serverless Function Count in api/...');
 
 const apiDir = path.join(projectRoot, 'api');
 const apiEntries = fs.readdirSync(apiDir, { withFileTypes: true });
-const serverlessFunctions = apiEntries.filter(e => e.isFile() && e.name.endsWith('.js')).map(e => e.name);
+const serverlessFunctions = apiEntries.filter(e => e.isFile() && e.name.endsWith('.js') && !e.name.startsWith('_')).map(e => e.name);
 
 console.log('  Active Serverless Functions in api/:', serverlessFunctions.join(', '));
 check('Total Serverless Functions count is <= 10', serverlessFunctions.length <= 10);

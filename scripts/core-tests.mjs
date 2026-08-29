@@ -70,7 +70,7 @@ const deployServiceText = fs.readFileSync(path.join(rootDir, 'src/services/Deplo
 assert.ok(!deployServiceText.includes('import.meta.env.VITE_NETLIFY_TOKEN'), 'DeployService must not import VITE_NETLIFY_TOKEN');
 
 // 7. Exactly 6 Serverless Functions
-const apiFiles = fs.readdirSync(path.join(rootDir, 'api')).filter(f => f.endsWith('.js'));
+const apiFiles = fs.readdirSync(path.join(rootDir, 'api')).filter(f => f.endsWith('.js') && !f.startsWith('_'));
 assert.equal(apiFiles.length, 6, `Expected exactly 6 api functions, found ${apiFiles.length}`);
 
 // 8. SEO Structured Data

@@ -7,6 +7,8 @@ applyRouteSEO(path);
 if (path === '/' || path === '/index.html') {
   const { renderLandingPage } = await import('./ui/LandingPage.js');
   await renderLandingPage(document.getElementById('app'));
+} else if (path === '/pricing') {
+  await import('./pricing-entry.js');
 } else {
   await import('./main.js');
 }

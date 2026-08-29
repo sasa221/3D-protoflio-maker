@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { sendBrevoEmail } from '../src/services/BrevoDispatcher.js';
 import { generatePasswordResetEmail, generateSignupVerificationEmail } from '../src/services/EmailTemplates.js';
+import { applyCors } from './_cors.js';
 
 const RESERVED_SLUGS = new Set(['admin', 'api', 'login', 'studio', 'start', 'privacy', 'terms', 'reset-password']);
 
@@ -190,9 +191,7 @@ async function sendPortfolio(req, res, adminClient, slug) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  applyCors(req, res, { headers: 'Content-Type' });
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const action = req.query.action || (req.method === 'POST' ? 'reset-password' : 'resume');

@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { sendBrevoEmail } from '../src/services/BrevoDispatcher.js';
 import { generateGroupInvitationEmail, generateGroupMemberActivatedEmail, generateGroupMemberJoinedEmail } from '../src/services/EmailTemplates.js';
+import { applyCors } from './_cors.js';
 
 // Feature flags helper
 function isServerFeatureEnabled(flagName) {
@@ -16,9 +17,7 @@ const THEME_TIERS = {
 const TIER_HIERARCHY = ['free', 'pro', 'premium'];
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const action = req.query.action || req.query.route || 'check';

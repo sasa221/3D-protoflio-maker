@@ -63,7 +63,7 @@ for (const [name, h] of Object.entries({
   const res = mockRes();
   await h({ method: 'OPTIONS', query: {}, headers: {} }, res);
   assert(res.statusCode === 200, `${name} handles OPTIONS preflight with HTTP 200`);
-  assert(res.headers['Access-Control-Allow-Origin'] === '*', `${name} sets CORS header`);
+  assert(res.headers['Access-Control-Allow-Origin'] !== '*', `${name} does not use wildcard CORS`);
 }
 
 console.log('\n3. Testing Unauthenticated Access Restrictions...');
@@ -114,6 +114,8 @@ console.log('\n4. Testing Input Validation on Public & Health Endpoints...');
   await adminHandler({ method: 'GET', query: { action: 'health' }, headers: {} }, res);
   assert(res.statusCode === 200 || res.statusCode === 503, 'admin health endpoint executes and returns status code');
   assert(['configured', 'not_connected'].includes(res.body?.billing), 'admin health reports whether billing is configured without inventing a ready state');
+  assert(Array.isArray(res.body?.degradedReasons), 'admin health includes machine-readable degraded reasons');
+  assert(!JSON.stringify(res.body).match(/(?:secret|password|token|key|postgres(?:ql)?):?\s*[^,}]+/i), 'admin health does not expose credentials or connection details');
 }
 
 console.log('\n============================================================');

@@ -8,6 +8,7 @@ import {
   generatePaymentRejectedEmail
 } from '../src/services/EmailTemplates.js';
 import { INSTAPAY_CONFIG } from '../src/config/PlanConfig.js';
+import { applyCors } from './_cors.js';
 
 const VALID_PLANS = ['free', 'pro', 'premium', 'premium_group'];
 const VALID_STATUSES = ['active', 'canceling', 'expired', 'grace', 'keep_it_live'];
@@ -86,9 +87,7 @@ async function writeAuditLog(adminClient, adminUserId, targetUserId, action, pre
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const action = req.query.action || (req.method === 'GET' ? 'overview' : 'me');
@@ -108,10 +107,17 @@ export default async function handler(req, res) {
     const monitoring = Boolean(process.env.SENTRY_AUTH_TOKEN || process.env.VITE_SENTRY_DSN);
     const coreHealthy = database === 'connected' && storage === 'connected';
     const launchReady = coreHealthy && billing && email && monitoring;
+    const degradedReasons = [];
+    if (database !== 'connected') degradedReasons.push('database_not_configured');
+    if (storage !== 'connected') degradedReasons.push('storage_not_configured');
+    if (!billing) degradedReasons.push('billing_not_configured');
+    if (!email) degradedReasons.push('email_not_configured');
+    if (!monitoring) degradedReasons.push('monitoring_not_configured');
     return res.status(coreHealthy ? 200 : 503).json({
       status: launchReady ? 'HEALTHY' : coreHealthy ? 'DEGRADED' : 'UNHEALTHY',
       launchReady, api: 'connected', database, storage, billing: billing ? 'configured' : 'not_connected',
       email: email ? 'configured' : 'not_connected', monitoring: monitoring ? 'connected' : 'not_connected',
+      degradedReasons,
       timestamp: new Date().toISOString()
     });
   }
