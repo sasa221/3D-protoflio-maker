@@ -239,6 +239,7 @@ export function generatePortfolioCSS(colors) {
       position: relative;
       box-sizing: border-box;
       width: 100%;
+      scroll-margin-top: 82px;
     }
 
     /* Hero Section Specifics */
@@ -428,6 +429,26 @@ export function generatePortfolioCSS(colors) {
       background: rgba(255, 255, 255, 0.03);
     }
 
+    .project-img-placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 6px;
+      background: radial-gradient(circle at 30% 20%, rgba(124,58,237,0.35), transparent 55%), linear-gradient(135deg, rgba(6,182,212,0.18), rgba(12,12,28,0.92));
+      color: rgba(255,255,255,0.72);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 0.68rem;
+      font-weight: 800;
+    }
+
+    .project-placeholder-icon {
+      font-size: 2rem;
+      line-height: 1;
+      filter: drop-shadow(0 0 14px rgba(124,58,237,0.7));
+    }
+
     .project-img-wrap img {
       width: 100%;
       height: 100%;
@@ -472,6 +493,37 @@ export function generatePortfolioCSS(colors) {
       display: flex;
       gap: 10px;
       margin-top: auto;
+      flex-wrap: wrap;
+    }
+
+    .project-links .btn {
+      flex: 1 1 130px;
+      min-height: 42px;
+      white-space: nowrap;
+    }
+
+    .project-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: -2px 0 12px;
+      color: rgba(255,255,255,0.58);
+      font-size: 0.75rem;
+    }
+
+    .project-role { color: var(--secondary); font-weight: 700; }
+
+    .project-result {
+      margin: 0 0 16px;
+      padding: 9px 12px;
+      border-left: 2px solid var(--secondary);
+      border-radius: 0 10px 10px 0;
+      background: rgba(6,182,212,0.08);
+      color: rgba(255,255,255,0.82);
+      font-size: 0.8rem;
+      line-height: 1.5;
     }
 
     /* Skills Section Grid */
@@ -485,6 +537,28 @@ export function generatePortfolioCSS(colors) {
     .skill-card {
       padding: 18px 22px;
       border-radius: 18px;
+    }
+
+    .skill-group-card { padding: 18px 20px; }
+    .skill-group-title {
+      margin: 0 0 12px;
+      color: #fff;
+      font-size: 0.85rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .skill-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .skill-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 5px 11px;
+      border-radius: 999px;
+      color: rgba(255,255,255,0.92);
+      background: rgba(124,58,237,0.14);
+      border: 1px solid rgba(124,58,237,0.34);
+      font-size: 0.8rem;
+      line-height: 1.2;
     }
 
     .skill-header {
@@ -1000,6 +1074,10 @@ export function generatePortfolioCSS(colors) {
     @media (max-width: 768px) {
       .navbar-links { display: none !important; }
       .mobile-menu-btn { display: flex !important; }
+      /* The exported document defaults to desktop device mode for the Studio preview.
+         Viewport media queries must still win on a real narrow public page. */
+      [data-device="desktop"] .navbar-links { display: none !important; }
+      [data-device="desktop"] .mobile-menu-btn { display: flex !important; }
       .portfolio-navbar {
         padding: 0 14px;
         padding-top: env(safe-area-inset-top, 0px);
@@ -1085,6 +1163,9 @@ export function generatePortfolioCSS(colors) {
       .project-card, .glass-card {
         padding: 18px;
       }
+      .project-links .btn { flex-basis: 100%; }
+      .project-meta { align-items: flex-start; flex-direction: column; gap: 4px; }
+      .portfolio-section { scroll-margin-top: 68px; }
     }
 
     /* ─── VIEW MODE SWITCHER & RECRUITER STYLES ─── */
@@ -1448,7 +1529,7 @@ export function generatePortfolioHTMLBody(portfolioData, theme, options = {}) {
             </div>
 
             <div class="hero-actions">
-              ${hasProjects ? `<a href="#sec-projects" class="btn btn-primary">Explore Projects ↓</a>` : `<a href="#sec-contact" class="btn btn-primary">Get In Touch</a>`}
+              ${hasProjects ? `<a href="#sec-projects" class="btn btn-primary">Explore Projects ↓</a>` : ''}
               ${hasValidResume ? `<a href="${escapeHTML(resumeURL)}" download="${escapeHTML(portfolioData.resume.fileName || 'Resume.pdf')}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary resume-btn">📄 ${escapeHTML(portfolioData.resume.buttonText || 'Download Resume')}</a>` : ''}
               <a href="#sec-contact" class="btn btn-secondary">Get In Touch</a>
             </div>
@@ -1634,22 +1715,24 @@ function renderProjectsHTML(projects, primary, secondary) {
   }
   return projects.map((p, i) => `
     <div class="glass-card project-card">
-      ${p.image ? `
+      ${safeImageSrc(p.image) ? `
         <div class="project-img-wrap">
         <img src="${escapeHTML(safeImageSrc(p.image))}" alt="${escapeHTML(p.name || 'Project image')}" loading="lazy" decoding="async" />
         </div>
       ` : `
-        <div class="project-img-wrap" style="display:flex;align-items:center;justify-content:center;font-size:2.5rem;opacity:0.4">🚀</div>
+        <div class="project-img-wrap project-img-placeholder" role="img" aria-label="Project preview unavailable"><span class="project-placeholder-icon">✦</span><span>Project preview</span></div>
       `}
       <div class="project-header">
         <span class="project-badge">PROJECT 0${i + 1}</span>
         ${p.tech ? `<span class="project-tech">${escapeHTML(p.tech)}</span>` : ''}
       </div>
       <div class="project-name">${escapeHTML(p.name || 'Project Name')}</div>
+      ${(() => { const dates = [p.startDate, p.endDate].filter(Boolean).map(value => escapeHTML(value)).join(' — '); return (p.role || dates) ? `<div class="project-meta">${p.role ? `<span class="project-role">${escapeHTML(p.role)}</span>` : '<span></span>'}${dates ? `<span>${dates}</span>` : ''}</div>` : ''; })()}
       <div class="project-desc">${escapeHTML(p.description || '')}</div>
+      ${(p.result || p.outcome) ? `<p class="project-result"><strong>Impact:</strong> ${escapeHTML(p.result || p.outcome)}</p>` : ''}
       <div class="project-links">
-        ${safeExternalHref(p.github) ? `<a href="${escapeHTML(safeExternalHref(p.github))}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="padding: 7px 14px; font-size: 0.78rem;">💻 GitHub</a>` : ''}
-        ${safeExternalHref(p.url) ? `<a href="${escapeHTML(safeExternalHref(p.url))}" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="padding: 7px 16px; font-size: 0.78rem; margin-left: auto;">🌐 Live Demo →</a>` : ''}
+        ${safeExternalHref(p.github) ? `<a href="${escapeHTML(safeExternalHref(p.github))}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary project-link-btn" style="padding: 7px 14px; font-size: 0.78rem;">💻 GitHub</a>` : ''}
+        ${safeExternalHref(p.url) ? `<a href="${escapeHTML(safeExternalHref(p.url))}" target="_blank" rel="noopener noreferrer" class="btn btn-primary project-link-btn" style="padding: 7px 16px; font-size: 0.78rem;">🌐 View website ↗</a>` : ''}
       </div>
       <button class="btn btn-cinema-trigger" onclick="openProjectCinema(${i})" style="width:100%;margin-top:12px;padding:9px 16px;font-size:0.8rem;background:linear-gradient(135deg,rgba(124,58,237,0.22),rgba(6,182,212,0.22));border:1px solid rgba(124,58,237,0.45);color:#fff;border-radius:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all 0.25s">
         🎬 View Case Study →
@@ -1662,12 +1745,22 @@ function renderSkillsHTML(skills) {
   if (!skills || skills.length === 0) {
     return '<div class="glass-card" style="padding: 24px; text-align: center; color: rgba(255,255,255,0.6);">No skills added yet.</div>';
   }
-  return skills.map(s => `
-      <div class="glass-card skill-card skill-pill-card" style="padding: 12px 18px; display: flex; align-items: center; justify-content: space-between;">
-        <span style="font-weight: 700; font-size: 0.9rem; color: #fff;">${escapeHTML(s.name || 'Skill')}</span>
-        ${s.category ? `<span style="font-size: 0.7rem; color: #7c3aed; background: rgba(124,58,237,0.15); border: 1px solid rgba(124,58,237,0.3); border-radius: 12px; padding: 2px 10px; font-weight: 700;">${escapeHTML(s.category)}</span>` : '<span style="font-size: 0.75rem; color: rgba(255,255,255,0.5);">✦ Skill</span>'}
-      </div>
-    `).join('');
+  const groups = new Map();
+  skills.forEach((rawSkill) => {
+    const skill = typeof rawSkill === 'string' ? { name: rawSkill } : (rawSkill || {});
+    const name = String(skill.name || skill.text || '').trim();
+    if (!name) return;
+    const category = String(skill.category || 'Skills').trim() || 'Skills';
+    if (!groups.has(category)) groups.set(category, []);
+    groups.get(category).push(name);
+  });
+  if (groups.size === 0) return '<div class="glass-card" style="padding: 24px; text-align: center; color: rgba(255,255,255,0.6);">No skills added yet.</div>';
+  return Array.from(groups.entries()).map(([category, names]) => `
+    <div class="glass-card skill-card skill-group-card">
+      <h3 class="skill-group-title">${escapeHTML(category)}</h3>
+      <div class="skill-chips">${names.map(name => `<span class="skill-chip">${escapeHTML(name)}</span>`).join('')}</div>
+    </div>
+  `).join('');
 }
 
 function generateVolunteeringHTML(volList) {

@@ -1398,12 +1398,14 @@ html:has(.admin-forbidden) {
 .ats-entry-header { display:flex; justify-content:space-between; gap:18px; align-items:baseline; }
 .ats-entry-header strong { font-size: 13px; }
 .ats-entry-header span { white-space:nowrap; font-size:11px; color:#475569; }
+.ats-contact { overflow-wrap:anywhere; line-height:1.5; }
+.ats-entry-header a { color:#075985; font-size:11px; font-weight:700; text-decoration:underline; white-space:nowrap; }
 .ats-entry-meta { font-size:11.5px; font-weight:600; color:#334155; margin-top:2px; }
 .ats-entry p { margin:3px 0 0; white-space:pre-wrap; }
 .ats-entry a, .ats-contact a { color:#075985; text-decoration:underline; }
 .ats-entry-bullets { margin:4px 0 0; padding-left:18px; }
 .ats-entry-bullets li { margin:2px 0; }
-@media (max-width: 560px) { .cv-skill-row { grid-template-columns: 1fr 30px; } .cv-skill-row select, .cv-skill-row input { grid-column:1; } .cv-skill-row button { grid-column:2; grid-row:1 / span 2; } .ats-entry-header { gap:8px; flex-wrap:wrap; } }
+@media (max-width: 560px) { .cv-skill-row { grid-template-columns: 1fr 30px; } .cv-skill-row select, .cv-skill-row input { grid-column:1; } .cv-skill-row button { grid-column:2; grid-row:1 / span 2; } .ats-entry-header { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 8px; align-items:baseline; } .ats-entry-header strong { grid-column:1; } .ats-entry-header a { grid-column:1; white-space:normal; } .ats-entry-header span { grid-column:2; grid-row:1 / span 2; text-align:right; } }
 .career-studio-preview small { display: block; max-width: 700px; margin: 10px auto 0; color: #4b5563; }
 .ats-empty-preview { min-height: 220px; display: grid; place-content: center; gap: 8px; padding: 28px; text-align: center; color: #64748b; border: 1px dashed #cbd5e1; border-radius: 12px; background: rgba(248,250,252,.72); }
 .ats-empty-preview strong { color: #334155; font-size: 1rem; }

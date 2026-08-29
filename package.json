@@ -33,6 +33,7 @@
     "test:cv-quality": "node src/tests/CVQualityScoreServiceTestSuite.mjs",
     "test:pr7a-browser": "node scripts/test_local_pr7a_browser.mjs",
     "test:product-polish": "node scripts/product_polish_smoke.mjs",
+    "test:public-polish": "node src/tests/PublicPortfolioPolishTestSuite.mjs",
     "preview": "vite preview",
     "test:core": "node scripts/core-tests.mjs && npm run test:cv-import && npm run test:cv-quality && npm run test:contact-persistence",
     "check": "npm run test:core && npm run build:local"
