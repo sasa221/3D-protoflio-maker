@@ -17,6 +17,18 @@ Measured locally from the production build with fresh browser contexts at 390×8
 
 The local measurement script records transfer size, elapsed navigation, overflow, and whether deferred runtimes were fetched. Home and Pricing fetched no HyperEngine, PDF worker, or PDF extractor assets on both viewports. No overflow was observed.
 
+Latest run (mobile uses 4× CPU plus 150 ms/1.6 Mbps network emulation; desktop is unthrottled):
+
+| Route | Mobile transfer / elapsed | Desktop transfer / elapsed |
+| --- | ---: | ---: |
+| Home | 105 KB / 3.58 s | 105 KB / 1.12 s |
+| Pricing | 86 KB / 2.26 s | 86 KB / 1.08 s |
+| CV route (feature-off auth shell) | 15 KB / 5.06 s | 17 KB / 1.06 s |
+| Studio (unauthenticated shell) | 15 KB / 4.62 s | 17 KB / 1.05 s |
+| Public unknown slug | 200 KB / 2.84 s | 200 KB / 1.04 s |
+
+The CV and Studio rows are unauthenticated safety-shell measurements; a staging run with a real synthetic account and published portfolio fixture is still required before public launch.
+
 Run again with:
 
 ```text

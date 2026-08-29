@@ -9,6 +9,17 @@ try {
   for (const viewport of [{ name: 'mobile', width: 390, height: 844 }, { name: 'desktop', width: 1440, height: 900 }]) {
     for (const route of ['/', '/pricing', '/cv/new', '/studio', '/u/unknown']) {
       const page = await browser.newPage({ viewport, serviceWorkers: 'block' });
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: viewport.name === 'mobile' ? 4 : 1 });
+      if (viewport.name === 'mobile') {
+        await cdp.send('Network.enable');
+        await cdp.send('Network.emulateNetworkConditions', {
+          offline: false,
+          latency: 150,
+          downloadThroughput: Math.round((1.6 * 1024 * 1024) / 8),
+          uploadThroughput: Math.round((750 * 1024) / 8)
+        });
+      }
       const started = Date.now();
       await page.goto(`http://127.0.0.1:${port}${route}`, { waitUntil: 'networkidle' });
       const metrics = await page.evaluate(() => {
