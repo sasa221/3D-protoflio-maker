@@ -26,6 +26,18 @@ assert.equal(studentChecklist.breakdown.find(item => item.id === 'stage-focus').
 assert.equal(studentChecklist.breakdown.some(item => /full-time|experience/i.test(item.reason) && item.id !== 'stage-focus'), false, 'student score does not add a full-time experience penalty');
 assert.match(getCVStageGuidance('student').message, /Education.*Projects.*Training.*Skills/i);
 
+const structuredImportedStudent = {
+  careerStage: 'student',
+  content: {
+    contact: { name: 'Imported Student', email: 'imported@example.test' },
+    summary: 'Computer science student with a reviewed imported profile and verified academic details.',
+    education: [{ institution: 'Helwan University', degree: 'Bachelor, Computer Science and Artificial Intelligence', endDate: '2027', grade: '3.35' }],
+    projects: [{ name: 'Portfolio project' }],
+    skills: [{ text: 'JavaScript', category: 'Programming & Tools' }]
+  }
+};
+assert.equal(buildCVQualityChecklist(structuredImportedStudent).breakdown.find(item => item.id === 'stage-focus').earned, 20, 'structured imported education is counted whenever Preview can render it');
+
 const professional = {
   careerStage: 'professional',
   content: {

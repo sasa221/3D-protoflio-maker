@@ -22,7 +22,8 @@ export const EMPTY_CAREER_CONTENT = Object.freeze({
   certifications: [],
   languages: [],
   training: [],
-  activities: []
+  activities: [],
+  links: []
 });
 
 const memoryStore = new Map();

@@ -5,6 +5,7 @@
  */
 
 import { normalizeCVText } from './CVTextNormalizer.js';
+import { extractQrLinkFromPdfPage } from './QRLinkExtractor.js';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
@@ -45,8 +46,12 @@ export async function extractTextFromPDF(file, { maxPages = 12, maxTextLength = 
         const annotations = await page.getAnnotations().catch(() => []);
         annotations.forEach(annotation => {
           const url = String(annotation?.url || annotation?.unsafeUrl || '').trim();
-          if (/^https:\/\//i.test(url) && !embeddedLinks.includes(url)) embeddedLinks.push(url);
+          // Contact labels in a PDF can hide their real mailto:/tel: target
+          // in an annotation. Preserve them for the review just like https.
+          if (/^(?:https?:\/\/|mailto:|tel:)/i.test(url) && !embeddedLinks.includes(url)) embeddedLinks.push(url);
         });
+        const qrLink = await extractQrLinkFromPdfPage(page);
+        if (qrLink && !embeddedLinks.includes(qrLink)) embeddedLinks.push(qrLink);
         const textContent = await page.getTextContent();
 
         // Reconstruct line breaks using item Y positions

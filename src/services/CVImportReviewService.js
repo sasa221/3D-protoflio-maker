@@ -1,13 +1,23 @@
 import { unzipSync } from 'fflate';
+import { extractQrLinksFromDocxEntries } from './QRLinkExtractor.js';
 
 export const CV_IMPORT_LIMITS = Object.freeze({ maxBytes: 10 * 1024 * 1024, maxPages: 12, maxTextLength: 120000, maxDocxXmlLength: 6000000 });
 const SECTION_NAMES = ['summary', 'experience', 'education', 'skills', 'projects', 'certifications', 'languages', 'training', 'activities'];
-const SECTION_RE = /^(summary|profile|about me|professional summary|objectives?|experience|work experience|professional experience|international experience|relevant experience|additional experience|research experience|employment|career history|education|academic background|qualifications|academics|skills|skills\s*&\s*languages|technical skills|core skills|tools(?:\s*&\s*technologies)?|technologies|competencies|projects|selected projects|featured projects|certifications|certificates|licenses|courses|languages|foreign languages|training|activities|leadership\s*&\s*activities|volunteering|volunteer experience|community involvement|presentations\s*&\s*conferences|publications|professional memberships|الملخص|الملخص المهني|نبذة شخصية|الهدف المهني|الخبرة|الخبرات|الخبرات العملية|التعليم|المؤهلات|المؤهلات العلمية|المهارات|المهارات التقنية|المشاريع|المشروعات|الشهادات|الدورات|اللغات|التدريب|الأنشطة|الانشطة|العمل التطوعي|التواصل|بيانات التواصل|التفاصيل)\s*:??$/i;
+const SECTION_RE = /^(summary|profile|about me|professional summary|objectives?|experience|work experience|professional experience|international experience|relevant experience|additional experience|research experience|employment|career history|education|academic background|qualifications|academics|skills|skills\s*&\s*languages|technical skills|core skills|tools(?:\s*&\s*technologies)?|technologies|competencies|projects|selected projects|featured projects|certifications|certificates|licenses|courses|languages|foreign languages|training|activities|leadership\s*&\s*activities|volunteering|volunteer experience|community involvement|presentations\s*&\s*conferences|publications|professional memberships|الملخص|الملخص المهني|نبذة شخصية|نبذة مهنية|الهدف المهني|الخبرة|الخبرات|الخبرات العملية|التعليم|المؤهلات|المؤهلات العلمية|المهارات|المهارات التقنية|المشاريع|المشروعات|الشهادات|الدورات|اللغات|التدريب|الأنشطة|الانشطة|العمل التطوعي|التواصل|بيانات التواصل|التفاصيل)\s*:??$/i;
 const INLINE_SECTION_RE = /^(professional summary|about me|objectives?|work experience|professional experience|career history|academic background|technical skills|core skills|tools\s*&\s*technologies|selected projects|featured projects|volunteer experience|community involvement|summary|profile|experience|employment|education|qualifications|academics|skills|technologies|competencies|projects|certifications|certificates|licenses|courses|languages|training|activities|volunteering)\s*(?::|\s{2,})\s*(.+)$/i;
 const UPPER_INLINE_SECTION_RE = /^(PROFESSIONAL SUMMARY|OBJECTIVES?|WORK EXPERIENCE|PROFESSIONAL EXPERIENCE|INTERNATIONAL EXPERIENCE|RELEVANT EXPERIENCE|ADDITIONAL EXPERIENCE|RESEARCH EXPERIENCE|CAREER HISTORY|ACADEMIC BACKGROUND|TECHNICAL SKILLS|CORE SKILLS|SKILLS & LANGUAGES|SELECTED PROJECTS|FEATURED PROJECTS|VOLUNTEER EXPERIENCE|LEADERSHIP & ACTIVITIES|SUMMARY|PROFILE|EXPERIENCE|EMPLOYMENT|EDUCATION|QUALIFICATIONS|ACADEMICS|SKILLS|PROJECTS|CERTIFICATIONS|LANGUAGES|TRAINING|ACTIVITIES|VOLUNTEERING)\s+(.+)$/;
 
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
-function clean(value, max = 2400) { return String(value || '').replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max); }
+function clean(value, max = 2400) {
+  return String(value || '')
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    // Some PDFs expose Arabic glyphs in visual rather than logical order.
+    // Repair the common visual-order spelling before the review is saved.
+    .replace(/عمالء/g, 'عملاء')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max);
+}
 // Word/PDF exports often use a pipe as a visual column separator. Treat it as
 // structure during import so it never leaks into the saved CV or rendered PDF.
 function splitSourceLine(value) {
@@ -31,7 +41,7 @@ function keyFor(value) { return String(value || '').toLowerCase().replace(/[^a-z
 function isHeading(line) { return SECTION_RE.test(cleanLine(line)); }
 function sectionKey(line) {
   const lower = cleanLine(line).toLowerCase();
-  if (/summary|profile|about|objective|ملخص|نبذة|هدف مهني/.test(lower)) return 'summary';
+  if (/summary|profile|about|objective|ملخص|نبذة/.test(lower)) return 'summary';
   if (/experience|employment|career history|خبر/.test(lower)) return 'experience';
   if (/education|academic|qualification|تعليم|مؤهل/.test(lower)) return 'education';
   if (/skill|tools|technolog|competenc|مهار/.test(lower)) return 'skills';
@@ -53,7 +63,7 @@ function normalizeWebLink(value) {
 
 function parseDateRange(value) {
   const text = clean(value, 180);
-  const match = text.match(new RegExp(`(${MONTH_YEAR_RE.source}|\\b\\d{4}\\b)\\s*(?:-|–|—|to|until)\\s*(${MONTH_YEAR_RE.source}|\\b\\d{4}\\b|present|current)`, 'i'));
+  const match = text.match(new RegExp(`(${DATE_TOKEN_RE.source})\\s*(?:-|–|—|to|until)\\s*(${DATE_TOKEN_RE.source}|present|current|now)`, 'i'));
   if (!match) return { startDate: '', endDate: '' };
   return { startDate: clean(match[1]), endDate: clean(match[2]) };
 }
@@ -83,6 +93,20 @@ function normalizeSkillCategory(value = '') {
   if (/language/.test(lower)) return 'Languages';
   return clean(value) || 'Programming & Tools';
 }
+function repairPdfSkill(value = '') {
+  let text = clean(value).replace(/^[.·]+\s*/, '');
+  // PDF glyph order in mixed RTL/LTR documents can split common technical
+  // tokens. Repair only unambiguous, well-known forms; never invent a skill.
+  text = text.replace(/^B\s+B\s+Sales$/i, 'B2B Sales')
+    .replace(/^Next\s+js$/i, 'Next.js')
+    .replace(/^Node\s+js$/i, 'Node.js')
+    .replace(/^Primavera\s+P$/i, 'Primavera P6');
+  if (/^2CRM$/i.test(text)) return 'CRM';
+  if (/^2000SAP$/i.test(text)) return 'SAP2000';
+  if (/^4GA$/i.test(text)) return 'GA4';
+  if (/^6EVM$/i.test(text)) return 'EVM';
+  return text;
+}
 function parseExperienceEntry(lines = []) {
   const source = lines.flatMap(normalizedSourceLines).map(value => clean(value)).filter(Boolean);
   const normalizedSource = source.map(value => value.replace(/^[•▪◦\-*]+\s*/, '').trim());
@@ -90,16 +114,21 @@ function parseExperienceEntry(lines = []) {
   const dateLine = dateIndex >= 0 ? normalizedSource[dateIndex] : '';
   const dates = parseDateRange(dateLine);
   const before = normalizedSource.slice(0, dateIndex >= 0 ? dateIndex : normalizedSource.length);
-  const roleLine = before.find(line => /(?:developer|engineer|designer|analyst|trainee|intern|manager|specialist|consultant|coordinator|member|lead)/i.test(line)) || before[0] || '';
-  const dateStart = dateLine.search(new RegExp(`(?:${MONTH_YEAR_RE.source}|\\b\\d{4}\\b)`, 'i'));
-  const rolePrefix = dateStart >= 0 ? dateLine.slice(0, dateStart) : '';
-  const role = clean(rolePrefix || roleLine).replace(/[,:|\-]+$/, '').trim();
-  const headerLine = before.find(line => /\s+(?:-|–|—)\s+/.test(line)) || (before.length > 1 ? before.at(-1) : before[0] || '');
-  const organizationSource = headerLine || before.find(line => line !== role) || '';
-  const orgParts = organizationSource.replace(/[–—]/g, '|').split(/\||\s+-\s+|(?<=[a-z])-(?=[A-Z]{2,}\b)/).map(value => clean(value)).filter(Boolean);
-  const headerStartsWithRole = orgParts.length > 1 && /developer|engineer|analyst|trainee|intern|manager|designer|specialist|consultant/i.test(orgParts[0]);
-  const organization = orgParts.length > 1 && !headerStartsWithRole ? orgParts[0] : (orgParts.slice(1).join(' - ') || organizationSource);
-  const organizationShort = orgParts.length > 1 && !headerStartsWithRole ? orgParts.slice(1).join(' - ') : '';
+  const roleLine = before.find(line => /(?:developer|engineer|designer|analyst|trainee|intern|manager|specialist|consultant|coordinator|member|lead|مهندس|محاسب|مدير|محلل|منسق|أخصائي)/i.test(line)) || before[0] || '';
+  const dateStart = dateLine.search(new RegExp(DATE_TOKEN_RE.source, 'i'));
+  const rawHeaderPrefix = clean(dateStart >= 0 ? dateLine.slice(0, dateStart) : roleLine).replace(/[,:|\-]+$/, '').trim();
+  // Dates are sometimes on their own line (or arrive as "21/2021" after
+  // extraction). Do not turn that numeric fragment into a job title.
+  const headerPrefix = /[\p{L}]/u.test(rawHeaderPrefix) ? rawHeaderPrefix : roleLine;
+  const headerParts = headerPrefix.split(/\s*\|\s*|\s+[–—]\s+|\s+-\s+/).map(value => clean(value)).filter(Boolean);
+  const roleAppearsOnDateLine = before.length > 0 && /[\p{L}]/u.test(rawHeaderPrefix);
+  const organizationLine = roleAppearsOnDateLine ? before.at(-1) : '';
+  const organizationParts = organizationLine.split(/\s*\|\s*|\s+[–—]\s+|\s+-\s+/).map(value => clean(value)).filter(Boolean);
+  const role = roleAppearsOnDateLine ? headerPrefix : (headerParts[0] || headerPrefix || roleLine);
+  const organization = roleAppearsOnDateLine
+    ? (organizationParts[0] || organizationLine)
+    : (headerParts.slice(1).join(' - ') || before.find(line => line !== role && !parseDateRange(line).startDate) || '');
+  const organizationShort = roleAppearsOnDateLine ? organizationParts.slice(1).join(' - ') : organization;
   const detailStart = dateIndex >= 0 ? dateIndex + 1 : 1;
   const details = source.slice(detailStart);
   const bullets = bulletLines(details);
@@ -120,7 +149,7 @@ function structuredEntry(kind, raw, links = []) {
   const bullets = bulletLines(detailsLines);
   const details = detailsLines.filter(line => !/^[•▪◦\-*]/.test(line)).join(' ');
   if (kind === 'projects') {
-    const rawUrl = text.match(/(?:https?:\/\/|www\.)[^\s|)]+/i)?.[0] || (/view\s+(?:my\s+)?(?:website|project)/i.test(text) ? links.find(link => /^https?:\/\//i.test(link)) : '') || '';
+    const rawUrl = text.match(/(?:https?:\/\/|www\.)[^\s|)]+/i)?.[0] || (/(?:view\s+(?:my\s+)?(?:website|project)|عرض\s+(?:المشروع|الموقع))/i.test(text) ? (links.find(link => /(?:[?&](?:src=)?project=|[?&]src=project)/i.test(link)) || links.find(link => /^https?:\/\//i.test(link))) : '') || '';
     const url = /^https?:\/\//i.test(normalizeWebLink(rawUrl)) ? normalizeWebLink(rawUrl) : '';
     const datedSource = dateLine || first;
     const dateMatch = datedSource.match(new RegExp(`(${MONTH_YEAR_RE.source}|\\b\\d{4}\\b)`, 'i'));
@@ -160,7 +189,8 @@ function structuredEntry(kind, raw, links = []) {
 }
 
 const MONTH_YEAR_RE = /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{4}\b/i;
-const DATE_RANGE_RE = new RegExp(`${MONTH_YEAR_RE.source}\\s*(?:-|–|—|to)\\s*(?:${MONTH_YEAR_RE.source}|present|current)`, 'i');
+const DATE_TOKEN_RE = /(?:\b(?:19|20)\d{2}(?:[./-](?:0?[1-9]|1[0-2]))?\b|\b(?:0?[1-9]|1[0-2])[./-](?:19|20)\d{2}\b|\b(?:19|20)\d{2}\b|(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{4})/i;
+const DATE_RANGE_RE = new RegExp(`${DATE_TOKEN_RE.source}\\s*(?:-|–|—|to|until)\\s*(?:${DATE_TOKEN_RE.source}|present|current|now)`, 'i');
 
 function joinWrappedLines(lines = []) {
   return lines.reduce((out, raw) => {
@@ -231,7 +261,7 @@ function groupResumeEntryLines(lines = [], kind) {
   return source.map(line => [line]);
 }
 
-function extractDocxText(buffer) {
+async function extractDocxText(buffer) {
   const bytes = new Uint8Array(buffer);
   if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) throw new Error('The DOCX file is not a valid ZIP document.');
   let entries;
@@ -245,17 +275,30 @@ function extractDocxText(buffer) {
     documentName,
     ...names.filter(name => /^word\/footer\d+\.xml$/i.test(name))
   ];
+  const relationshipTargets = new Map();
+  names.filter(name => name.endsWith('.rels')).forEach(name => {
+    const relationships = new TextDecoder().decode(entries[name]);
+    for (const match of relationships.matchAll(/<Relationship\b[^>]*\bId="([^"]+)"[^>]*\bTarget="([^"]+)"[^>]*\bTargetMode="External"[^>]*\/?\s*>/gi)) {
+      relationshipTargets.set(match[1], decodeXml(match[2]));
+    }
+  });
+  const embeddedLinkDetails = [];
   const extractPart = name => {
     const xml = new TextDecoder().decode(entries[name]);
     if (xml.length > CV_IMPORT_LIMITS.maxDocxXmlLength) throw new Error('The DOCX document body exceeds the local size limit.');
+    for (const match of xml.matchAll(/<w:hyperlink\b[^>]*\br:id="([^"]+)"[^>]*>([\s\S]*?)<\/w:hyperlink>/gi)) {
+      const target = relationshipTargets.get(match[1]);
+      const text = [...match[2].matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t\s*>/gi)].map(value => decodeXml(value[1])).join('');
+      if (target && /^(?:https?:\/\/|mailto:|tel:)/i.test(target) && !embeddedLinkDetails.some(link => link.target === target && link.text === text)) embeddedLinkDetails.push({ text: clean(text, 240), target });
+    }
     const textOnlyXml = xml.replace(/<w:tab\s*\/?\s*>/gi, '\t').replace(/<\/w:p\s*>/gi, '\n');
     return textOnlyXml.split('\n').map(paragraph => [...paragraph.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t\s*>/gi)].map(match => decodeXml(match[1])).join('')).map(cleanLine).filter(Boolean).join('\n');
   };
-  const embeddedLinks = names.filter(name => name.endsWith('.rels')).flatMap(name => {
-    const relationships = new TextDecoder().decode(entries[name]);
-    return [...relationships.matchAll(/<Relationship\b[^>]*\bTarget="([^"]+)"[^>]*\bTargetMode="External"[^>]*\/?\s*>/gi)].map(match => decodeXml(match[1]));
-  }).filter((link, index, links) => /^(?:https?:\/\/|mailto:|tel:)/i.test(link) && links.indexOf(link) === index);
-  return { text: contentNames.map(extractPart).filter(Boolean).join('\n'), embeddedLinks };
+  const text = contentNames.map(extractPart).filter(Boolean).join('\n');
+  const qrLinks = await extractQrLinksFromDocxEntries(entries, names);
+  qrLinks.forEach(target => embeddedLinkDetails.push({ text: 'QR code', target, source: 'qr' }));
+  const embeddedLinks = [...relationshipTargets.values(), ...qrLinks].filter((link, index, links) => /^(?:https?:\/\/|mailto:|tel:)/i.test(link) && links.indexOf(link) === index);
+  return { text, embeddedLinks, embeddedLinkDetails };
 }
 
 export function validateImportFile(file) {
@@ -272,7 +315,7 @@ export function validateImportFile(file) {
 export async function extractImportText(file, { onProgress } = {}) {
   const meta = validateImportFile(file);
   onProgress?.({ stage: 'reading', percent: 15, label: 'Reading locally…' });
-  let text; let embeddedLinks = [];
+  let text; let embeddedLinks = []; let embeddedLinkDetails = [];
   if (meta.format === 'pdf') {
     onProgress?.({ stage: 'pdf', percent: 45, label: 'Extracting PDF text locally…' });
     // Load the browser-only PDF.js worker lazily so local Node tests can
@@ -283,18 +326,19 @@ export async function extractImportText(file, { onProgress } = {}) {
     embeddedLinks = Array.isArray(extractedPdf.embeddedLinks) ? extractedPdf.embeddedLinks : [];
   } else {
     onProgress?.({ stage: 'docx', percent: 45, label: 'Extracting DOCX text locally…' });
-    const extractedDocx = extractDocxText(await file.arrayBuffer());
+    const extractedDocx = await extractDocxText(await file.arrayBuffer());
     text = extractedDocx.text;
     embeddedLinks = extractedDocx.embeddedLinks;
+    embeddedLinkDetails = extractedDocx.embeddedLinkDetails;
   }
   const normalized = String(text || '').replace(/\r/g, '').split('\n').map(cleanLine).filter(Boolean).join('\n');
   if (normalized.length < 20) throw new Error('The file contains too little readable text.');
   if (normalized.length > CV_IMPORT_LIMITS.maxTextLength) throw new Error('Extracted text exceeds the local character limit.');
   onProgress?.({ stage: 'review', percent: 100, label: 'Ready for field-by-field review.' });
-  return { ...meta, text: normalized, embeddedLinks };
+  return { ...meta, text: normalized, embeddedLinks, embeddedLinkDetails };
 }
 
-export function buildImportReview(text, { format = 'text', fileName = '', embeddedLinks = [] } = {}) {
+export function buildImportReview(text, { format = 'text', fileName = '', embeddedLinks = [], embeddedLinkDetails = [] } = {}) {
   const repairedText = format === 'pdf' ? repairPdfArtifacts(text) : String(text || '');
   const lines = repairedText.split('\n').flatMap(normalizedSourceLines).filter(Boolean).flatMap(line => {
     const match = line.match(INLINE_SECTION_RE) || line.match(UPPER_INLINE_SECTION_RE);
@@ -306,9 +350,11 @@ export function buildImportReview(text, { format = 'text', fileName = '', embedd
   const header = lines.slice(0, firstSection);
   const documentText = `${lines.join(' ')} ${embeddedLinks.join(' ')}`;
   const documentParts = lines.flatMap(line => line.split(/\s*\|\s*/)).map(part => clean(part)).filter(Boolean);
-  const email = lines.join(' ').match(/[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0] || embeddedLinks.find(link => /^mailto:/i.test(link))?.replace(/^mailto:/i, '').split('?')[0] || '';
+  const preferredEmailLink = embeddedLinkDetails.find(link => /preferred\s+contact|contact\s+preferred|التواصل\s+المفضل/i.test(link.text || '') && /^mailto:/i.test(link.target))?.target
+    || (/preferred\s+contact|contact\s+preferred|التواصل\s+المفضل/i.test(lines.join(' ')) ? embeddedLinks.find(link => /^mailto:/i.test(link)) : '');
+  const email = preferredEmailLink?.replace(/^mailto:/i, '').split('?')[0] || lines.join(' ').match(/[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0] || embeddedLinks.find(link => /^mailto:/i.test(link))?.replace(/^mailto:/i, '').split('?')[0] || '';
   const phone = lines.join(' ').match(/\+\d{1,3}[\s-]?(?:\(?\d{2,4}\)?[\s-]?)\d{3,4}[\s-]?\d{3,4}/)?.[0] || embeddedLinks.find(link => /^tel:/i.test(link))?.replace(/^tel:/i, '') || lines.join(' ').match(/(?:\(?\d{2,4}\)?[\s-]?)\d{3,4}[\s-]?\d{3,4}/)?.[0] || '';
-  const links = documentText.match(/(?:https?:\/\/|www\.|(?:linkedin|github)\.com\/)[^\s|]+/gi) || [];
+  const links = [...(documentText.match(/(?:https?:\/\/|www\.|(?:linkedin|github)\.com\/)[^\s|]+/gi) || []), ...embeddedLinks];
   const nameCandidate = header.map(line => clean(line.replace(/\s+(?:linkedin\s+)?portfolio\s*$/i, ''))).find(line => !/@/.test(line) && !/\+?\d[\d\s()-]{7,}/.test(line) && !/(?:https?:\/\/|www\.|(?:linkedin|github)\.com\/)/i.test(line) && !/synthetic test cv|not a real person/i.test(line) && !/^CVX?-\d+/i.test(line) && !/^page\s+\d+$/i.test(line) && !/^(?:view|open|visit|email|call|schedule|download)\b/i.test(line) && !/^(?:website|linkedin|github|portfolio|certificate|project link)(?:\s*[|·-]\s*(?:website|linkedin|github|portfolio|certificate|project link))*$/i.test(line) && !/^(resume|cv|curriculum vitae)$/i.test(line)) || '';
   const name = clean(nameCandidate, 160);
   const location = documentParts.find(part => part.length <= 70 && !/[.!?]$/.test(part) && /^[\p{L}.' -]+,\s*[\p{L}.' -]+$/u.test(part) && !/@/.test(part)) || '';
@@ -325,10 +371,19 @@ export function buildImportReview(text, { format = 'text', fileName = '', embedd
     sections[heading.key].push(...lines.slice(heading.index + 1, end).map(value => clean(value)).filter(Boolean));
   });
   const projectLinks = embeddedLinks.map(normalizeWebLink).filter(link => /^https?:\/\//i.test(link) && !/linkedin\.com|github\.com/i.test(link));
+  const websiteLink = normalizeWebLink(
+    embeddedLinkDetails.find(link => /(?:website|portfolio|site|موقع|بورتفوليو)/i.test(link.text || '') && /^https?:\/\//i.test(link.target))?.target
+    || projectLinks.find(link => !/(?:[?&](?:src=)?project=|[?&]src=project)/i.test(link))
+    || ''
+  );
   const groupedProjectLines = groupResumeEntryLines(sections.projects, 'projects');
   const groupedProjects = groupedProjectLines.map((value, index) => {
     const group = [...value];
-    if (group.some(line => /view\s+(?:my\s+)?website|view\s+project/i.test(line)) && projectLinks[index]) group.push(projectLinks[index]);
+    const groupText = group.join(' ');
+    const linkedTarget = embeddedLinkDetails.find(link => link.text && groupText.includes(link.text) && /^https?:\/\//i.test(link.target))?.target;
+    const projectTarget = projectLinks.find(link => /(?:[?&](?:src=)?project=|[?&]src=project)/i.test(link));
+    if (linkedTarget) group.push(linkedTarget);
+    else if (group.some(line => /(?:view\s+(?:my\s+)?website|view\s+project|عرض\s+(?:المشروع|الموقع))/i.test(line)) && (projectTarget || projectLinks[index])) group.push(projectTarget || projectLinks[index]);
     return group;
   });
   const reviewItem = (value, kind, links = []) => ({ ...field(Array.isArray(value) ? value.join('\n') : value), parsed: structuredEntry(kind, value, links), confidence: Array.isArray(value) && value.length > 1 ? 'medium' : 'high' });
@@ -339,10 +394,10 @@ export function buildImportReview(text, { format = 'text', fileName = '', embedd
     else if (currentSkillGroup) currentSkillGroup.text += ` ${clean(value)}`;
     else { currentSkillGroup = { category: 'Programming & Tools', text: value }; skillGroups.push(currentSkillGroup); }
   });
-  const skillItems = skillGroups.flatMap(group => group.text.split(/[,;|•·]/).map(item => ({ value: clean(item).replace(/[.,;]+$/, ''), category: group.category })).filter(item => item.value)).map(item => ({ ...field(item.value), parsed: { text: item.value, name: item.value, category: item.category } }));
+  const skillItems = skillGroups.flatMap(group => group.text.split(/[,;|•·]/).map(item => ({ value: repairPdfSkill(clean(item).replace(/[.,;]+$/, '')), category: group.category })).filter(item => item.value)).map(item => ({ ...field(item.value), parsed: { text: item.value, name: item.value, category: item.category } }));
   const review = {
     source: { format, fileName: clean(fileName, 160) },
-    contact: { name: field(name), email: field(email), phone: field(phone), location: field(location), linkedin: field(normalizeWebLink(links.find(link => /linkedin\.com/i.test(link)) || '')), github: field(normalizeWebLink(links.find(link => /github\.com/i.test(link)) || '')) },
+    contact: { name: field(name), email: field(email), phone: field(phone), location: field(location), linkedin: field(normalizeWebLink(links.find(link => /linkedin\.com/i.test(link)) || '')), github: field(normalizeWebLink(links.find(link => /github\.com/i.test(link)) || '')), website: field(websiteLink) },
     summary: field(sections.summary.join(' ')),
     experience: groupResumeEntryLines(sections.experience, 'experience').map(value => reviewItem(value, 'experience')), education: groupResumeEntryLines(sections.education, 'education').map(value => reviewItem(value, 'education')), skills: skillItems,
     projects: groupedProjects.map(value => reviewItem(value, 'projects', projectLinks)), certifications: groupResumeEntryLines(sections.certifications, 'certifications').map(value => reviewItem(value, 'certifications')), languages: sections.languages.map(value => ({ ...field(value), parsed: { name: value } })), training: groupResumeEntryLines(sections.training, 'training').map(value => reviewItem(value, 'training')), activities: groupResumeEntryLines(sections.activities, 'activities').map(value => {
@@ -356,6 +411,7 @@ export function buildImportReview(text, { format = 'text', fileName = '', embedd
       if (recoveredStart >= 0) item.parsed.bullets = bulletLines(recoveredLines.slice(recoveredStart));
       return item;
     }),
+    links: [...new Map([...embeddedLinkDetails, ...embeddedLinks.map(target => ({ text: '', target }))].filter(link => /^https?:\/\//i.test(link.target)).map(link => [normalizeWebLink(link.target), { ...field(link.text || normalizeWebLink(link.target)), parsed: { name: clean(link.text || 'Website', 120), url: normalizeWebLink(link.target) } }])).values()],
     warnings: []
   };
   if (!name) review.warnings.push('Name was not clearly identified.');
@@ -425,7 +481,7 @@ export function applyImportSelection(profile, review, selection, { overwriteExis
   next.content = { ...(next.content || {}) };
   next.content.contact = { ...(next.content.contact || {}) };
   const changedFields = []; const skippedFields = [];
-  const scalarFields = ['name', 'email', 'phone', 'location', 'linkedin', 'github'];
+  const scalarFields = ['name', 'email', 'phone', 'location', 'linkedin', 'github', 'website'];
   for (const key of scalarFields) {
     const value = selectedValue(selection?.contact?.[key]);
     if (!value) continue;
@@ -439,7 +495,7 @@ export function applyImportSelection(profile, review, selection, { overwriteExis
     if (next.content.summary && !overwriteExisting) skippedFields.push('summary');
     else { next.content.summary = summary; changedFields.push('summary'); }
   }
-  for (const key of ['experience', 'education', 'skills', 'projects', 'certifications', 'languages', 'training', 'activities']) {
+  for (const key of ['experience', 'education', 'skills', 'projects', 'certifications', 'languages', 'training', 'activities', 'links']) {
     const selected = (selection?.[key] || []).map(selectedItem).filter(Boolean);
     const values = selected.map(value => typeof value === 'object' ? value : clean(value)).filter(Boolean);
     if (!values.length) continue;

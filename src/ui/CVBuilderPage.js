@@ -101,6 +101,7 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
           <label>Location<input name="location" value="${escape(active.content.contact.location)}"></label>
           <label>LinkedIn URL<input name="linkedin" type="url" value="${escape(active.content.contact.linkedin)}" placeholder="https://linkedin.com/in/you"></label>
           <label>GitHub URL<input name="github" type="url" value="${escape(active.content.contact.github)}" placeholder="https://github.com/you"></label>
+          <label>Website / portfolio URL<input name="website" type="url" value="${escape(active.content.contact.website || '')}" placeholder="https://your-site.com"></label>
           <label>Professional summary<textarea name="summary" rows="5" placeholder="Write only what is true about your experience.">${escape(active.content.summary)}</textarea></label>
           ${renderSkillsSection(active.content.skills)}
           ${renderCollection('education', active.content.education)}
@@ -134,6 +135,7 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
       location: contact.location || '',
       linkedin: contact.linkedin || '',
       github: contact.github || '',
+      website: contact.website || '',
       summary: source?.content?.summary || '',
       skills: '', experience: ''
     };
@@ -156,7 +158,7 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
       return row;
     }).filter(row => Object.values(row).some(value => Array.isArray(value) ? value.length : value));
     const skills = Array.from(form.querySelectorAll('[data-skill-row]')).map(row => ({ text: row.querySelector('[data-skill-name]')?.value.trim() || '', category: row.querySelector('[data-skill-category]')?.value || '' })).filter(item => item.text);
-    return { ...active, careerStage: data.get('careerStage'), content: { ...active.content, contact: { ...active.content.contact, name: data.get('name') || '', email: data.get('email') || '', phone: data.get('phone') || '', location: data.get('location') || '', linkedin: data.get('linkedin') || '', github: data.get('github') || '' }, summary: data.get('summary') || '', skills, education: entries('education'), projects: entries('projects'), training: entries('training'), experience: entries('experience'), certifications: entries('certifications'), activities: entries('activities') } };
+    return { ...active, careerStage: data.get('careerStage'), content: { ...active.content, contact: { ...active.content.contact, name: data.get('name') || '', email: data.get('email') || '', phone: data.get('phone') || '', location: data.get('location') || '', linkedin: data.get('linkedin') || '', github: data.get('github') || '', website: data.get('website') || '' }, summary: data.get('summary') || '', skills, education: entries('education'), projects: entries('projects'), training: entries('training'), experience: entries('experience'), certifications: entries('certifications'), activities: entries('activities') } };
   };
   const updatePreview = () => {
     const next = collect();

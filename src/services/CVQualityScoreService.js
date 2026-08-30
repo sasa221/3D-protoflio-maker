@@ -9,7 +9,10 @@ function text(value) {
 
 function list(content, key) {
   return Array.isArray(content?.[key])
-    ? content[key].map(item => text(typeof item === 'string' ? item : item?.text || item?.name || item?.title || item?.description)).filter(Boolean)
+    // Import produces structured entries (for example education has
+    // institution + degree rather than a legacy `text` field). Quality must
+    // assess the same data the Preview renders, not an older shape only.
+    ? content[key].map(item => text(typeof item === 'string' ? item : [item?.text, item?.name, item?.title, item?.role, item?.institution, item?.degree, item?.organization, item?.description, item?.details].filter(Boolean).join(' '))).filter(Boolean)
     : [];
 }
 

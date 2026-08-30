@@ -112,10 +112,11 @@ function normalizedContent(profile = {}) {
     certifications: itemsToLines(content.certifications),
     languages: itemsToLines(content.languages),
     training: itemsToLines(content.training),
-    activities: itemsToLines(content.activities)
+    activities: itemsToLines(content.activities),
+    links: itemsToLines(content.links)
   };
   const entries = Object.fromEntries(Object.entries(sections).map(([key, lines]) => [key,
-    ['experience', 'education', 'projects', 'training', 'certifications', 'activities'].includes(key)
+    ['experience', 'education', 'projects', 'training', 'certifications', 'activities', 'links'].includes(key)
       ? structured(key).map(itemEntry).filter(Boolean)
       : key === 'skills'
         ? (() => {
@@ -133,8 +134,8 @@ function normalizedContent(profile = {}) {
   ]));
   const student = profile.careerStage === 'student';
   const order = student
-    ? ['summary', 'education', 'projects', 'training', 'experience', 'skills', 'certifications', 'languages', 'activities']
-    : ['summary', 'experience', 'projects', 'education', 'skills', 'certifications', 'languages', 'training', 'activities'];
+    ? ['summary', 'education', 'projects', 'training', 'experience', 'skills', 'certifications', 'languages', 'activities', 'links']
+    : ['summary', 'experience', 'projects', 'education', 'skills', 'certifications', 'languages', 'training', 'activities', 'links'];
   return { name: safeText(contact.name) || 'My CV', contactLines, contact: { email: safeText(contact.email), phone: safeText(contact.phone), location: safeText(contact.location), github, linkedin, website }, sections, entries, order };
 }
 
