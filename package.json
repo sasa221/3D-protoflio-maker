@@ -24,7 +24,7 @@
     "test:cv-variants-api": "node src/tests/CVTargetedVariantApiContractTestSuite.mjs",
     "test:cv-variants-local": "node scripts/test_local_cv_targeted_variants_api.mjs",
     "test:cv-import": "node src/tests/CVImportReviewServiceTestSuite.mjs",
-    "test:cv-real-import": "node src/tests/CVRealImportRegressionTestSuite.mjs",
+    "test:cv-real-import": "node src/tests/CVRealImportRegressionTestSuite.mjs && node src/tests/CVRealPdfImportRegressionTestSuite.mjs",
     "test:cv-structured": "node src/tests/CVStructuredImportTestSuite.mjs",
     "test:seo": "node src/tests/SEOContractTestSuite.mjs && node scripts/test_local_seo_browser.mjs",
     "test:cors": "node src/tests/CorsPolicyTestSuite.mjs && node src/tests/ServerlessConsolidationTestSuite.mjs",

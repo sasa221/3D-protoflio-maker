@@ -7,7 +7,13 @@ function safeText(value = '') {
   return String(value)
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
     .replace(/<\/?[a-z][^>]*>/gi, '')
+    // Imported column separators are structure, never visible CV content.
+    .replace(/\s*\|\s*/g, ' ')
     .trim();
+}
+
+function detailSegments(value) {
+  return String(value || '').split(/\s*\|\s*/).map(safeText).filter(Boolean);
 }
 
 function safeUrl(value, kind = 'web') {
@@ -45,7 +51,7 @@ function itemText(item) {
   const details = safeText(item.details || item.description || '');
   const bullets = Array.isArray(item.bullets) ? item.bullets.map(safeText).filter(Boolean).join(' • ') : '';
   const link = safeUrl(item.websiteUrl || item.url || '', 'web');
-  return [title, organization, field, dates, details, bullets, link].filter(Boolean).join(' | ');
+  return [title, organization, field, dates, details, bullets, link].filter(Boolean).join(' · ');
 }
 
 function itemEntry(item) {
@@ -55,13 +61,15 @@ function itemEntry(item) {
   const organization = safeText(item.organization || item.institution || item.provider || item.company || '');
   const shortOrganization = safeText(item.organizationShort || '');
   const bullets = Array.isArray(item.bullets) ? item.bullets.map(safeText).filter(Boolean) : (Array.isArray(item.achievements) ? item.achievements.map(safeText).filter(Boolean) : []);
-  const rawDetails = safeText(item.details || item.description || item.text || '');
+  const rawDetails = item.details || item.description || item.text || '';
+  const detailParts = detailSegments(rawDetails);
+  const normalizedBullets = bullets.length ? bullets : (detailParts.length > 1 ? detailParts : []);
   return {
     title: item.role ? (shortOrganization ? `${shortOrganization} — ${role}` : role) : safeText(item.name || item.degree || item.title || ''),
-    meta: [item.role && shortOrganization ? organization : organization, safeText(item.field || ''), item.role && !shortOrganization && item.title && item.title !== role ? safeText(item.title) : ''].filter(Boolean).join(' · '),
+    meta: [organization, safeText(item.field || ''), item.role && !shortOrganization && item.title && item.title !== role && item.title !== organization ? safeText(item.title) : ''].filter(Boolean).join(' · '),
     dates: [safeText(item.startDate || ''), safeText(item.endDate || '')].filter(Boolean).join(' – '),
-    details: bullets.length ? '' : rawDetails,
-    bullets,
+    details: normalizedBullets.length ? '' : safeText(rawDetails),
+    bullets: normalizedBullets,
     url: safeUrl(item.websiteUrl || item.url || '', 'web')
   };
 }
@@ -232,7 +240,9 @@ export async function exportCareerProfilePdf(profile) {
           bulletLines.forEach((line, index) => drawLines([`${index === 0 ? '• ' : '  '}${line}`], regular, bodySize, bodyLineHeight));
         }
       }
-      if (entry.url) drawLines(wrapLine(entry.url, regular, 9, width), regular, 9, 11);
+      // Keep the project URL represented by the adjacent "View website >"
+      // affordance above; printing the raw URL again below the bullets makes
+      // imported projects look duplicated and breaks the compact hierarchy.
       y -= 4;
     }
     y -= sectionGap;

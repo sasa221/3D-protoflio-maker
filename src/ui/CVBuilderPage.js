@@ -236,9 +236,21 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
         const row = document.createElement('article'); row.className = 'ats-entry';
         if (entry.title || entry.dates) {
           const header = document.createElement('div'); header.className = 'ats-entry-header';
+          const headerMain = document.createElement('div'); headerMain.className = 'ats-entry-header-main';
           const title = document.createElement('strong'); title.textContent = entry.title;
           const dates = document.createElement('span'); dates.textContent = entry.dates;
-          header.append(title); if (entry.url) { const projectLink = document.createElement('a'); projectLink.href = entry.url; projectLink.target = '_blank'; projectLink.rel = 'noopener noreferrer'; projectLink.textContent = ' · View website ↗'; header.append(projectLink); } header.append(dates); row.append(header);
+          headerMain.append(title);
+          if (entry.url) {
+            const projectLink = document.createElement('a');
+            projectLink.href = entry.url;
+            projectLink.target = '_blank';
+            projectLink.rel = 'noopener noreferrer';
+            projectLink.textContent = ' · View website ↗';
+            projectLink.setAttribute('aria-label', `View website for ${entry.title || 'project'}`);
+            headerMain.append(projectLink);
+          }
+          header.append(headerMain, dates);
+          row.append(header);
         }
         if (entry.meta) { const meta = document.createElement('div'); meta.className = 'ats-entry-meta'; meta.textContent = entry.meta; row.append(meta); }
         if (entry.details) { const details = document.createElement('p'); details.textContent = entry.details; row.append(details); }
