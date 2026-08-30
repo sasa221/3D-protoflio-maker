@@ -224,7 +224,7 @@ export async function exportCareerProfilePdf(profile) {
           page.drawText(entry.title, { x: margin, y, size: bodySize, font: bold, color: rgb(0.08, 0.1, 0.14), maxWidth: entry.url ? width * 0.52 : width * 0.72 });
           // Standard WinAnsi fonts cannot encode the Unicode northeast arrow;
           // keep the link affordance ASCII so real imported project URLs export.
-          if (entry.url) page.drawText(' · View website >', { x: margin + bold.widthOfTextAtSize(entry.title, bodySize), y, size: 9.5, font: regular, color: rgb(0.02, 0.45, 0.62), maxWidth: width * 0.4 });
+          if (entry.url) page.drawText(' · View website >', { x: margin + bold.widthOfTextAtSize(entry.title, bodySize), y, size: 8.8, font: regular, color: rgb(0.30, 0.36, 0.44), maxWidth: width * 0.4 });
         }
         if (entry.dates) {
           const dateWidth = regular.widthOfTextAtSize(entry.dates, 9.5);
