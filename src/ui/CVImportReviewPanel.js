@@ -5,7 +5,7 @@ import {
   applyImportSelection,
   releaseImportSession
 } from '../services/CVImportReviewService.js';
-import { saveCareerProfile } from '../services/CareerProfileService.js';
+import { saveCareerProfile, persistCareerProfile } from '../services/CareerProfileService.js';
 
 const escape = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
 
@@ -51,9 +51,13 @@ export function renderCVImportReviewPanel(container, { ownerUserId = 'local-dev-
       view.querySelector('[data-import-select-all]').addEventListener('click', () => view.querySelectorAll('[data-import-select]').forEach(input => { input.checked = true; }));
       view.querySelector('[data-import-clear-all]').addEventListener('click', () => view.querySelectorAll('[data-import-select]').forEach(input => { input.checked = false; }));
       view.querySelector('[data-import-cancel]').addEventListener('click', close);
-      view.querySelector('[data-import-save]').addEventListener('click', () => {
+      view.querySelector('[data-import-save]').addEventListener('click', async () => {
+        const saveButton = view.querySelector('[data-import-save]');
+        if (saveButton.disabled) return;
+        saveButton.disabled = true;
+        status.textContent = 'Saving imported fields…';
         const base = getBaseProfile?.();
-        if (!base?.id) { status.textContent = 'Base CV is unavailable; nothing was saved.'; return; }
+        if (!base?.id) { status.textContent = 'Base CV is unavailable; nothing was saved.'; saveButton.disabled = false; return; }
         const nextSelection = createImportSelection(review);
         view.querySelectorAll('[data-import-field]').forEach(input => {
           const path = input.dataset.importField.split('.'); const key = path[0];
@@ -69,12 +73,20 @@ export function renderCVImportReviewPanel(container, { ownerUserId = 'local-dev-
         });
         view.querySelectorAll('[data-import-select]').forEach(input => { const path = input.dataset.importSelect.split('.'); const key = path[0]; if (path.length === 2 && /^\d+$/.test(path[1])) nextSelection[key][Number(path[1])].selected = input.checked; else if (key === 'contact') nextSelection.contact[path[1]].selected = input.checked; else nextSelection[key].selected = input.checked; });
         const result = applyImportSelection(base, review, nextSelection, { overwriteExisting: view.querySelector('[data-import-overwrite]').checked });
-        if (!result.changedFields.length) { status.textContent = 'No fields selected or existing values were preserved. Nothing changed.'; return; }
+        if (!result.changedFields.length) { status.textContent = 'No fields selected or existing values were preserved. Nothing changed.'; saveButton.disabled = false; return; }
         let saved;
         try {
-          saved = saveCareerProfile(result.profile, ownerUserId);
+          // This flow awaits the remote write below. Suppress the usual
+          // fire-and-forget save here so two competing upserts cannot let a
+          // newly opened browser context hydrate an older CV snapshot.
+          saved = saveCareerProfile(result.profile, ownerUserId, { persist: false });
+          // Wait for the authoritative Supabase write before navigating away.
+          // Without this barrier, the next browser context could hydrate the
+          // old row while the current tab still displayed its local cache.
+          await persistCareerProfile(saved, ownerUserId);
         } catch (error) {
           status.textContent = error?.message || 'The selected fields could not be saved.';
+          saveButton.disabled = false;
           return;
         }
         releaseImportSession(session); session = { review: null, file: null }; overlay.remove(); onSaved?.(saved, result);

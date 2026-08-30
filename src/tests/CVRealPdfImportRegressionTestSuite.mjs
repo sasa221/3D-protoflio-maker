@@ -44,6 +44,9 @@ const base = { id: 'real-saleh-fixture', careerStage: 'student', content: { cont
 const profile = applyImportSelection(base, review, selection, { overwriteExisting: true }).profile;
 const model = buildCVExportModel(profile);
 
+assert.equal(review.education[0]?.parsed?.grade, '3.35', 'real PDF GPA is extracted as a structured education field');
+assert.equal(profile.content.education[0]?.grade, '3.35', 'GPA survives Review selection and Save mapping');
+
 const skills = model.sections.find(section => section.id === 'skills');
 assert.equal(skills.entries.length, 4, 'real PDF keeps four skill categories');
 assert.equal(skills.entries.filter(entry => entry.title === 'Data Analysis').length, 1);
@@ -53,6 +56,8 @@ assert.equal(skills.entries.some(entry => /Data Analysis:|Interpersonal Skills:/
 const experience = model.sections.find(section => section.id === 'experience');
 assert.equal(experience.entries.length, 2);
 assert.ok(experience.entries.every(entry => entry.title && entry.meta && entry.dates && entry.bullets.length >= 3), 'experience has separate role, organization, dates and bullets');
+const education = model.sections.find(section => section.id === 'education');
+assert.equal(education.entries[0]?.grade, '3.35', 'GPA survives the export model after reload-shaped profile data');
 
 const projects = model.sections.find(section => section.id === 'projects');
 assert.equal(projects.entries.length, 3);
@@ -89,6 +94,15 @@ for (let pageNumber = 1; pageNumber <= exportedPdf.numPages; pageNumber += 1) {
 assert.equal(exportedText.includes('|'), false, 'exported PDF contains no pipe delimiters');
 assert.match(exportedText, /Programming & Tools/);
 assert.match(exportedText, /Power BI/);
+assert.match(exportedText, /GPA:\s*3\.35/, 'exported PDF keeps the real GPA');
 assert.match(exportedText, /Web developer Trainee/);
 assert.match(exportedText, /View website/);
+
+const noGradeModel = buildCVExportModel({ id: 'no-grade-fixture', careerStage: 'student', content: { contact: { name: 'No GPA' }, education: [{ institution: 'Example University', degree: 'Bachelor' }] } });
+assert.equal(noGradeModel.sections.find(section => section.id === 'education')?.entries[0]?.grade, '', 'missing GPA stays absent rather than rendering an empty line');
+const { bytes: noGradeBytes } = await exportCareerProfilePdf({ id: 'no-grade-fixture', careerStage: 'student', content: { contact: { name: 'No GPA' }, education: [{ institution: 'Example University', degree: 'Bachelor' }] } });
+const noGradePdf = await pdfjs.getDocument({ data: noGradeBytes, useWorkerFetch: false, disableWorker: true }).promise;
+let noGradeText = '';
+for (let pageNumber = 1; pageNumber <= noGradePdf.numPages; pageNumber += 1) noGradeText += (await (await noGradePdf.getPage(pageNumber)).getTextContent()).items.map(item => item.str).join(' ');
+assert.equal(/GPA\s*:/.test(noGradeText), false, 'PDF does not render an empty GPA line when GPA is absent');
 console.log('CVRealPdfImportRegressionTestSuite: real SalehResume PDF structured import, rendered model, and PDF export verified.');

@@ -205,14 +205,14 @@ export function getCareerProfile(profileId, ownerUserId = 'local-dev-user') {
   return listCareerProfiles(ownerUserId).find(profile => profile.id === profileId) || null;
 }
 
-export function saveCareerProfile(profile, ownerUserId = profile?.ownerUserId) {
+export function saveCareerProfile(profile, ownerUserId = profile?.ownerUserId, { persist = true } = {}) {
   const normalized = normalizeCareerProfile(profile, ownerUserId);
   const profiles = readProfiles(normalized.ownerUserId);
   const index = profiles.findIndex(item => item.id === normalized.id);
   if (index === -1) profiles.push(normalized);
   else profiles[index] = normalized;
   writeProfiles(normalized.ownerUserId, profiles);
-  if (isBrowserUser(normalized.ownerUserId)) {
+  if (persist && isBrowserUser(normalized.ownerUserId)) {
     // Keep the UI responsive while making the server write authoritative. The
     // caller can await persistCareerProfile when it needs an explicit result.
     persistCareerProfile(normalized, normalized.ownerUserId).catch(error => {

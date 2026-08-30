@@ -69,6 +69,12 @@ function bulletLines(lines = []) {
     return out;
   }, []);
 }
+function extractGrade(lines = []) {
+  const index = lines.findIndex(line => /(?:^|[\s•▪◦\-*])(?:gpa|grade)\s*(?::|[-–—])?\s*\d(?:[\d.,/ -]*\d)?\s*$/i.test(String(line || '').trim()));
+  if (index < 0) return { index: -1, value: '' };
+  const match = String(lines[index]).match(/(?:^|[\s•▪◦\-*])(?:gpa|grade)\s*(?::|[-–—])?\s*(\d(?:[\d.,/ -]*\d)?)/i);
+  return { index, value: clean(match?.[1] || '') };
+}
 function normalizeSkillCategory(value = '') {
   const lower = clean(value).toLowerCase();
   if (/programming|tools|technical skills|technologies/.test(lower)) return 'Programming & Tools';
@@ -133,9 +139,10 @@ function structuredEntry(kind, raw, links = []) {
     const degreeLine = dateLine || lines.find(line => line !== institution && !/^[•▪◦\-*]/.test(line)) || '';
     const range = parseDateRange(degreeLine);
     const degree = clean(degreeLine.replace(range.startDate ? new RegExp(`${MONTH_YEAR_RE.source}\\s*(?:-|–|—|to)\\s*(?:${MONTH_YEAR_RE.source}|present|current)`, 'i') : /$^/, '').replace(/^[,\s-]+|[,\s-]+$/g, ''));
-    const remaining = lines.filter(line => line !== institution && line !== degreeLine);
+    const grade = extractGrade(lines);
+    const remaining = lines.filter((line, index) => line !== institution && line !== degreeLine && index !== grade.index);
     const educationBullets = bulletLines(remaining);
-    return { institution, degree, field: '', startDate: range.startDate, endDate: range.endDate, details: educationBullets.length ? '' : remaining.join(' '), bullets: educationBullets };
+    return { institution, degree, field: '', startDate: range.startDate, endDate: range.endDate, grade: grade.value, details: educationBullets.length ? '' : remaining.join(' '), bullets: educationBullets };
   }
   if (kind === 'training') return { name: first, provider: second, startDate: dates.startDate, endDate: dates.endDate, details, bullets };
   if (kind === 'certifications') return { name: first.replace(/^[•▪◦\-*]+\s*/, ''), title: first.replace(/^[•▪◦\-*]+\s*/, ''), issuer: second, date: dateLine, details: bullets.length ? '' : details, bullets };

@@ -13,6 +13,7 @@ const origin = `http://127.0.0.1:${process.env.LOCAL_BROWSER_PORT || 5174}`;
 const screenshotDir = path.join(root, 'output', 'local-real-import');
 const desktopScreenshot = path.join(screenshotDir, 'cv-preview-after-real-import-desktop.png');
 const mobileScreenshot = path.join(screenshotDir, 'cv-preview-after-real-import-mobile.png');
+const educationScreenshot = path.join(screenshotDir, 'cv-education-after-real-import-desktop.png');
 
 const localUrl = process.env.SUPABASE_LOCAL_URL || 'http://127.0.0.1:54321';
 const anonKey = process.env.SUPABASE_LOCAL_ANON_KEY;
@@ -70,12 +71,15 @@ const assertRendered = async page => {
     const skillArticles = [...(skillBody?.querySelectorAll('article') || [])];
     const skillTitles = skillArticles.map(article => article.querySelector('strong')?.textContent?.trim()).filter(Boolean);
     const dataAnalysis = skillArticles.find(article => article.querySelector('strong')?.textContent?.trim() === 'Data Analysis')?.innerText || '';
+    const educationHeading = [...(preview?.querySelectorAll('h3') || [])].find(node => node.textContent?.trim() === 'Education');
+    const educationText = educationHeading?.nextElementSibling?.innerText || '';
     const projectLink = [...(preview?.querySelectorAll('a') || [])].find(link => /View website/i.test(link.textContent || ''));
     const editorValues = [...document.querySelectorAll('[data-entry-field]')].map(field => field.value || '');
     return {
       previewText,
       skillTitles,
       dataAnalysis,
+      educationText,
       projectHref: projectLink?.href || '',
       projectLinkText: projectLink?.textContent || '',
       pipes: [previewText, ...editorValues].some(value => value.includes('|')),
@@ -116,7 +120,17 @@ try {
   await page.locator('[data-preview-sections]').waitFor({ state: 'visible', timeout: 15000 });
   await page.waitForTimeout(800);
   const desktopResult = await assertRendered(page);
+  assert.match(desktopResult.educationText, /GPA:\s*3\.35/, 'Desktop Preview is missing the imported GPA.');
   await page.screenshot({ path: desktopScreenshot, fullPage: true });
+  const educationHeading = page.locator('[data-preview-sections] h3', { hasText: 'Education' });
+  await educationHeading.scrollIntoViewIfNeeded();
+  const educationBox = await educationHeading.evaluate(node => {
+    const body = node.nextElementSibling;
+    const headingRect = node.getBoundingClientRect();
+    const bodyRect = body?.getBoundingClientRect();
+    return { x: Math.max(0, Math.min(headingRect.x, bodyRect?.x || headingRect.x) - 12), y: Math.max(0, headingRect.y - 12), width: Math.max(headingRect.width, bodyRect?.width || 0) + 24, height: (bodyRect ? bodyRect.bottom : headingRect.bottom) - headingRect.y + 24 };
+  });
+  await page.screenshot({ path: educationScreenshot, clip: educationBox });
 
   const downloadPromise = page.waitForEvent('download', { timeout: 15000 });
   await page.getByRole('button', { name: 'Export PDF', exact: true }).click();
@@ -134,6 +148,7 @@ try {
   assert.equal(pdfText.includes('|'), false, 'Exported PDF contains a pipe delimiter.');
   for (const category of ['Programming & Tools', 'Data Analysis', 'Interpersonal Skills', 'Languages']) assert.ok(pdfText.includes(category), `Exported PDF is missing ${category}.`);
   assert.ok(pdfText.includes('Power BI'), 'Exported PDF is missing Power BI.');
+  assert.ok(/GPA:\s*3\.35/.test(pdfText), 'Exported PDF is missing the imported GPA.');
   assert.ok(pdfText.includes('Completed one-month intensive training'), 'Exported PDF is missing imported experience bullets.');
   assert.ok(pdfText.includes('Built a fully Front-End website'), 'Exported PDF is missing imported project bullets.');
   assert.ok(pdfText.includes('View website'), 'Exported PDF is missing the project URL CTA.');
@@ -145,6 +160,7 @@ try {
   const mobileOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   assert.equal(mobileOverflow, false, 'Mobile CV preview has horizontal overflow.');
   const mobileResult = await assertRendered(page);
+  assert.match(mobileResult.educationText, /GPA:\s*3\.35/, 'Mobile Preview is missing the imported GPA.');
   await page.screenshot({ path: mobileScreenshot, fullPage: true });
 
   await context.close();
@@ -159,12 +175,17 @@ try {
   await freshPage.waitForURL(/\/cv$/, { timeout: 15000 });
   await freshPage.waitForTimeout(1400);
   const freshResult = await assertRendered(freshPage);
+  assert.match(freshResult.educationText, /GPA:\s*3\.35/, 'Fresh browser context after Login/Reload is missing the imported GPA.');
+  await freshPage.reload({ waitUntil: 'networkidle' });
+  await freshPage.waitForTimeout(1200);
+  const freshReloadResult = await assertRendered(freshPage);
+  assert.match(freshReloadResult.educationText, /GPA:\s*3\.35/, 'Fresh browser context after an explicit Reload is missing the imported GPA.');
   assert.deepEqual(freshResult.skillTitles, desktopResult.skillTitles);
   assert.equal(freshResult.projectHref, desktopResult.projectHref);
   assert.equal(freshResult.pipes, false);
   await freshContext.close();
   if (errors.length) throw new Error(`Browser console issues: ${errors.join(' | ')}`);
-  console.log(JSON.stringify({ pass: true, desktop: desktopResult, mobile: mobileResult, freshContext: freshResult, screenshots: [desktopScreenshot, mobileScreenshot], pdf: exportedPdf }));
+  console.log(JSON.stringify({ pass: true, desktop: desktopResult, mobile: mobileResult, freshContext: freshResult, freshReload: freshReloadResult, screenshots: [desktopScreenshot, mobileScreenshot, educationScreenshot], pdf: exportedPdf }));
 } finally {
   await browser.close();
   await admin.auth.admin.deleteUser(userId);

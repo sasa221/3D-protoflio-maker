@@ -54,9 +54,10 @@ function itemText(item) {
   const field = safeText(item.field || '');
   const dates = [safeText(item.startDate || ''), safeText(item.endDate || '')].filter(Boolean).join(' – ');
   const details = safeText(item.details || item.description || '');
+  const grade = safeText(item.grade || item.gpa || '').replace(/^gpa\s*[:\-]?\s*/i, '').trim();
   const bullets = bulletSegments(item.bullets || item.achievements).join(' • ');
   const link = safeUrl(item.websiteUrl || item.url || '', 'web');
-  return [title, organization, field, dates, details, bullets, link].filter(Boolean).join(' · ');
+  return [title, organization, field, dates, details, grade ? `GPA: ${grade}` : '', bullets, link].filter(Boolean).join(' · ');
 }
 
 function itemEntry(item) {
@@ -69,10 +70,12 @@ function itemEntry(item) {
   const rawDetails = item.details || item.description || item.text || '';
   const detailParts = detailSegments(rawDetails);
   const normalizedBullets = bullets.length ? bullets : (detailParts.length > 1 ? detailParts : []);
+  const grade = safeText(item.grade || item.gpa || '').replace(/^gpa\s*[:\-]?\s*/i, '').trim();
   return {
     title: item.role ? (shortOrganization ? `${shortOrganization} — ${role}` : role) : safeText(item.name || item.degree || item.title || ''),
     meta: [organization, safeText(item.field || ''), item.role && !shortOrganization && item.title && item.title !== role && item.title !== organization ? safeText(item.title) : ''].filter(Boolean).join(' · '),
     dates: [safeText(item.startDate || ''), safeText(item.endDate || '')].filter(Boolean).join(' – '),
+    grade,
     details: normalizedBullets.length ? '' : safeText(rawDetails),
     bullets: normalizedBullets,
     url: safeUrl(item.websiteUrl || item.url || '', 'web')
@@ -221,7 +224,7 @@ export async function exportCareerProfilePdf(profile) {
     page.drawLine({ start: { x: margin, y }, end: { x: margin + width, y }, thickness: 0.7, color: rgb(0.12, 0.14, 0.18) });
     y -= 12;
     for (const entry of section.entries) {
-      const estimated = bodyLineHeight * (1 + (entry.meta ? 1 : 0) + (entry.details ? Math.min(4, wrapLine(entry.details, regular, bodySize, width).length) : 0) + (entry.bullets?.length || 0));
+      const estimated = bodyLineHeight * (1 + (entry.meta ? 1 : 0) + (entry.grade ? 1 : 0) + (entry.details ? Math.min(4, wrapLine(entry.details, regular, bodySize, width).length) : 0) + (entry.bullets?.length || 0));
       ensure(Math.min(estimated + 8, A4_PAGE.height - margin * 2));
       if (entry.title || entry.dates) {
         ensure(bodyLineHeight * 2);
@@ -238,6 +241,7 @@ export async function exportCareerProfilePdf(profile) {
         y -= bodyLineHeight;
       }
       if (entry.meta) drawLines(wrapLine(entry.meta, bold, 9.5, width), bold, 9.5, 12);
+      if (entry.grade) drawLines([`GPA: ${entry.grade}`], regular, bodySize, bodyLineHeight);
       if (entry.details) drawLines(wrapLine(entry.details, regular, bodySize, width));
       if (entry.bullets?.length) {
         for (const bullet of entry.bullets) {
