@@ -64,6 +64,7 @@ const projects = model.sections.find(section => section.id === 'projects');
 assert.equal(projects.entries.length, 3);
 assert.equal(projects.entries.filter(entry => entry.url).length, 1, 'only the linked project gets a website CTA');
 assert.ok(projects.entries.every(entry => entry.bullets.length > 0));
+assert.equal(model.sections.some(section => section.id === 'links'), false, 'generic imported links never become a duplicate CV section');
 
 const certifications = model.sections.find(section => section.id === 'certifications');
 assert.equal(certifications.entries.length, 3, 'certifications remain separate');

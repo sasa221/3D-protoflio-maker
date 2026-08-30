@@ -494,7 +494,7 @@ export function applyImportSelection(profile, review, selection, { overwriteExis
     if (next.content.summary && !overwriteExisting) skippedFields.push('summary');
     else { next.content.summary = summary; changedFields.push('summary'); }
   }
-  for (const key of ['experience', 'education', 'skills', 'projects', 'certifications', 'languages', 'training', 'activities', 'links']) {
+  for (const key of ['experience', 'education', 'skills', 'projects', 'certifications', 'languages', 'training', 'activities']) {
     const selected = (selection?.[key] || []).map(selectedItem).filter(Boolean);
     const values = selected.map(value => typeof value === 'object' ? value : clean(value)).filter(Boolean);
     if (!values.length) continue;
