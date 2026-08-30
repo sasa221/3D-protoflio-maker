@@ -46,6 +46,7 @@ const model = buildCVExportModel(profile);
 
 assert.equal(review.education[0]?.parsed?.grade, '3.35', 'real PDF GPA is extracted as a structured education field');
 assert.equal(profile.content.education[0]?.grade, '3.35', 'GPA survives Review selection and Save mapping');
+assert.equal(review.contact.website.value, '', 'a project URL must not be promoted to the header website field');
 
 const skills = model.sections.find(section => section.id === 'skills');
 assert.equal(skills.entries.length, 4, 'real PDF keeps four skill categories');

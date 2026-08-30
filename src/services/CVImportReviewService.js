@@ -373,7 +373,6 @@ export function buildImportReview(text, { format = 'text', fileName = '', embedd
   const projectLinks = embeddedLinks.map(normalizeWebLink).filter(link => /^https?:\/\//i.test(link) && !/linkedin\.com|github\.com/i.test(link));
   const websiteLink = normalizeWebLink(
     embeddedLinkDetails.find(link => /(?:website|portfolio|site|موقع|بورتفوليو)/i.test(link.text || '') && /^https?:\/\//i.test(link.target))?.target
-    || projectLinks.find(link => !/(?:[?&](?:src=)?project=|[?&]src=project)/i.test(link))
     || ''
   );
   const groupedProjectLines = groupResumeEntryLines(sections.projects, 'projects');
