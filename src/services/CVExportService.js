@@ -16,6 +16,11 @@ function detailSegments(value) {
   return String(value || '').split(/\s*\|\s*/).map(safeText).filter(Boolean);
 }
 
+function bulletSegments(value) {
+  const source = Array.isArray(value) ? value : String(value || '').replace(/\s*\|\s*/g, '\n').split(/\r?\n+/);
+  return source.map(item => safeText(item).replace(/^[•▪◦\-*]\s*/, '')).filter(Boolean);
+}
+
 function safeUrl(value, kind = 'web') {
   const raw = safeText(value);
   if (!raw) return '';
@@ -49,7 +54,7 @@ function itemText(item) {
   const field = safeText(item.field || '');
   const dates = [safeText(item.startDate || ''), safeText(item.endDate || '')].filter(Boolean).join(' – ');
   const details = safeText(item.details || item.description || '');
-  const bullets = Array.isArray(item.bullets) ? item.bullets.map(safeText).filter(Boolean).join(' • ') : '';
+  const bullets = bulletSegments(item.bullets || item.achievements).join(' • ');
   const link = safeUrl(item.websiteUrl || item.url || '', 'web');
   return [title, organization, field, dates, details, bullets, link].filter(Boolean).join(' · ');
 }
@@ -60,7 +65,7 @@ function itemEntry(item) {
   const role = safeText(item.role || '');
   const organization = safeText(item.organization || item.institution || item.provider || item.company || '');
   const shortOrganization = safeText(item.organizationShort || '');
-  const bullets = Array.isArray(item.bullets) ? item.bullets.map(safeText).filter(Boolean) : (Array.isArray(item.achievements) ? item.achievements.map(safeText).filter(Boolean) : []);
+  const bullets = bulletSegments(item.bullets || item.achievements);
   const rawDetails = item.details || item.description || item.text || '';
   const detailParts = detailSegments(rawDetails);
   const normalizedBullets = bullets.length ? bullets : (detailParts.length > 1 ? detailParts : []);

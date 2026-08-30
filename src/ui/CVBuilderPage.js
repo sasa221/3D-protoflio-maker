@@ -30,6 +30,15 @@ function collectionRows(items = []) {
   return (Array.isArray(items) ? items : []).map(item => typeof item === 'string' ? { details: item } : { ...item, details: item?.details || item?.text || item?.description || '', bullets: Array.isArray(item?.bullets) ? item.bullets.join('\n') : (item?.bullets || '') });
 }
 
+function normalizeBulletInput(value = '') {
+  if (Array.isArray(value)) return value.map(item => String(item || '').trim()).filter(Boolean);
+  return String(value || '')
+    .replace(/\s*\|\s*/g, '\n')
+    .split(/\r?\n+/)
+    .map(line => line.replace(/^[•▪◦\-*]\s*/, '').trim())
+    .filter(Boolean);
+}
+
 function renderEntry(type, row = {}, index = 0) {
   const config = COLLECTIONS[type];
   return `<article class="cv-entry-card" data-entry><div class="cv-entry-card-head"><strong>${config.title} #${index + 1}</strong><button type="button" data-remove-entry>Remove</button></div><div class="cv-entry-fields">${config.fields.map(([key, label, placeholder, control]) => `<label>${label}${control === 'textarea' ? `<textarea data-entry-field="${key}" rows="3" placeholder="${placeholder}">${escape(row[key] || '')}</textarea>` : `<input data-entry-field="${key}" ${key === 'url' ? 'type="url"' : ''} value="${escape(row[key] || '')}" placeholder="${placeholder}">`}</label>`).join('')}</div></article>`;
@@ -140,7 +149,12 @@ export function renderCVBuilderPage(container, { ownerUserId = 'local-dev-user',
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => hydrateFormFields(active));
   const collect = () => {
     const data = new FormData(form);
-    const entries = type => Array.from(form.querySelectorAll(`[data-collection="${type}"] [data-entry]`)).map(card => Object.fromEntries(Array.from(card.querySelectorAll('[data-entry-field]')).map(field => [field.dataset.entryField, field.value.trim()]))).filter(row => Object.values(row).some(Boolean));
+    const entries = type => Array.from(form.querySelectorAll(`[data-collection="${type}"] [data-entry]`)).map(card => {
+      const row = Object.fromEntries(Array.from(card.querySelectorAll('[data-entry-field]')).map(field => [field.dataset.entryField, field.value.trim()]));
+      if ('bullets' in row) row.bullets = normalizeBulletInput(row.bullets);
+      if ('details' in row) row.details = String(row.details || '').replace(/\s*\|\s*/g, ' ').replace(/\s+/g, ' ').trim();
+      return row;
+    }).filter(row => Object.values(row).some(value => Array.isArray(value) ? value.length : value));
     const skills = Array.from(form.querySelectorAll('[data-skill-row]')).map(row => ({ text: row.querySelector('[data-skill-name]')?.value.trim() || '', category: row.querySelector('[data-skill-category]')?.value || '' })).filter(item => item.text);
     return { ...active, careerStage: data.get('careerStage'), content: { ...active.content, contact: { ...active.content.contact, name: data.get('name') || '', email: data.get('email') || '', phone: data.get('phone') || '', location: data.get('location') || '', linkedin: data.get('linkedin') || '', github: data.get('github') || '' }, summary: data.get('summary') || '', skills, education: entries('education'), projects: entries('projects'), training: entries('training'), experience: entries('experience'), certifications: entries('certifications'), activities: entries('activities') } };
   };

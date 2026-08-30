@@ -64,6 +64,21 @@ assert.equal(certifications.entries.length, 3, 'certifications remain separate')
 const renderedEntries = model.sections.flatMap(section => section.entries);
 assert.equal(renderedEntries.some(entry => /\|/.test(JSON.stringify(entry))), false, 'render model contains no pipe delimiters');
 
+// The editor serializes collection textareas as strings. Export must preserve
+// those line-separated bullets as structured bullet arrays as well.
+const editorShape = buildCVExportModel({
+  id: 'editor-shape-fixture',
+  careerStage: 'professional',
+  content: {
+    contact: { name: 'Editor shape' },
+    experience: [{ role: 'Trainee', organization: 'NTI', startDate: 'Sep 2025', endDate: 'Oct 2025', bullets: 'Built APIs\nWorked with SQL' }],
+    projects: [{ name: 'Linked project', startDate: 'May 2024', endDate: 'May 2024', url: 'https://example.test/project', bullets: 'Shipped the site\nImproved accessibility' }],
+    skills: [{ name: 'Power BI', category: 'Data Analysis' }]
+  }
+});
+assert.deepEqual(editorShape.sections.find(section => section.id === 'experience').entries[0].bullets, ['Built APIs', 'Worked with SQL']);
+assert.deepEqual(editorShape.sections.find(section => section.id === 'projects').entries[0].bullets, ['Shipped the site', 'Improved accessibility']);
+
 const { bytes } = await exportCareerProfilePdf(profile);
 const exportedPdf = await pdfjs.getDocument({ data: bytes, useWorkerFetch: false, disableWorker: true }).promise;
 let exportedText = '';
