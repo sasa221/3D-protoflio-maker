@@ -398,6 +398,14 @@ async function router() {
       renderAuthPage(() => { window.location.href = '/start'; });
       return;
     }
+    // Returning users should never be put back through first-portfolio setup.
+    // The CTA may originate from a public SEO page, so make the server-backed
+    // portfolio check here rather than relying on a stale landing-page session.
+    const existingPortfolio = await loadUserPortfoliosFromSupabase(startUser).catch(() => null);
+    if (existingPortfolio?.id) {
+      window.location.href = '/studio';
+      return;
+    }
     // Onboarding includes PDF parsing and the 3D preview. Keep it out of the
     // marketing/pricing/auth bundles and load it only when this route opens.
     const { renderOnboardingWizard } = await import('./ui/OnboardingWizard.js');

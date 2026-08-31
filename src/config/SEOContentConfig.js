@@ -46,7 +46,7 @@ export const SEO_CONTENT_PAGES = Object.freeze({
       ['Does recruiter view replace my portfolio?', 'No. It is a focused way to surface your key information while the full portfolio remains available for deeper exploration.']
     ],
     cta: 'Build my developer portfolio',
-    ctaHref: '/login?next=%2Fstart',
+    ctaHref: '/start',
     related: ['/cv-to-portfolio', '/3d-portfolio-maker']
   },
   '/3d-portfolio-maker': {
@@ -69,7 +69,7 @@ export const SEO_CONTENT_PAGES = Object.freeze({
       ['Can visitors find my projects quickly?', 'Yes. Project sections, recruiter view, and clear calls to action are designed to make important evidence easy to scan.']
     ],
     cta: 'Create my 3D portfolio',
-    ctaHref: '/login?next=%2Fstart',
+    ctaHref: '/start',
     related: ['/developer-portfolio-builder', '/cv-to-portfolio']
   }
 });

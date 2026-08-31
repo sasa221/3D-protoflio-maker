@@ -74,7 +74,7 @@ export async function renderOnboardingWizard(container) {
           <span style="color: ${state.step >= 3 ? '#a855f7' : 'rgba(255,255,255,0.4)'};">3. Live Preview</span>
         </div>
 
-        <a href="/login" style="color: rgba(255,255,255,0.6); font-size: 0.85rem; font-weight: 600; text-decoration:none;">Sign in</a>
+        <a href="/studio" style="color: rgba(255,255,255,0.75); font-size: 0.85rem; font-weight: 700; text-decoration:none;">Open Studio</a>
       </header>
 
       <!-- MAIN STEP CONTAINER -->
