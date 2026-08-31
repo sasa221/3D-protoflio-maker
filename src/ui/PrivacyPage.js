@@ -43,7 +43,7 @@ export function renderPrivacyPage(container) {
           <ul style="padding-left: 20px; margin-top: 8px;">
             <li><strong>Account Data:</strong> Email address, display name, and password credentials managed via Supabase Auth.</li>
             <li><strong>Portfolio Content:</strong> Resume files, career history, education, projects, skills, and custom images uploaded by you.</li>
-            <li><strong>Visitor Analytics:</strong> Aggregated, privacy-conscious page views, project opens, and resume download clicks recorded on published portfolios.</li>
+            <li><strong>Visitor Analytics:</strong> Basic page views, project opens, and resume download clicks on published portfolios.</li>
           </ul>
         </section>
 
@@ -57,20 +57,18 @@ export function renderPrivacyPage(container) {
 
         <section style="margin-bottom: 32px;">
           <h2 style="font-size: 1.3rem; font-weight: 800; color: #fff; margin-bottom: 12px;">3. Third-Party Infrastructure Processors</h2>
-          <p>We utilize trusted enterprise infrastructure providers to operate the product securely:</p>
+          <p>We currently use the following infrastructure providers to operate the product:</p>
           <ul style="padding-left: 20px; margin-top: 8px;">
-            <li><strong>Supabase:</strong> Authenticated database persistence and encrypted file storage.</li>
+            <li><strong>Supabase:</strong> Authentication, database persistence, and storage for user-provided files.</li>
             <li><strong>Vercel:</strong> Global edge website hosting and serverless API execution.</li>
-            <li><strong>Stripe:</strong> PCI-compliant billing and subscription management. Credit card details are never stored on our servers.</li>
-            <li><strong>Resend:</strong> Secure transactional password reset email delivery.</li>
-            <li><strong>Sentry:</strong> Client-side exception monitoring with automated data sanitization filters.</li>
           </ul>
+          <p>Stripe billing, Resend email delivery, and Sentry monitoring are not active on this production site at this time.</p>
         </section>
 
         <section style="margin-bottom: 32px;">
           <h2 style="font-size: 1.3rem; font-weight: 800; color: #fff; margin-bottom: 12px;">4. Account Deletion & Data Retention</h2>
           <p>
-            You retain 100% ownership of your career data. You may request account deletion at any time through Account Settings. Deletion permanently removes your portfolios, storage assets, and variants from our servers.
+            You retain ownership of your career data. You may permanently delete your account through Account Settings. The deletion flow removes your portfolios, storage assets, and variants from the application.
           </p>
         </section>
 

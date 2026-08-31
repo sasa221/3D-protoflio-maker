@@ -6,6 +6,7 @@
 
 import { PLANS, GROUP_SEAT_PRICING, GROUP_SEAT_MIN, GROUP_SEAT_MAX, KEEP_IT_LIVE, formatPrice, formatEGP } from '../config/PlanConfig.js';
 import { isFeatureEnabled } from '../config/FeatureFlags.js';
+import { PRODUCT_CONFIG } from '../config/ProductConfig.js';
 
 /**
  * Render the full pricing page into a container element.
@@ -176,7 +177,7 @@ function renderGroupCard(currentPlan) {
         <li>Individual creation cooldowns</li>
         <li>All themes included</li>
       </ul>
-      <p class="group-note">Need more than 5 seats? <a href="mailto:support@3dportfolio.app">Contact us.</a></p>
+      <p class="group-note">Need more than 5 seats? <a href="mailto:${PRODUCT_CONFIG.supportEmail}">Contact us.</a></p>
       <div class="pricing-card-cta">
         ${isCurrent
           ? '<button class="btn-plan" data-plan-select="premium_group">Manage Team</button>'

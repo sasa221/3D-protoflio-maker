@@ -8,14 +8,14 @@ export const PRODUCT_CONFIG = {
   productName: '3D Portfolio Maker',
   productTagline: 'Turn your CV into a cinematic 3D portfolio recruiters remember.',
   companyName: '3D Portfolio Technologies Inc.',
-  supportEmail: 'support@3dportfolio.app',
+  supportEmail: 'saleh2005mohamed@gmail.com',
   appDomain: 'https://portfolio-maker-murex.vercel.app',
   marketingDomain: 'https://portfolio-maker-murex.vercel.app',
   cnameTarget: 'cname.3dportfolio.app',
   version: '3.0.4',
   legal: {
     governingLaw: 'Delaware, USA',
-    lastUpdated: 'August 13, 2026'
+    lastUpdated: 'August 31, 2026'
   },
   social: {
     twitter: 'https://twitter.com/3dportfoliomaker',

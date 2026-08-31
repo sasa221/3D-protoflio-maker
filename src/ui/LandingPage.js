@@ -14,6 +14,7 @@ import { LANDING_GALLERY_FILTERS, LANDING_GALLERY_ITEMS } from '../config/Landin
 import { getThemeTier } from '../config/ThemeTierConfig.js';
 import { isFeatureEnabled } from '../config/FeatureFlags.js';
 import { getCareerEntryPaths } from '../services/CareerEntryPathService.js';
+import { PRODUCT_CONFIG } from '../config/ProductConfig.js';
 
 let demoEngine = null;
 let currentDemoThemeId = 'code';
@@ -868,7 +869,7 @@ export async function renderLandingPage(container) {
         <div style="display: flex; gap: 20px;">
           <a href="/privacy" style="color: rgba(255,255,255,0.72); min-height: 44px; display: inline-flex; align-items: center; text-decoration: none;">Privacy</a>
           <a href="/terms" style="color: rgba(255,255,255,0.72); min-height: 44px; display: inline-flex; align-items: center; text-decoration: none;">Terms</a>
-          <a href="mailto:support@3dportfolio.app" style="color: rgba(255,255,255,0.72); min-height: 44px; display: inline-flex; align-items: center; text-decoration: none;">Support</a>
+          <a href="mailto:${PRODUCT_CONFIG.supportEmail}" style="color: rgba(255,255,255,0.72); min-height: 44px; display: inline-flex; align-items: center; text-decoration: none;">Support</a>
         </div>
       </footer>
     </div>
